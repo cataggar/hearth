@@ -101,14 +101,15 @@ pub fn getIoData(self: Self) ?IoExit {
 }
 
 pub fn setCpuid(self: Self, cpuid: *Kvm.CpuidBuffer) !void {
+    if (cpuid.nent > Kvm.MAX_CPUID_ENTRIES) return error.InvalidArgument;
     try abi.ioctlVoid(self.fd, c.KVM_SET_CPUID2, @intFromPtr(cpuid));
 }
 
 /// Read back the CPUID entries currently set on this vCPU.
 /// Needed for snapshot: the guest may see filtered CPUID vs host's supported set.
 pub fn getCpuid(self: Self, cpuid: *Kvm.CpuidBuffer) !void {
+    cpuid.* = std.mem.zeroes(Kvm.CpuidBuffer);
     cpuid.nent = Kvm.MAX_CPUID_ENTRIES;
-    cpuid.padding = 0;
     try abi.ioctlVoid(self.fd, c.KVM_GET_CPUID2, @intFromPtr(cpuid));
 }
 
@@ -277,8 +278,10 @@ pub fn setMsrs(self: Self, buf: *const MsrBuffer) !void {
 
 /// Notify KVM that the guest was paused (prevents soft lockup watchdog
 /// false positives on resume). Non-fatal if the guest doesn't support kvmclock.
-pub fn kvmclockCtrl(self: Self) !void {
-    try abi.ioctlVoid(self.fd, c.KVM_KVMCLOCK_CTRL, 0);
+pub fn kvmclockCtrl(self: Self) void {
+    abi.ioctlVoid(self.fd, c.KVM_KVMCLOCK_CTRL, 0) catch |err| {
+        log.warn("KVM_KVMCLOCK_CTRL failed (non-fatal): {}", .{err});
+    };
 }
 
 pub fn getXsave(self: Self) !c.kvm_xsave {

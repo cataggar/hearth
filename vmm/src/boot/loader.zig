@@ -145,7 +145,7 @@ pub fn loadBzImage(mem: *Memory, kernel_path: [*:0]const u8, initrd_path: ?[*:0]
 
     // Load initrd if provided
     if (initrd_path) |path| {
-        try loadInitrd(bp, mem, path, kernel_size);
+        try loadInitrd(bp, mem, path, params.KERNEL_ADDR + kernel_size);
     }
 
     // Set up e820 memory map
@@ -161,7 +161,7 @@ pub fn loadBzImage(mem: *Memory, kernel_path: [*:0]const u8, initrd_path: ?[*:0]
     };
 }
 
-fn loadInitrd(bp: []u8, mem: *Memory, path: [*:0]const u8, kernel_size: usize) !void {
+fn loadInitrd(bp: []u8, mem: *Memory, path: [*:0]const u8, kernel_region_end: usize) !void {
     const initrd_data = try readFile(path);
     defer std.heap.page_allocator.free(initrd_data);
 
@@ -180,9 +180,9 @@ fn loadInitrd(bp: []u8, mem: *Memory, path: [*:0]const u8, kernel_size: usize) !
 
     const initrd_addr = (top - initrd_data.len) & ~@as(usize, 0xFFF); // page-align down
 
-    if (initrd_addr < params.KERNEL_ADDR + kernel_size) {
+    if (initrd_addr < kernel_region_end) {
         log.err("initrd too large: needs 0x{x} but only 0x{x} available", .{
-            initrd_data.len, top - (params.KERNEL_ADDR + kernel_size),
+            initrd_data.len, top - kernel_region_end,
         });
         return error.InitrdTooLarge;
     }
@@ -219,6 +219,12 @@ fn loadElfKernel(mem: *Memory, kernel_data: []const u8, initrd_path: ?[*:0]const
 
     log.info("ELF kernel: entry=0x{x}, {} program headers", .{ entry, phnum });
 
+    // ELF64 program header must be at least 56 bytes
+    if (phentsize < 56) {
+        log.err("ELF phentsize {} too small (need >= 56)", .{phentsize});
+        return error.InvalidKernel;
+    }
+
     // Load all PT_LOAD segments into guest memory
     var kernel_end: u64 = 0;
     var i: u16 = 0;
@@ -239,15 +245,21 @@ fn loadElfKernel(mem: *Memory, kernel_data: []const u8, initrd_path: ?[*:0]const
         // use virtual addresses starting at 0xffffffff81000000, physical at 0x1000000)
         const paddr: usize = blk: {
             if (p_paddr < mem.size()) break :blk @intCast(p_paddr);
-            // Try using a standard kernel text offset (16MB)
-            const PHYS_OFFSET: u64 = 0x1000000;
+            // High-half kernel virtual addresses: subtract the kernel map base
+            // e.g. 0xffffffff81000000 - 0xffffffff80000000 = 0x1000000
             if (p_paddr >= 0xffffffff80000000) {
-                const phys = p_paddr - 0xffffffff80000000 + PHYS_OFFSET;
+                const phys = p_paddr - 0xffffffff80000000;
                 if (phys < mem.size()) break :blk @intCast(phys);
             }
             log.err("PT_LOAD segment paddr 0x{x} out of guest memory bounds", .{p_paddr});
             return error.InvalidKernel;
         };
+
+        // Validate segment fits in guest memory
+        if (paddr + @as(usize, @intCast(p_memsz)) > mem.size()) {
+            log.err("PT_LOAD segment at 0x{x} + 0x{x} exceeds guest RAM (0x{x})", .{ paddr, p_memsz, mem.size() });
+            return error.InvalidKernel;
+        }
 
         if (p_filesz > 0) {
             const end = p_offset + p_filesz;
@@ -259,10 +271,8 @@ fn loadElfKernel(mem: *Memory, kernel_data: []const u8, initrd_path: ?[*:0]const
         if (p_memsz > p_filesz) {
             const bss_start = paddr + @as(usize, @intCast(p_filesz));
             const bss_size: usize = @intCast(p_memsz - p_filesz);
-            if (bss_start + bss_size <= mem.size()) {
-                const bss = try mem.slice(bss_start, bss_size);
-                @memset(bss, 0);
-            }
+            const bss = try mem.slice(bss_start, bss_size);
+            @memset(bss, 0);
         }
 
         const seg_end = paddr + @as(usize, @intCast(p_memsz));
@@ -273,9 +283,8 @@ fn loadElfKernel(mem: *Memory, kernel_data: []const u8, initrd_path: ?[*:0]const
     // Resolve entry point to physical address
     const entry_phys: u64 = blk: {
         if (entry < mem.size()) break :blk entry;
-        const PHYS_OFFSET: u64 = 0x1000000;
         if (entry >= 0xffffffff80000000) {
-            break :blk entry - 0xffffffff80000000 + PHYS_OFFSET;
+            break :blk entry - 0xffffffff80000000;
         }
         break :blk entry;
     };
@@ -312,9 +321,9 @@ fn loadElfKernel(mem: *Memory, kernel_data: []const u8, initrd_path: ?[*:0]const
     const init_size = kernel_end - @min(entry_phys, kernel_end);
     std.mem.writeInt(u32, bp[params.OFF_INIT_SIZE..][0..4], @intCast(init_size), .little);
 
-    // Load initrd if provided
+    // Load initrd if provided — use actual kernel_end to protect ELF segments
     if (initrd_path) |path| {
-        try loadInitrd(bp, mem, path, @intCast(init_size));
+        try loadInitrd(bp, mem, path, @intCast(kernel_end));
     }
 
     // Set up e820 memory map

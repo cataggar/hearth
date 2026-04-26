@@ -194,6 +194,12 @@ pub fn load(
     var mem = try Memory.initFromFile(mem_path, header.mem_size);
     errdefer mem.deinit();
     try vm.setMemoryRegion(0, 0, mem.alignedMem());
+    // If restore fails after this point, delete the KVM memory slot before
+    // mem.deinit() unmaps the backing memory — otherwise slot 0 would reference
+    // freed memory.
+    errdefer {
+        vm.deleteMemoryRegion(0) catch {};
+    }
 
     // --- Restore vCPU state FIRST (matches Firecracker's order) ---
 
@@ -241,10 +247,7 @@ pub fn load(
 
     // KVM_KVMCLOCK_CTRL: notify the host that the guest was paused.
     // Prevents soft lockup watchdog false positives on resume.
-    // Errors are non-fatal (guest may not support kvmclock).
-    vcpu.kvmclockCtrl() catch |err| {
-        log.warn("KVM_KVMCLOCK_CTRL failed (non-fatal): {}", .{err});
-    };
+    vcpu.kvmclockCtrl();
 
     // --- Read VM state from file (in file order: irqchip, PIT, clock) ---
     var irqchips: [3][Vm.IRQCHIP_SIZE]u8 = undefined;

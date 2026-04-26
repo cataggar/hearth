@@ -224,7 +224,6 @@ pub fn pollRx(self: *Self, mem: *Memory, queue: *Queue) bool {
     var did_work = false;
     for (&self.connections) |*conn| {
         if (conn.state != .established or conn.fd < 0) continue;
-        if (conn.availableForTx() == 0) continue;
 
         // Try to deliver data from this connection to the guest
         if (self.deliverRxData(mem, queue, conn)) |delivered| {
@@ -410,14 +409,13 @@ fn handleRw(self: *Self, mem: *Memory, descs: []const Queue.Desc, desc_count: us
     // Flush any pending write buffer first
     if (!conn.flushWriteBuffer()) {
         // Still blocked — stash new data in write buffer
-        var remaining: u32 = effective_payload;
         for (descs[1..desc_count]) |desc| {
-            if (remaining == 0) break;
-            const chunk_len = @min(desc.len, remaining);
+            const chunk_len = @min(desc.len, effective_payload);
+            if (chunk_len == 0) break;
             const buf = mem.slice(@intCast(desc.addr), chunk_len) catch return;
             const stashed = conn.stashWrite(buf[0..chunk_len]);
             conn.rx_cnt +%= stashed;
-            remaining -= chunk_len;
+            if (stashed < chunk_len) break; // buffer full, stop
         }
         return;
     }
@@ -444,6 +442,7 @@ fn handleRw(self: *Self, mem: *Memory, descs: []const Queue.Desc, desc_count: us
                     const unsent = buf[written..chunk_len];
                     const stashed = conn.stashWrite(unsent);
                     conn.rx_cnt +%= @intCast(written + stashed);
+                    if (stashed < unsent.len) return; // buffer full
                     // Stash remaining descriptors starting from the NEXT one
                     remaining -= chunk_len;
                     var rem_idx = desc_idx + 1;
@@ -454,7 +453,8 @@ fn handleRw(self: *Self, mem: *Memory, descs: []const Queue.Desc, desc_count: us
                         const rem_buf = mem.slice(@intCast(rem_desc.addr), rem_len) catch break;
                         const rem_stashed = conn.stashWrite(rem_buf[0..rem_len]);
                         conn.rx_cnt +%= rem_stashed;
-                        remaining -= rem_len;
+                        remaining -= rem_stashed;
+                        if (rem_stashed < rem_len) break; // buffer full
                     }
                     return;
                 }
@@ -488,7 +488,36 @@ fn handleShutdown(self: *Self, guest_port: u32, host_port: u32, flags: u32) void
 }
 
 fn deliverRxData(self: *Self, mem: *Memory, queue: *Queue, conn: *Connection) !bool {
-    // Pop an RX descriptor from the guest
+    // Check flow control before consuming any RX descriptors
+    const tx_window = conn.availableForTx();
+    if (tx_window == 0) return false;
+
+    // Poll the socket for readability before popping a descriptor
+    var pfd = [1]linux.pollfd{.{
+        .fd = conn.fd,
+        .events = linux.POLL.IN,
+        .revents = 0,
+    }};
+    const poll_rc: isize = @bitCast(linux.poll(&pfd, 1, 0));
+    if (poll_rc <= 0) return false; // not readable or error
+    if (pfd[0].revents & linux.POLL.IN == 0) {
+        // Check for HUP/ERR without consuming a descriptor
+        if (pfd[0].revents & (linux.POLL.HUP | linux.POLL.ERR) != 0) {
+            // Socket error/hangup — need a descriptor to send RST
+            const head = (try queue.popAvail(mem)) orelse return error.NoBuffers;
+            var descs: [16]Queue.Desc = undefined;
+            _ = queue.collectChain(mem, head, &descs) catch |err| {
+                queue.pushUsed(mem, head, 0) catch |e| log.warn("pushUsed failed: {}", .{e});
+                return err;
+            };
+            self.sendRstToGuest(mem, queue, head, &descs, conn);
+            self.closeConnectionPtr(conn);
+            return true;
+        }
+        return false;
+    }
+
+    // Socket is readable — now safe to pop an RX descriptor
     const head = (try queue.popAvail(mem)) orelse return error.NoBuffers;
 
     var descs: [16]Queue.Desc = undefined;
@@ -508,16 +537,9 @@ fn deliverRxData(self: *Self, mem: *Memory, queue: *Queue, conn: *Connection) !b
         data_space += desc.len;
     }
 
-    // Also respect flow control
-    const tx_window = conn.availableForTx();
-    if (tx_window == 0 and data_space > 0) {
-        // No TX window — push descriptor back unused
-        queue.pushUsed(mem, head, 0) catch |e| log.warn("pushUsed failed: {}", .{e});
-        return false;
-    }
     const max_read = @min(data_space, tx_window);
 
-    // Try to read from the host socket into data descriptors using readv
+    // Read from the host socket into data descriptors using readv
     var total_read: u32 = 0;
     const data_descs = descs[1..desc_count];
     if (max_read > 0 and data_descs.len > 0) {
@@ -542,7 +564,7 @@ fn deliverRxData(self: *Self, mem: *Memory, queue: *Queue, conn: *Connection) !b
         if (rc < 0) {
             const errno: linux.E = @enumFromInt(@as(u16, @intCast(-rc)));
             if (errno == .AGAIN) {
-                // No data available
+                // No data available (spurious poll wakeup)
                 queue.pushUsed(mem, head, 0) catch |e| log.warn("RX pushUsed failed: {}", .{e});
                 return false;
             }
@@ -561,8 +583,7 @@ fn deliverRxData(self: *Self, mem: *Memory, queue: *Queue, conn: *Connection) !b
         total_read = @intCast(rc);
     }
 
-    if (total_read == 0 and data_space > 0) {
-        // No data to deliver
+    if (total_read == 0) {
         queue.pushUsed(mem, head, 0) catch |e| log.warn("pushUsed failed: {}", .{e});
         return false;
     }

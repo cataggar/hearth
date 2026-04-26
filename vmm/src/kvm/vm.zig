@@ -22,6 +22,19 @@ pub fn deinit(self: Self) void {
     abi.close(self.fd);
 }
 
+/// Delete a guest physical memory region by setting its size to 0.
+pub fn deleteMemoryRegion(self: Self, slot: u32) !void {
+    var region = c.kvm_userspace_memory_region{
+        .slot = slot,
+        .flags = 0,
+        .guest_phys_addr = 0,
+        .memory_size = 0,
+        .userspace_addr = 0,
+    };
+    try abi.ioctlVoid(self.fd, c.KVM_SET_USER_MEMORY_REGION, @intFromPtr(&region));
+    log.info("memory region deleted: slot={}", .{slot});
+}
+
 /// Register a guest physical memory region backed by host memory.
 pub fn setMemoryRegion(self: Self, slot: u32, guest_phys_addr: u64, memory: []align(std.heap.page_size_min) u8) !void {
     var region = c.kvm_userspace_memory_region{
