@@ -3,15 +3,11 @@
 // Protocol: 4-byte LE length prefix + JSON payload over vsock.
 
 const std = @import("std");
-const posix = std.posix;
+const posix = @import("posix.zig");
 const linux = std.os.linux;
 
 // libc imports for functions not available in std.posix
-const c = @cImport({
-    @cInclude("pty.h");
-    @cInclude("sys/ioctl.h");
-    @cInclude("sys/time.h");
-});
+const c = @import("libc");
 
 const VSOCK_CID_HOST: u32 = 2;
 const VMADDR_CID_ANY: u32 = 0xFFFF_FFFF;
@@ -209,7 +205,10 @@ fn handleSpawn(sock: posix.fd_t, cmd_str: []const u8, timeout: u32) void {
     cmd_buf[cmd_str.len] = 0;
     sh_argv[2] = @ptrCast(cmd_buf[0..cmd_str.len :0]);
 
-    const stdout_fds = posix.pipe() catch { sendMsg(sock, formatError(&spawn_msg, "pipe failed")) catch {}; return; };
+    const stdout_fds = posix.pipe() catch {
+        sendMsg(sock, formatError(&spawn_msg, "pipe failed")) catch {};
+        return;
+    };
     const stderr_fds = posix.pipe() catch {
         posix.close(stdout_fds[0]);
         posix.close(stdout_fds[1]);
@@ -218,8 +217,10 @@ fn handleSpawn(sock: posix.fd_t, cmd_str: []const u8, timeout: u32) void {
     };
 
     const fork_result = posix.fork() catch {
-        posix.close(stdout_fds[0]); posix.close(stdout_fds[1]);
-        posix.close(stderr_fds[0]); posix.close(stderr_fds[1]);
+        posix.close(stdout_fds[0]);
+        posix.close(stdout_fds[1]);
+        posix.close(stderr_fds[0]);
+        posix.close(stderr_fds[1]);
         sendMsg(sock, formatError(&spawn_msg, "fork failed")) catch {};
         return;
     };
@@ -227,8 +228,10 @@ fn handleSpawn(sock: posix.fd_t, cmd_str: []const u8, timeout: u32) void {
     if (fork_result == 0) {
         posix.dup2(stdout_fds[1], 1) catch linux.exit_group(126);
         posix.dup2(stderr_fds[1], 2) catch linux.exit_group(126);
-        posix.close(stdout_fds[0]); posix.close(stdout_fds[1]);
-        posix.close(stderr_fds[0]); posix.close(stderr_fds[1]);
+        posix.close(stdout_fds[0]);
+        posix.close(stdout_fds[1]);
+        posix.close(stderr_fds[0]);
+        posix.close(stderr_fds[1]);
         if (timeout > 0) setAlarm(timeout);
         const envp = [_:null]?[*:0]const u8{
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
@@ -262,7 +265,6 @@ fn streamPipesLoop(sock: posix.fd_t, stdout_fd: posix.fd_t, stderr_fd: posix.fd_
     while (open_fds > 0) {
         const ready = posix.poll(&pfds, 300_000) catch break;
         if (ready == 0) continue;
-
 
         if (pfds[0].revents & (posix.POLL.IN | posix.POLL.HUP) != 0) {
             const n = posix.read(stdout_fd, &spawn_chunk) catch 0;
@@ -573,7 +575,6 @@ fn readPipesPoll(stdout_fd: posix.fd_t, stderr_fd: posix.fd_t) PipesResult {
         const ready = posix.poll(&pfds, -1) catch break;
         if (ready == 0) continue;
 
-
         if (pfds[0].revents & (posix.POLL.IN | posix.POLL.HUP) != 0) {
             if (stdout_total < exec_stdout.len) {
                 const n = posix.read(stdout_fd, exec_stdout[stdout_total..]) catch 0;
@@ -704,7 +705,7 @@ fn startListener(port: u32, handler: *const fn (posix.fd_t) void) void {
             // Reap any finished children (use raw syscall — posix.waitpid
             // panics on ECHILD when no children exist)
             while (true) {
-                var dummy: u32 = 0;
+                var dummy: i32 = 0;
                 const w: isize = @bitCast(linux.waitpid(-1, &dummy, linux.W.NOHANG));
                 if (w <= 0) break;
             }
@@ -760,7 +761,7 @@ fn tcpConnect(port: u32) ?posix.fd_t {
         .family = linux.AF.INET,
         .port = @byteSwap(port16),
         .addr = @byteSwap(@as(u32, 0x7f000001)), // 127.0.0.1
-        .zero = .{0} ** 8,
+        .zero = @splat(0),
     };
 
     const connect_rc: isize = @bitCast(linux.connect(fd, @ptrCast(&addr), @sizeOf(linux.sockaddr.in)));
@@ -792,7 +793,7 @@ fn startProxyBridge() void {
         if (child > 0) {
             posix.close(tcp_fd);
             while (true) {
-                var dummy: u32 = 0;
+                var dummy: i32 = 0;
                 const w: isize = @bitCast(linux.waitpid(-1, &dummy, linux.W.NOHANG));
                 if (w <= 0) break;
             }
@@ -825,7 +826,7 @@ fn tcpListen(port: u16) !posix.fd_t {
         .family = linux.AF.INET,
         .port = @byteSwap(port),
         .addr = @byteSwap(@as(u32, 0x7f000001)), // 127.0.0.1
-        .zero = .{0} ** 8,
+        .zero = @splat(0),
     };
 
     const bind_rc: isize = @bitCast(linux.bind(fd, @ptrCast(&addr), @sizeOf(linux.sockaddr.in)));
@@ -848,7 +849,6 @@ fn proxyRelay(fd_a: posix.fd_t, fd_b: posix.fd_t) void {
     while (true) {
         const ready = posix.poll(&pfds, 300_000) catch break;
         if (ready == 0) continue;
-
 
         if (pfds[0].revents & (posix.POLL.IN | posix.POLL.HUP) != 0) {
             const n = posix.read(fd_a, &proxy_buf) catch break;
@@ -906,7 +906,7 @@ fn execWithFdRedirect(
     fd: posix.fd_t,
     target_fd: posix.fd_t, // 0 for stdin, 1 for stdout
 ) void {
-    var argv: [8:null]?[*:0]const u8 = .{null} ** 8;
+    var argv: [8:null]?[*:0]const u8 = @splat(null);
     argv[0] = bin;
     for (args, 0..) |arg, j| {
         if (j + 1 >= argv.len - 1) break;
