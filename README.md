@@ -120,6 +120,10 @@ explicit prerequisites: accessible `/dev/kvm`, the guest bzImage at
 with `zig build integration-test -Doptimize=safe`. Missing prerequisites or an
 entirely skipped integration suite are not passing KVM coverage.
 
+The hosted job adds its runner user to `kvm` and starts KVM steps with `sg kvm`,
+so new processes inherit access without running as root or making the device
+world-writable. A one-off device ACL is insufficient on runners that reset it.
+
 ## Environments
 
 Environments are pre-built, snapshotted sandbox configurations. Go from "I have a repo" to "isolated VM with code cloned, deps installed, and Claude Code ready" in one command.

@@ -121,6 +121,13 @@ Both Hearth manifests use the new immutable fork revision and verified package
 hash, removing Codeberg from the dependency chain without changing compiler
 comparison code. The PR remains unmerged until actual hosted acceptance succeeds.
 
+Run 37162341668 establishes that the named runner ACL disappears between the
+successful immediate preflight and test execution. Subsequent direct Python
+opens fail too, with unchanged runner identity; the VMM syscall flags are normal.
+The actor resetting the ACL is not identified. CI now grants `kvm` membership and
+uses `sg kvm` for preflight and runtime steps, preserving non-root execution and
+restricted device permissions instead of racing a one-off ACL.
+
 The unchanged Flint backend has no host-initiated vsock `CONNECT` listener, so
 SDK port-forward/tar-stream acceptance is already blocked on the baseline.
 Clean Docker-based Ubuntu image setup and native AArch64 execution are not

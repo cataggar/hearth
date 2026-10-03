@@ -28,6 +28,9 @@ TypeScript checks.
   kernel, KVM, and initrd prerequisites explicitly; an entirely skipped suite is
   not passing integration coverage. Never run untrusted PR code on this
   persistent development VM.
+- Grant the ephemeral runner access through `kvm` group membership and start
+  KVM steps with that group active. Do not run acceptance as root or make
+  `/dev/kvm` world-writable.
 - Provide a stable Zig validation status that fails on failed or unexpectedly
   skipped required jobs. Keep existing TypeScript job names and checks.
 - Validate boot, lifecycle and snapshot operations against the existing guest
