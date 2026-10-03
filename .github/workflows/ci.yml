@@ -254,6 +254,23 @@ jobs:
               raise SystemExit(f"Incomplete integration coverage: {passed}/{total} passed; expected at least {expected}")
           print(f"Verified {passed} integration tests executed with KVM and the pinned kernel")
           PY
+      - name: Trace failed KVM device access
+        if: failure()
+        working-directory: vmm
+        run: |
+          set -euo pipefail
+          if ! command -v strace; then
+            sudo apt-get install -y --no-install-recommends strace
+          fi
+          status=0
+          timeout --kill-after=30s 2m \
+            strace -f -e trace=open,openat,openat2,clone,clone3,getuid,geteuid,getgid,getegid,setuid,setgid,setresuid,setresgid,setfsuid,setfsgid,setgroups \
+              -o ../.ci-logs/kvm-syscalls.log \
+              zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
+              2>&1 | tee ../.ci-logs/kvm-trace-test.log || status=$?
+          printf 'Diagnostic integration exit status: %s\n' "$status"
+          grep -E '/dev/kvm|[gs]et.*[ug]id|clone' ../.ci-logs/kvm-syscalls.log | tail -80
+          exit "$status"
       - name: Retain KVM integration logs
         if: always()
         uses: actions/upload-artifact@v4
