@@ -127,7 +127,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../.ci-logs
-          zig build -Dtarget="$TARGET" -Doptimize=safe --summary all 2>&1 | tee "../.ci-logs/agent-$TARGET.log"
+          zig build -Dtarget="$TARGET" --summary all 2>&1 | tee "../.ci-logs/agent-$TARGET.log"
+      - name: Run native guest-agent unit tests
+        if: matrix.target == 'x86_64-linux'
+        working-directory: agent
+        run: |
+          set -euo pipefail
+          zig build test -Dtarget=x86_64-linux --summary all 2>&1 | tee ../.ci-logs/agent-native-test.log
       - name: Retain guest-agent failure logs
         if: failure()
         uses: actions/upload-artifact@v4

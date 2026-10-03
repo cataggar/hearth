@@ -11,7 +11,7 @@ export class SetupError extends HearthError {
   }
 }
 
-export function buildWithZig(sourceDir: string): void {
+export function buildWithZig(sourceDir: string, component: "flint" | "agent"): void {
   if (!existsSync(join(sourceDir, "build.zig"))) {
     throw new SetupError(
       `Missing Zig source module at ${sourceDir} (build.zig not found). Run setup from the hearth repo root.`,
@@ -37,7 +37,9 @@ export function buildWithZig(sourceDir: string): void {
   }
 
   try {
-    execFileSync("zig", ["build", "-Doptimize=safe"], { cwd: sourceDir, stdio: "pipe" });
+    // The agent build fixes safe mode internally and has no optimize option.
+    const args = component === "flint" ? ["build", "-Doptimize=safe"] : ["build"];
+    execFileSync("zig", args, { cwd: sourceDir, stdio: "pipe" });
   } catch (err: unknown) {
     const stderr = err && typeof err === "object" && "stderr" in err ? err.stderr : undefined;
     const detail = Buffer.isBuffer(stderr)

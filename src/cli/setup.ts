@@ -83,7 +83,7 @@ async function setupFlint() {
 
   const vmmDir = findVmmDir();
   console.log("  flint: building with Zig...");
-  buildWithZig(vmmDir);
+  buildWithZig(vmmDir, "flint");
   copyFileSync(join(vmmDir, "zig-out", "bin", "flint"), flintPath);
   chmodSync(flintPath, 0o755);
   console.log("  flint: built and installed");
@@ -150,7 +150,7 @@ async function setupAgent() {
 
   const agentDir = findAgentDir();
   console.log("  hearth-agent: building with Zig...");
-  buildWithZig(agentDir);
+  buildWithZig(agentDir, "agent");
   copyFileSync(join(agentDir, "zig-out", "bin", "hearth-agent"), agentPath);
   chmodSync(agentPath, 0o755);
   console.log("  hearth-agent: built");
