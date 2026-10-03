@@ -231,7 +231,7 @@ test "boot to userspace" {
         .cwd = .{ .path = fixture.dir() },
         .argv = &.{ FIXTURE_FLINT_BIN, DEFAULT_KERNEL, "initrd.cpio.gz" },
         .stdout = .pipe,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer {
         child.kill(io());
@@ -254,7 +254,7 @@ test "API boot and VM status" {
         .cwd = .{ .path = fixture.dir() },
         .argv = &.{ FIXTURE_FLINT_BIN, "--api-sock", "api.sock" },
         .stdout = .ignore,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer {
         child.kill(io());
@@ -298,7 +298,7 @@ test "API pause and resume" {
         .cwd = .{ .path = fixture.dir() },
         .argv = &.{ FIXTURE_FLINT_BIN, "--api-sock", "api.sock" },
         .stdout = .ignore,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer {
         child.kill(io());
@@ -351,7 +351,7 @@ test "snapshot requires pause" {
         .cwd = .{ .path = fixture.dir() },
         .argv = &.{ FIXTURE_FLINT_BIN, "--api-sock", "api.sock" },
         .stdout = .ignore,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer {
         child.kill(io());
@@ -404,7 +404,7 @@ test "snapshot create and restore" {
         .cwd = .{ .path = fixture.dir() },
         .argv = &.{ FIXTURE_FLINT_BIN, "--api-sock", "api.sock" },
         .stdout = .ignore,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer child.kill(io());
 
@@ -458,7 +458,7 @@ test "snapshot create and restore" {
         .cwd = .{ .path = fixture.dir() },
         .argv = &.{ FIXTURE_FLINT_BIN, "--restore", "--vmstate-path", "snapshot.vmstate", "--mem-path", "snapshot.mem", "--api-sock", "restored.sock" },
         .stdout = .pipe,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer {
         restored.kill(io());

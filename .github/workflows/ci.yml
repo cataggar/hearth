@@ -88,6 +88,7 @@ jobs:
         with:
           name: flint-failure-logs
           path: .ci-logs/
+          include-hidden-files: true
           retention-days: 7
           if-no-files-found: ignore
 
@@ -140,6 +141,7 @@ jobs:
         with:
           name: agent-failure-logs-${{ matrix.target }}
           path: .ci-logs/
+          include-hidden-files: true
           retention-days: 7
           if-no-files-found: ignore
 
@@ -246,6 +248,7 @@ jobs:
         with:
           name: kvm-integration-logs
           path: .ci-logs/
+          include-hidden-files: true
           retention-days: 7
           if-no-files-found: ignore
 
