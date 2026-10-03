@@ -224,6 +224,18 @@ jobs:
         run: |
           set -euo pipefail
           timeout --kill-after=30s 10m \
+            zig build install integration-test-build -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
+            2>&1 | tee ../.ci-logs/kvm-build.log
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          id
+          getfacl /dev/kvm
+          python3 - <<'PY'
+          import os
+          fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC)
+          os.close(fd)
+          print("KVM access immediately before test execution: OK")
+          PY
+          timeout --kill-after=30s 10m \
             zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
             2>&1 | tee ../.ci-logs/kvm-integration.log
           python3 - <<'PY'
