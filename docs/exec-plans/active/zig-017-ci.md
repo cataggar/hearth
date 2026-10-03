@@ -1,7 +1,8 @@
 # Execution Plan: Zig 0.17.0 and ghr-based CI
 
-**Status**: In progress
+**Status**: Blocked on hosted CI acceptance
 **Issue**: #4
+**PR**: [#5](https://github.com/cataggar/hearth/pull/5)
 **Spec**: [Zig Toolchain and CI](../../product-specs/zig-toolchain-ci.md)
 
 ## Parallel Workstreams
@@ -93,7 +94,23 @@ subsequent VirtIO experiments.
 
 Actual hosted PR CI, including KVM execution and the required-result gate, must
 pass before merge. Raw perf data, reports, workload runner, and fixture assets
-are retained as session artifacts; publish their reproducible recipe with the PR.
+are retained as session artifacts. The [reproducible workload recipe](https://github.com/cataggar/hearth/pull/5#issuecomment-5973822154)
+is published with the PR.
+
+Hosted runs 37156441987 and 37156778320 passed the compiler, guest-target,
+source-build, and TypeScript checks. Their real KVM tests failed: child VMMs
+reported `/dev/kvm` `AccessDenied` despite successful initial VM-creation
+preflight checks. Child stderr is now visible and the explicitly scoped hidden
+CI log directory is retained. Integration artifacts are built before refreshing
+the runner-user device ACL and recording access immediately before execution.
+This change is locally verified but is not yet proven to resolve hosted access.
+
+Run 37157089601 and its failed-job retry could not fetch the locked translate-c
+dependency from Codeberg (`ReadFailed`), so neither reached the new runtime
+check. Direct official archive and archive-API requests also timed out, and the
+official GitHub mirror does not contain the locked release commit. Keep the
+verified dependency pin and merge gate intact; do not treat these failures as
+passing KVM coverage. The PR remains unmerged until hosted acceptance succeeds.
 
 The unchanged Flint backend has no host-initiated vsock `CONNECT` listener, so
 SDK port-forward/tar-stream acceptance is already blocked on the baseline.
