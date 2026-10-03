@@ -1,12 +1,10 @@
-// KVM ABI: ioctl constants and struct definitions imported from Linux headers,
+// KVM ABI: ioctl constants and structs translated from target Linux headers at build time,
 // plus a generic ioctl helper to eliminate repetitive errno checking.
 
 const std = @import("std");
 const linux = std.os.linux;
 
-pub const c = @cImport({
-    @cInclude("linux/kvm.h");
-});
+pub const c = @import("kvm_abi");
 
 /// Generic ioctl helper that translates errno into Zig errors.
 /// Returns the ioctl result as a usize on success.
@@ -15,7 +13,7 @@ pub fn ioctl(fd: std.posix.fd_t, request: u32, arg: usize) !usize {
         const rc = linux.syscall3(.ioctl, @bitCast(@as(isize, fd)), request, arg);
         const signed: isize = @bitCast(rc);
         if (signed >= 0) return rc;
-        const errno: linux.E = @enumFromInt(@as(u16, @intCast(-signed)));
+        const errno: linux.E = @fromBackingInt(@as(u16, @intCast(-signed)));
         switch (errno) {
             .INTR => continue,
             .AGAIN => return error.Again,

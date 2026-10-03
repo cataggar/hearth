@@ -72,7 +72,7 @@ pub fn run(self: Self) !u32 {
     const rc = linux.syscall3(.ioctl, @bitCast(@as(isize, self.fd)), c.KVM_RUN, 0);
     const signed: isize = @bitCast(rc);
     if (signed < 0) {
-        const errno: linux.E = @enumFromInt(@as(u16, @intCast(-signed)));
+        const errno: linux.E = @fromBackingInt(@as(u16, @intCast(-signed)));
         return switch (errno) {
             .INTR => error.Interrupted,
             .AGAIN => error.Again,
@@ -90,7 +90,7 @@ pub fn getIoData(self: Self) ?IoExit {
     // Bounds-check: data_offset + count*size must fit in the kvm_run mmap region
     const total: usize = @as(usize, io.count) * io.size;
     if (total == 0 or io.data_offset + total > self.kvm_run_mmap_size) return null;
-    const base: [*]u8 = @constCast(@ptrCast(@volatileCast(self.kvm_run)));
+    const base: [*]u8 = @ptrCast(@constCast(@volatileCast(self.kvm_run)));
     return .{
         .direction = io.direction,
         .port = io.port,
@@ -270,7 +270,7 @@ pub fn setMsrs(self: Self, buf: *const MsrBuffer) !void {
     const set_count: u32 = @intCast(rc);
     if (set_count != buf.nmsrs) {
         log.warn("KVM_SET_MSRS: requested {} set {} (MSR 0x{x} failed)", .{
-            buf.nmsrs, set_count,
+            buf.nmsrs,                                                      set_count,
             if (set_count < buf.nmsrs) buf.entries[set_count].index else 0,
         });
     }

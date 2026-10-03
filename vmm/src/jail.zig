@@ -77,7 +77,7 @@ pub fn setup(config: Config) !void {
     try check(linux.setuid(config.uid), "setuid");
 
     // Prevent ptrace and core dumps from leaking VM memory
-    const rc: isize = @bitCast(linux.prctl(@intFromEnum(linux.PR.SET_DUMPABLE), 0, 0, 0, 0));
+    const rc: isize = @bitCast(linux.prctl(@backingInt(linux.PR.SET_DUMPABLE), 0, 0, 0, 0));
     if (rc < 0) {
         log.warn("prctl(SET_DUMPABLE) failed: {}", .{rc});
     }

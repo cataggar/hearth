@@ -1,6 +1,6 @@
 // Integration tests for flint.
 // Spawn the flint binary and test end-to-end behavior.
-// Requires /dev/kvm and a kernel bzImage at /tmp/vmlinuz-minimal.
+// Requires /dev/kvm, /tmp/vmlinuz-minimal, bsdcpio, gzip, and static /usr/bin/busybox.
 //
 // Run with: zig build integration-test
 
@@ -9,9 +9,22 @@ const linux = std.os.linux;
 const process = std.process;
 
 const FLINT_BIN = "zig-out/bin/flint";
+const FIXTURE_FLINT_BIN = "../../zig-out/bin/flint";
 const DEFAULT_KERNEL = "/tmp/vmlinuz-minimal";
+const INIT_SCRIPT =
+    \\#!/bin/sh
+    \\set -eu
+    \\if [ ! -c /dev/console ]; then /bin/busybox mknod /dev/console c 5 1; fi
+    \\exec </dev/console >/dev/console 2>&1
+    \\while true; do
+    \\    echo FLINT_BOOT_OK
+    \\    /bin/busybox sleep 1
+    \\done
+    \\
+;
 
 var threaded_io: ?std.Io.Threaded = null;
+var fixture_counter: u32 = 0;
 
 fn io() std.Io {
     if (threaded_io == null) {
@@ -20,40 +33,112 @@ fn io() std.Io {
     return threaded_io.?.io();
 }
 
-fn kernelAvailable() bool {
-    const rc: isize = @bitCast(linux.open(DEFAULT_KERNEL, .{ .ACCMODE = .RDONLY }, 0));
-    if (rc < 0) return false;
-    _ = linux.close(@intCast(rc));
-    return true;
+fn deinitIo() void {
+    if (threaded_io) |*threaded| threaded.deinit();
+    threaded_io = null;
 }
 
-/// Build a minimal cpio initrd with a single init script.
-/// Returns allocated stdout containing the path to the initrd file.
-fn buildInitrd(comptime init_script: []const u8) ![]const u8 {
+fn requireKernel() !void {
+    const rc: isize = @bitCast(linux.open(DEFAULT_KERNEL, .{ .ACCMODE = .RDONLY }, 0));
+    if (rc < 0) {
+        std.debug.print("integration requires a kernel at {s}\n", .{DEFAULT_KERNEL});
+        return error.KernelUnavailable;
+    }
+    _ = linux.close(@intCast(rc));
+}
+
+const Fixture = struct {
+    root: [64]u8 = undefined,
+    root_len: usize,
+
+    fn dir(self: *const Fixture) []const u8 {
+        return self.root[0..self.root_len];
+    }
+
+    fn path(self: *const Fixture, name: []const u8, buf: []u8) ![:0]u8 {
+        return std.fmt.bufPrintSentinel(buf, "{s}/{s}", .{ self.dir(), name }, 0);
+    }
+
+    fn deinit(self: *const Fixture) !void {
+        try std.Io.Dir.cwd().deleteTree(io(), self.dir());
+    }
+};
+
+/// Build an executable BusyBox initramfs in a private, project-relative fixture directory.
+fn buildInitrd() !Fixture {
+    var fixture: Fixture = .{ .root_len = 0 };
+    fixture_counter += 1;
+    const root = try std.fmt.bufPrint(&fixture.root, ".zig-cache/flint-integration-{d}-{d}", .{ linux.getpid(), fixture_counter });
+    fixture.root_len = root.len;
+    try std.Io.Dir.cwd().createDir(io(), fixture.dir(), .fromMode(0o700));
+    errdefer fixture.deinit() catch |err| std.debug.panic("fixture cleanup failed: {s}", .{@errorName(err)});
+
+    var init_buf: [256]u8 = undefined;
+    const init_path = try fixture.path("init", &init_buf);
+    try std.Io.Dir.cwd().writeFile(io(), .{ .sub_path = init_path, .data = INIT_SCRIPT });
+
     const allocator = std.testing.allocator;
     const result = try process.run(allocator, io(), .{
+        .cwd = .{ .path = fixture.dir() },
         .argv = &.{
-            "/bin/sh", "-c",
-            "TMPDIR=$(mktemp -d) && cd \"$TMPDIR\" && " ++
-                "printf '" ++ init_script ++ "' > init && " ++
-                "chmod +x init && " ++
-                "echo init | bsdcpio -o -H newc 2>/dev/null | gzip > initrd.cpio.gz && " ++
-                "echo \"$TMPDIR/initrd.cpio.gz\"",
+            "/bin/sh", "-ec",
+            "mkdir bin dev; cp /usr/bin/busybox bin/busybox; ln -s busybox bin/sh; chmod +x init; " ++
+                "printf '%s\\n' bin bin/busybox bin/sh dev init | bsdcpio -o -H newc > initrd.cpio; " ++
+                "gzip initrd.cpio",
         },
     });
+    defer allocator.free(result.stdout);
     defer allocator.free(result.stderr);
 
     if (result.term != .exited or result.term.exited != 0) {
-        allocator.free(result.stdout);
+        std.debug.print("initrd build failed: {s}\n", .{result.stderr});
         return error.InitrdBuildFailed;
     }
 
-    return result.stdout;
+    return fixture;
 }
 
-fn trimNewline(s: []const u8) []const u8 {
-    if (s.len > 0 and s[s.len - 1] == '\n') return s[0 .. s.len - 1];
-    return s;
+fn expectHttpStatus(response: []const u8, expected: []const u8) !void {
+    try std.testing.expect(response.len >= 12);
+    if (!std.mem.eql(u8, response[9..12], expected)) {
+        std.debug.print("unexpected HTTP response: {s}\n", .{response});
+    }
+    try std.testing.expectEqualStrings(expected, response[9..12]);
+}
+
+fn checkedRequest(sock_path: []const u8, method: []const u8, target: []const u8, body: ?[]const u8, expected: []const u8) ![]u8 {
+    const response = try httpRequest(sock_path, method, target, body);
+    errdefer std.testing.allocator.free(response);
+    try expectHttpStatus(response, expected);
+    return response;
+}
+
+fn waitForGuestMarker(child: *process.Child) !void {
+    const stdout = child.stdout orelse return error.MissingStdout;
+    var buf: [8192]u8 = undefined;
+    var total: usize = 0;
+    var start_ts: linux.timespec = undefined;
+    if (linux.clock_gettime(.MONOTONIC, &start_ts) != 0) return error.ClockFailed;
+    while (true) {
+        var now_ts: linux.timespec = undefined;
+        if (linux.clock_gettime(.MONOTONIC, &now_ts) != 0) return error.ClockFailed;
+        if (now_ts.sec - start_ts.sec >= 10) break;
+        var pfd = [_]linux.pollfd{.{ .fd = stdout.handle, .events = linux.POLL.IN, .revents = 0 }};
+        const poll_rc: isize = @bitCast(linux.poll(&pfd, 1, 100));
+        if (poll_rc < 0) return error.PollFailed;
+        if (poll_rc == 0) continue;
+        const rc: isize = @bitCast(linux.read(stdout.handle, buf[total..].ptr, buf.len - total));
+        if (rc < 0) return error.ReadFailed;
+        if (rc == 0) break;
+        total += @intCast(rc);
+        if (std.mem.indexOf(u8, buf[0..total], "FLINT_BOOT_OK") != null) return;
+        if (total == buf.len) {
+            std.mem.copyForwards(u8, buf[0 .. buf.len / 2], buf[buf.len / 2 ..]);
+            total = buf.len / 2;
+        }
+    }
+    std.debug.print("guest did not reach userspace; final serial output:\n{s}\n", .{buf[0..total]});
+    return error.GuestBootFailed;
 }
 
 /// Connect to a Unix socket, send an HTTP request, return the full response.
@@ -111,6 +196,7 @@ fn sleep_ms(ms: u64) void {
 // ============================================================
 
 test "flint prints usage with no args" {
+    defer deinitIo();
     const allocator = std.testing.allocator;
     const result = try process.run(allocator, io(), .{
         .argv = &.{FLINT_BIN},
@@ -123,6 +209,7 @@ test "flint prints usage with no args" {
 }
 
 test "flint fails with nonexistent kernel" {
+    defer deinitIo();
     const allocator = std.testing.allocator;
     const result = try process.run(allocator, io(), .{
         .argv = &.{ FLINT_BIN, "/nonexistent/kernel" },
@@ -134,64 +221,40 @@ test "flint fails with nonexistent kernel" {
 }
 
 test "boot to userspace" {
-    if (!kernelAvailable()) {
-        std.debug.print("SKIP: no kernel at {s}\n", .{DEFAULT_KERNEL});
-        return;
-    }
-
-    const allocator = std.testing.allocator;
-    const initrd_stdout = try buildInitrd("#!/bin/sh\\necho FLINT_BOOT_OK\\nwhile true; do echo -n \\\"\\\" > /dev/null 2>&1; done\\n");
-    defer allocator.free(initrd_stdout);
-    const initrd = trimNewline(initrd_stdout);
+    defer deinitIo();
+    try requireKernel();
+    const fixture = try buildInitrd();
+    defer fixture.deinit() catch |err| std.debug.panic("fixture cleanup failed: {s}", .{@errorName(err)});
 
     // Use spawn+kill since the VM doesn't exit cleanly
     var child = try process.spawn(io(), .{
-        .argv = &.{ FLINT_BIN, DEFAULT_KERNEL, initrd },
+        .cwd = .{ .path = fixture.dir() },
+        .argv = &.{ FIXTURE_FLINT_BIN, DEFAULT_KERNEL, "initrd.cpio.gz" },
         .stdout = .pipe,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer {
         child.kill(io());
     }
 
-    // Read stdout until we see the marker or timeout
-    var buf: [8192]u8 = undefined;
-    var total: usize = 0;
-    var start_ts: linux.timespec = undefined;
-    _ = linux.clock_gettime(.MONOTONIC, &start_ts);
-    while (total < buf.len) {
-        var now_ts: linux.timespec = undefined;
-        _ = linux.clock_gettime(.MONOTONIC, &now_ts);
-        if (now_ts.sec - start_ts.sec > 10) break; // 10s timeout
-        if (child.stdout) |stdout| {
-            const rc: isize = @bitCast(linux.read(stdout.handle, buf[total..].ptr, buf.len - total));
-            if (rc <= 0) break;
-            total += @intCast(rc);
-            if (std.mem.indexOf(u8, buf[0..total], "FLINT_BOOT_OK") != null) break;
-        } else break;
-    }
-
-    try std.testing.expect(std.mem.indexOf(u8, buf[0..total], "FLINT_BOOT_OK") != null);
+    try waitForGuestMarker(&child);
 }
 
 test "API boot and VM status" {
-    if (!kernelAvailable()) {
-        std.debug.print("SKIP: no kernel at {s}\n", .{DEFAULT_KERNEL});
-        return;
-    }
+    defer deinitIo();
+    try requireKernel();
 
     const allocator = std.testing.allocator;
-    const initrd_stdout = try buildInitrd("#!/bin/sh\nwhile true; do echo -n '' > /dev/null 2>&1; done\n");
-    defer allocator.free(initrd_stdout);
-    const initrd = trimNewline(initrd_stdout);
-
-    const sock_path = "/tmp/flint-test-api.sock";
-    _ = linux.unlink(sock_path);
+    const fixture = try buildInitrd();
+    defer fixture.deinit() catch |err| std.debug.panic("fixture cleanup failed: {s}", .{@errorName(err)});
+    var sock_buf: [256]u8 = undefined;
+    const sock_path = try fixture.path("api.sock", &sock_buf);
 
     var child = try process.spawn(io(), .{
-        .argv = &.{ FLINT_BIN, "--api-sock", sock_path },
+        .cwd = .{ .path = fixture.dir() },
+        .argv = &.{ FIXTURE_FLINT_BIN, "--api-sock", "api.sock" },
         .stdout = .ignore,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer {
         child.kill(io());
@@ -201,42 +264,41 @@ test "API boot and VM status" {
 
     // Configure and boot
     var boot_cmd_buf: [512]u8 = undefined;
-    const boot_cmd = std.fmt.bufPrint(&boot_cmd_buf,
-        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}", .{ DEFAULT_KERNEL, initrd },
+    const boot_cmd = std.fmt.bufPrint(
+        &boot_cmd_buf,
+        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
+        .{ DEFAULT_KERNEL, "initrd.cpio.gz" },
     ) catch unreachable;
 
-    var r = try httpRequest(sock_path, "PUT", "/boot-source", boot_cmd);
+    var r = try checkedRequest(sock_path, "PUT", "/boot-source", boot_cmd, "204");
     allocator.free(r);
 
-    r = try httpRequest(sock_path, "PUT", "/actions", "{\"action_type\":\"InstanceStart\"}");
+    r = try checkedRequest(sock_path, "PUT", "/actions", "{\"action_type\":\"InstanceStart\"}", "204");
     allocator.free(r);
 
     sleep_ms(2000);
 
     // Check VM status
-    const status = try httpRequest(sock_path, "GET", "/vm", null);
+    const status = try checkedRequest(sock_path, "GET", "/vm", null, "200");
     defer allocator.free(status);
     try std.testing.expect(std.mem.indexOf(u8, status, "Running") != null);
 }
 
 test "API pause and resume" {
-    if (!kernelAvailable()) {
-        std.debug.print("SKIP: no kernel at {s}\n", .{DEFAULT_KERNEL});
-        return;
-    }
+    defer deinitIo();
+    try requireKernel();
 
     const allocator = std.testing.allocator;
-    const initrd_stdout = try buildInitrd("#!/bin/sh\nwhile true; do echo -n '' > /dev/null 2>&1; done\n");
-    defer allocator.free(initrd_stdout);
-    const initrd = trimNewline(initrd_stdout);
-
-    const sock_path = "/tmp/flint-test-pause.sock";
-    _ = linux.unlink(sock_path);
+    const fixture = try buildInitrd();
+    defer fixture.deinit() catch |err| std.debug.panic("fixture cleanup failed: {s}", .{@errorName(err)});
+    var sock_buf: [256]u8 = undefined;
+    const sock_path = try fixture.path("api.sock", &sock_buf);
 
     var child = try process.spawn(io(), .{
-        .argv = &.{ FLINT_BIN, "--api-sock", sock_path },
+        .cwd = .{ .path = fixture.dir() },
+        .argv = &.{ FIXTURE_FLINT_BIN, "--api-sock", "api.sock" },
         .stdout = .ignore,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer {
         child.kill(io());
@@ -245,52 +307,51 @@ test "API pause and resume" {
     sleep_ms(500);
 
     var boot_cmd_buf: [512]u8 = undefined;
-    const boot_cmd = std.fmt.bufPrint(&boot_cmd_buf,
-        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}", .{ DEFAULT_KERNEL, initrd },
+    const boot_cmd = std.fmt.bufPrint(
+        &boot_cmd_buf,
+        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
+        .{ DEFAULT_KERNEL, "initrd.cpio.gz" },
     ) catch unreachable;
 
-    var r = try httpRequest(sock_path, "PUT", "/boot-source", boot_cmd);
+    var r = try checkedRequest(sock_path, "PUT", "/boot-source", boot_cmd, "204");
     allocator.free(r);
-    r = try httpRequest(sock_path, "PUT", "/actions", "{\"action_type\":\"InstanceStart\"}");
+    r = try checkedRequest(sock_path, "PUT", "/actions", "{\"action_type\":\"InstanceStart\"}", "204");
     allocator.free(r);
 
     sleep_ms(2000);
 
     // Pause
-    r = try httpRequest(sock_path, "PATCH", "/vm", "{\"state\":\"Paused\"}");
+    r = try checkedRequest(sock_path, "PATCH", "/vm", "{\"state\":\"Paused\"}", "204");
     allocator.free(r);
 
-    const paused = try httpRequest(sock_path, "GET", "/vm", null);
+    const paused = try checkedRequest(sock_path, "GET", "/vm", null, "200");
     defer allocator.free(paused);
     try std.testing.expect(std.mem.indexOf(u8, paused, "Paused") != null);
 
     // Resume
-    r = try httpRequest(sock_path, "PATCH", "/vm", "{\"state\":\"Resumed\"}");
+    r = try checkedRequest(sock_path, "PATCH", "/vm", "{\"state\":\"Resumed\"}", "204");
     allocator.free(r);
 
-    const resumed = try httpRequest(sock_path, "GET", "/vm", null);
+    const resumed = try checkedRequest(sock_path, "GET", "/vm", null, "200");
     defer allocator.free(resumed);
     try std.testing.expect(std.mem.indexOf(u8, resumed, "Running") != null);
 }
 
 test "snapshot requires pause" {
-    if (!kernelAvailable()) {
-        std.debug.print("SKIP: no kernel at {s}\n", .{DEFAULT_KERNEL});
-        return;
-    }
+    defer deinitIo();
+    try requireKernel();
 
     const allocator = std.testing.allocator;
-    const initrd_stdout = try buildInitrd("#!/bin/sh\nwhile true; do echo -n '' > /dev/null 2>&1; done\n");
-    defer allocator.free(initrd_stdout);
-    const initrd = trimNewline(initrd_stdout);
-
-    const sock_path = "/tmp/flint-test-snap.sock";
-    _ = linux.unlink(sock_path);
+    const fixture = try buildInitrd();
+    defer fixture.deinit() catch |err| std.debug.panic("fixture cleanup failed: {s}", .{@errorName(err)});
+    var sock_buf: [256]u8 = undefined;
+    const sock_path = try fixture.path("api.sock", &sock_buf);
 
     var child = try process.spawn(io(), .{
-        .argv = &.{ FLINT_BIN, "--api-sock", sock_path },
+        .cwd = .{ .path = fixture.dir() },
+        .argv = &.{ FIXTURE_FLINT_BIN, "--api-sock", "api.sock" },
         .stdout = .ignore,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
     defer {
         child.kill(io());
@@ -299,108 +360,113 @@ test "snapshot requires pause" {
     sleep_ms(500);
 
     var boot_cmd_buf: [512]u8 = undefined;
-    const boot_cmd = std.fmt.bufPrint(&boot_cmd_buf,
-        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}", .{ DEFAULT_KERNEL, initrd },
+    const boot_cmd = std.fmt.bufPrint(
+        &boot_cmd_buf,
+        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
+        .{ DEFAULT_KERNEL, "initrd.cpio.gz" },
     ) catch unreachable;
 
-    var r = try httpRequest(sock_path, "PUT", "/boot-source", boot_cmd);
+    var r = try checkedRequest(sock_path, "PUT", "/boot-source", boot_cmd, "204");
     allocator.free(r);
-    r = try httpRequest(sock_path, "PUT", "/actions", "{\"action_type\":\"InstanceStart\"}");
+    r = try checkedRequest(sock_path, "PUT", "/actions", "{\"action_type\":\"InstanceStart\"}", "204");
     allocator.free(r);
 
     sleep_ms(2000);
 
     // Snapshot without pausing should fail
-    const snap_resp = try httpRequest(sock_path, "PUT", "/snapshot/create",
-        "{\"snapshot_path\":\"/tmp/flint-test.vmstate\",\"mem_file_path\":\"/tmp/flint-test.mem\"}",
+    const snap_resp = try checkedRequest(
+        sock_path,
+        "PUT",
+        "/snapshot/create",
+        "{\"snapshot_path\":\"snapshot.vmstate\",\"mem_file_path\":\"snapshot.mem\"}",
+        "400",
     );
     defer allocator.free(snap_resp);
     try std.testing.expect(std.mem.indexOf(u8, snap_resp, "must be paused") != null);
 }
 
 test "snapshot create and restore" {
-    if (!kernelAvailable()) {
-        std.debug.print("SKIP: no kernel at {s}\n", .{DEFAULT_KERNEL});
-        return;
-    }
+    defer deinitIo();
+    try requireKernel();
 
     const allocator = std.testing.allocator;
-    const initrd_stdout = try buildInitrd("#!/bin/sh\nwhile true; do echo -n '' > /dev/null 2>&1; done\n");
-    defer allocator.free(initrd_stdout);
-    const initrd = trimNewline(initrd_stdout);
-
-    const sock_path = "/tmp/flint-test-snapcreate.sock";
-    const vmstate = "/tmp/flint-test-snapcreate.vmstate";
-    const memfile = "/tmp/flint-test-snapcreate.mem";
-    _ = linux.unlink(sock_path);
-    _ = linux.unlink(vmstate);
-    _ = linux.unlink(memfile);
+    const fixture = try buildInitrd();
+    defer fixture.deinit() catch |err| std.debug.panic("fixture cleanup failed: {s}", .{@errorName(err)});
+    var sock_buf: [256]u8 = undefined;
+    const sock_path = try fixture.path("api.sock", &sock_buf);
+    var vmstate_buf: [256]u8 = undefined;
+    const vmstate = try fixture.path("snapshot.vmstate", &vmstate_buf);
+    var memfile_buf: [256]u8 = undefined;
+    const memfile = try fixture.path("snapshot.mem", &memfile_buf);
 
     // Boot VM
     var child = try process.spawn(io(), .{
-        .argv = &.{ FLINT_BIN, "--api-sock", sock_path },
+        .cwd = .{ .path = fixture.dir() },
+        .argv = &.{ FIXTURE_FLINT_BIN, "--api-sock", "api.sock" },
         .stdout = .ignore,
-        .stderr = .ignore,
+        .stderr = .inherit,
     });
+    defer child.kill(io());
 
     sleep_ms(500);
 
     var boot_cmd_buf: [512]u8 = undefined;
-    const boot_cmd = std.fmt.bufPrint(&boot_cmd_buf,
-        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}", .{ DEFAULT_KERNEL, initrd },
+    const boot_cmd = std.fmt.bufPrint(
+        &boot_cmd_buf,
+        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
+        .{ DEFAULT_KERNEL, "initrd.cpio.gz" },
     ) catch unreachable;
 
-    var r = try httpRequest(sock_path, "PUT", "/boot-source", boot_cmd);
+    var r = try checkedRequest(sock_path, "PUT", "/boot-source", boot_cmd, "204");
     allocator.free(r);
-    r = try httpRequest(sock_path, "PUT", "/actions", "{\"action_type\":\"InstanceStart\"}");
+    r = try checkedRequest(sock_path, "PUT", "/actions", "{\"action_type\":\"InstanceStart\"}", "204");
     allocator.free(r);
 
     sleep_ms(2000);
 
     // Pause and snapshot
-    r = try httpRequest(sock_path, "PATCH", "/vm", "{\"state\":\"Paused\"}");
+    r = try checkedRequest(sock_path, "PATCH", "/vm", "{\"state\":\"Paused\"}", "204");
     allocator.free(r);
 
     var snap_cmd_buf: [512]u8 = undefined;
-    const snap_cmd = std.fmt.bufPrint(&snap_cmd_buf,
-        "{{\"snapshot_path\":\"{s}\",\"mem_file_path\":\"{s}\"}}", .{ vmstate, memfile },
+    const snap_cmd = std.fmt.bufPrint(
+        &snap_cmd_buf,
+        "{{\"snapshot_path\":\"{s}\",\"mem_file_path\":\"{s}\"}}",
+        .{ "snapshot.vmstate", "snapshot.mem" },
     ) catch unreachable;
 
-    r = try httpRequest(sock_path, "PUT", "/snapshot/create", snap_cmd);
+    r = try checkedRequest(sock_path, "PUT", "/snapshot/create", snap_cmd, "204");
     allocator.free(r);
 
     // Kill original VM
     child.kill(io());
 
     // Verify snapshot files exist
-    const vm_rc: isize = @bitCast(linux.open(vmstate, .{ .ACCMODE = .RDONLY }, 0));
+    const vm_rc: isize = @bitCast(linux.open(vmstate.ptr, .{ .ACCMODE = .RDONLY }, 0));
     try std.testing.expect(vm_rc >= 0);
     _ = linux.close(@intCast(vm_rc));
 
-    const mem_rc: isize = @bitCast(linux.open(memfile, .{ .ACCMODE = .RDONLY }, 0));
+    const mem_rc: isize = @bitCast(linux.open(memfile.ptr, .{ .ACCMODE = .RDONLY }, 0));
     try std.testing.expect(mem_rc >= 0);
     _ = linux.close(@intCast(mem_rc));
 
     // Restore and verify it runs
-    const restore_sock = "/tmp/flint-test-restored.sock";
-    _ = linux.unlink(restore_sock);
+    var restore_sock_buf: [256]u8 = undefined;
+    const restore_sock = try fixture.path("restored.sock", &restore_sock_buf);
 
     var restored = try process.spawn(io(), .{
-        .argv = &.{ FLINT_BIN, "--restore", "--vmstate-path", vmstate, "--mem-path", memfile, "--api-sock", restore_sock },
-        .stdout = .ignore,
-        .stderr = .ignore,
+        .cwd = .{ .path = fixture.dir() },
+        .argv = &.{ FIXTURE_FLINT_BIN, "--restore", "--vmstate-path", "snapshot.vmstate", "--mem-path", "snapshot.mem", "--api-sock", "restored.sock" },
+        .stdout = .pipe,
+        .stderr = .inherit,
     });
     defer {
         restored.kill(io());
     }
 
-    sleep_ms(1000);
+    try waitForGuestMarker(&restored);
 
-    const status = try httpRequest(restore_sock, "GET", "/vm", null);
+    const status = try checkedRequest(restore_sock, "GET", "/vm", null, "200");
     defer allocator.free(status);
     try std.testing.expect(std.mem.indexOf(u8, status, "Running") != null);
-
-    // Clean up snapshot files
-    _ = linux.unlink(vmstate);
-    _ = linux.unlink(memfile);
 }

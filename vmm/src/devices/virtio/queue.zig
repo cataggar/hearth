@@ -130,7 +130,7 @@ pub fn snapshotRestore(self: *Self, buf: [SNAPSHOT_SIZE]u8) void {
 /// Walk a descriptor chain starting at `head`, collecting up to `max` descriptors.
 /// Returns the number of descriptors collected. Detects cycles via a visited bitset.
 pub fn collectChain(self: Self, mem: *Memory, head: u16, descs: []Desc) !usize {
-    var visited: [MAX_QUEUE_SIZE / 8]u8 = .{0} ** (MAX_QUEUE_SIZE / 8);
+    var visited: [MAX_QUEUE_SIZE / 8]u8 = @splat(0);
     var count: usize = 0;
     var idx = head;
 

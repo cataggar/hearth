@@ -74,39 +74,39 @@ const SYS_CLONE: u32 = 56;
 // clone, socket, mprotect are excluded; they have argument-level filters below.
 const simple_syscalls = [_]u32{
     // Core I/O
-    0,   // read
-    1,   // write
-    2,   // open (Zig's linux.open() emits raw open syscall)
-    3,   // close
-    8,   // lseek
-    16,  // ioctl (KVM, FIONBIO, TUNSETIFF)
-    17,  // pread64 (virtio-blk)
-    18,  // pwrite64 (virtio-blk)
-    19,  // readv (virtio-net TAP)
-    20,  // writev (virtio-net TAP)
-    48,  // shutdown (vsock partial close)
-    72,  // fcntl (O_NONBLOCK)
-    74,  // fsync
-    75,  // fdatasync (virtio-blk T_FLUSH)
-    87,  // unlink (API socket cleanup)
+    0, // read
+    1, // write
+    2, // open (Zig's linux.open() emits raw open syscall)
+    3, // close
+    8, // lseek
+    16, // ioctl (KVM, FIONBIO, TUNSETIFF)
+    17, // pread64 (virtio-blk)
+    18, // pwrite64 (virtio-blk)
+    19, // readv (virtio-net TAP)
+    20, // writev (virtio-net TAP)
+    48, // shutdown (vsock partial close)
+    72, // fcntl (O_NONBLOCK)
+    74, // fsync
+    75, // fdatasync (virtio-blk T_FLUSH)
+    87, // unlink (API socket cleanup)
     257, // openat
 
     // Memory (mprotect excluded — has argument filter)
-    9,   // mmap
-    11,  // munmap
-    12,  // brk
-    25,  // mremap
+    9, // mmap
+    11, // munmap
+    12, // brk
+    25, // mremap
 
     // Networking (socket excluded — has argument filter)
-    42,  // connect (vsock UDS)
-    44,  // sendto
-    45,  // recvfrom
-    49,  // bind
-    50,  // listen
+    42, // connect (vsock UDS)
+    44, // sendto
+    45, // recvfrom
+    49, // bind
+    50, // listen
     288, // accept4
 
     // Threading (clone excluded — has argument filter)
-    24,  // sched_yield
+    24, // sched_yield
     158, // arch_prctl (TLS)
     186, // gettid
     202, // futex
@@ -114,19 +114,19 @@ const simple_syscalls = [_]u32{
     273, // set_robust_list (thread cleanup)
 
     // Signals
-    13,  // rt_sigaction
-    14,  // rt_sigprocmask
-    15,  // rt_sigreturn
+    13, // rt_sigaction
+    14, // rt_sigprocmask
+    15, // rt_sigreturn
     131, // sigaltstack
 
     // Process lifecycle
-    60,  // exit
+    60, // exit
     200, // tkill
     219, // restart_syscall (kernel injects after interrupted sleep)
     231, // exit_group
 
     // Snapshot / file metadata
-    77,  // ftruncate
+    77, // ftruncate
     262, // newfstatat
     332, // statx (Memory.initFromFile, Blk.init)
 
@@ -136,7 +136,7 @@ const simple_syscalls = [_]u32{
     291, // epoll_create1
 
     // Timers / sleep
-    35,  // nanosleep (pause backoff, SendCtrlAltDel timeout)
+    35, // nanosleep (pause backoff, SendCtrlAltDel timeout)
 
     // Clock / random
     228, // clock_gettime
@@ -168,17 +168,13 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
 
     // Simple syscalls: match → jump to ALLOW
     for (simple, 0..) |nr, i| {
-        f[4 + i] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, nr,
-            @intCast(ALLOW_POS - (4 + i) - 1), 0);
+        f[4 + i] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, nr, @intCast(ALLOW_POS - (4 + i) - 1), 0);
     }
 
     // Filtered syscall dispatch: match → jump to argument check block
-    f[4 + N + 0] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_CLONE,
-        @intCast(CLONE_BLK - (4 + N + 0) - 1), 0);
-    f[4 + N + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_SOCKET,
-        @intCast(SOCKET_BLK - (4 + N + 1) - 1), 0);
-    f[4 + N + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_MPROTECT,
-        @intCast(MPROT_BLK - (4 + N + 2) - 1), 0);
+    f[4 + N + 0] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_CLONE, @intCast(CLONE_BLK - (4 + N + 0) - 1), 0);
+    f[4 + N + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_SOCKET, @intCast(SOCKET_BLK - (4 + N + 1) - 1), 0);
+    f[4 + N + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_MPROTECT, @intCast(MPROT_BLK - (4 + N + 2) - 1), 0);
 
     // Default: kill (or log)
     f[4 + N + 3] = bpf_stmt(BPF_RET | BPF_K, default_action);
@@ -186,21 +182,18 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
     // Clone check: only allow thread-creation flags (block CLONE_NEWUSER etc.)
     f[CLONE_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
     f[CLONE_BLK + 1] = bpf_stmt(BPF_ALU | BPF_AND | BPF_K, ~ALLOWED_CLONE_FLAGS);
-    f[CLONE_BLK + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0,
-        @intCast(ALLOW_POS - (CLONE_BLK + 2) - 1), 0);
+    f[CLONE_BLK + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (CLONE_BLK + 2) - 1), 0);
     f[CLONE_BLK + 3] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 
     // Socket check: only allow AF_UNIX (block AF_INET/AF_INET6 exfiltration)
     f[SOCKET_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
-    f[SOCKET_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, AF_UNIX,
-        @intCast(ALLOW_POS - (SOCKET_BLK + 1) - 1), 0);
+    f[SOCKET_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, AF_UNIX, @intCast(ALLOW_POS - (SOCKET_BLK + 1) - 1), 0);
     f[SOCKET_BLK + 2] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 
     // Mprotect check: deny PROT_EXEC (no shellcode execution)
     f[MPROT_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG2);
     f[MPROT_BLK + 1] = bpf_stmt(BPF_ALU | BPF_AND | BPF_K, PROT_EXEC);
-    f[MPROT_BLK + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0,
-        @intCast(ALLOW_POS - (MPROT_BLK + 2) - 1), 0);
+    f[MPROT_BLK + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (MPROT_BLK + 2) - 1), 0);
     f[MPROT_BLK + 3] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 
     // ALLOW
@@ -215,7 +208,7 @@ pub const log_filter = buildFilter(&simple_syscalls, SECCOMP_RET_LOG);
 /// Install the seccomp BPF filter. After this, unlisted syscalls kill
 /// the process (or log in audit mode for development).
 pub fn install(audit: bool) !void {
-    const rc1: isize = @bitCast(linux.prctl(@intFromEnum(linux.PR.SET_NO_NEW_PRIVS), 1, 0, 0, 0));
+    const rc1: isize = @bitCast(linux.prctl(@backingInt(linux.PR.SET_NO_NEW_PRIVS), 1, 0, 0, 0));
     if (rc1 < 0) {
         log.err("prctl(NO_NEW_PRIVS) failed: {}", .{rc1});
         return error.PrctlFailed;

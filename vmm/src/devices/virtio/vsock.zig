@@ -98,7 +98,7 @@ const Connection = struct {
         while (self.write_len > 0) {
             const rc: isize = @bitCast(linux.write(self.fd, self.write_buf[0..self.write_len].ptr, self.write_len));
             if (rc < 0) {
-                const errno: linux.E = @enumFromInt(@as(u16, @intCast(-rc)));
+                const errno: linux.E = @fromBackingInt(@intCast(@as(u16, @intCast(-rc))));
                 if (errno == .AGAIN) return false; // still blocked
                 // Real error — drop buffer, connection will be cleaned up
                 self.write_len = 0;
@@ -132,7 +132,7 @@ const Connection = struct {
 guest_cid: u64,
 uds_path: [MAX_UDS_PATH + 1]u8,
 uds_path_len: usize,
-connections: [MAX_CONNECTIONS]Connection = [_]Connection{.{}} ** MAX_CONNECTIONS,
+connections: [MAX_CONNECTIONS]Connection = @splat(.{}),
 pending: [MAX_PENDING]PendingPacket = undefined,
 pending_count: usize = 0,
 
@@ -353,7 +353,7 @@ fn handleRequest(self: *Self, guest_port: u32, host_port: u32, buf_alloc: u32, f
     // Connect
     const conn_rc: isize = @bitCast(linux.connect(fd, @ptrCast(&addr), @intCast(@sizeOf(linux.sockaddr.un))));
     if (conn_rc < 0) {
-        const errno: linux.E = @enumFromInt(@as(u16, @intCast(-conn_rc)));
+        const errno: linux.E = @fromBackingInt(@intCast(@as(u16, @intCast(-conn_rc))));
         // EINPROGRESS is fine for non-blocking sockets, but for simplicity
         // we treat it as an error for now; the socket should be listening
         if (errno != .INPROGRESS) {
@@ -436,7 +436,7 @@ fn handleRw(self: *Self, mem: *Memory, descs: []const Queue.Desc, desc_count: us
         while (written < chunk_len) {
             const rc: isize = @bitCast(linux.write(conn.fd, buf[written..].ptr, chunk_len - written));
             if (rc < 0) {
-                const errno: linux.E = @enumFromInt(@as(u16, @intCast(-rc)));
+                const errno: linux.E = @fromBackingInt(@intCast(@as(u16, @intCast(-rc))));
                 if (errno == .AGAIN) {
                     // Stash unwritten data in buffer instead of dropping it
                     const unsent = buf[written..chunk_len];
@@ -480,8 +480,8 @@ fn handleShutdown(self: *Self, guest_port: u32, host_port: u32, flags: u32) void
         // Partial shutdown
         if (conn.fd >= 0) {
             const how: i32 = if (flags & SHUTDOWN_RCV != 0) 0 // SHUT_RD
-            else if (flags & SHUTDOWN_SEND != 0) 1 // SHUT_WR
-            else return;
+                else if (flags & SHUTDOWN_SEND != 0) 1 // SHUT_WR
+                else return;
             _ = linux.shutdown(conn.fd, how);
         }
     }
@@ -562,7 +562,7 @@ fn deliverRxData(self: *Self, mem: *Memory, queue: *Queue, conn: *Connection) !b
 
         const rc: isize = @bitCast(linux.readv(conn.fd, @ptrCast(&iov), @intCast(iov_count)));
         if (rc < 0) {
-            const errno: linux.E = @enumFromInt(@as(u16, @intCast(-rc)));
+            const errno: linux.E = @fromBackingInt(@intCast(@as(u16, @intCast(-rc))));
             if (errno == .AGAIN) {
                 // No data available (spurious poll wakeup)
                 queue.pushUsed(mem, head, 0) catch |e| log.warn("RX pushUsed failed: {}", .{e});

@@ -8,7 +8,38 @@ const Serial = @import("devices/serial.zig");
 const Queue = @import("devices/virtio/queue.zig");
 const snapshot = @import("snapshot.zig");
 const seccomp_mod = @import("seccomp.zig");
+const abi = @import("kvm/abi.zig");
+const Vcpu = @import("kvm/vcpu.zig");
 
+test "kvm: ioctl preserves negative syscall errors" {
+    try std.testing.expectError(error.BadFd, abi.ioctl(-1, abi.c.KVM_GET_API_VERSION, 0));
+    try std.testing.expectError(error.BadFd, abi.ioctlVoid(-1, abi.c.KVM_GET_API_VERSION, 0));
+}
+
+test "kvm: IO exit reads translated payload and rejects out of bounds data" {
+    var mapped: [4096]u8 align(@alignOf(abi.c.kvm_run)) = @splat(0);
+    const run: *abi.c.kvm_run = @ptrCast(&mapped);
+    run.exit_reason = abi.c.KVM_EXIT_IO;
+    // Populate the x86_64 KVM IO payload by its UAPI byte layout, not the translated struct.
+    mapped[32] = abi.c.KVM_EXIT_IO_OUT;
+    mapped[33] = 2;
+    std.mem.writeInt(u16, mapped[34..36], 0x3f8, .little);
+    std.mem.writeInt(u32, mapped[36..40], 3, .little);
+    std.mem.writeInt(u64, mapped[40..48], 1024, .little);
+    @memcpy(mapped[1024..1030], "serial");
+    const vcpu = Vcpu{
+        .fd = -1,
+        .kvm_run = run,
+        .kvm_run_mmap_size = mapped.len,
+    };
+    const io = vcpu.getIoData().?;
+    try std.testing.expectEqual(abi.c.KVM_EXIT_IO_OUT, io.direction);
+    try std.testing.expectEqual(@as(u16, 0x3f8), io.port);
+    try std.testing.expectEqualStrings("serial", io.data[0 .. io.count * io.size]);
+
+    run.unnamed_0.io.data_offset = mapped.len - 2;
+    try std.testing.expect(vcpu.getIoData() == null);
+}
 
 // -- Memory tests --
 
@@ -378,4 +409,3 @@ test "snapshot: device min size check rejects undersized data" {
     // iteration, not in readHeader. We test it here structurally.
     try std.testing.expect(144 > 16); // documents the minimum was raised from 16
 }
-

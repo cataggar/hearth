@@ -45,7 +45,7 @@ fn readFile(path: [*:0]const u8) ![]u8 {
         } else if (rc == 0) {
             return error.UnexpectedEof;
         } else {
-            const errno: linux.E = @enumFromInt(@as(u16, @intCast(-rc)));
+            const errno: linux.E = @fromBackingInt(@intCast(@as(u16, @intCast(-rc))));
             if (errno == .INTR) continue;
             return error.ReadFailed;
         }

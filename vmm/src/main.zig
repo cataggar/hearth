@@ -98,13 +98,14 @@ const CliArgs = struct {
     /// For bool fields, sets to true. For pointer fields, consumes the next arg.
     /// Returns true if the flag was recognized.
     fn parse(self: *CliArgs, flag: []const u8, iter: *std.process.Args.Iterator) bool {
-        inline for (std.meta.fields(CliArgs)) |field| {
-            if (std.mem.eql(u8, flag, "--" ++ field.name)) {
-                if (field.type == bool) {
-                    @field(self, field.name) = true;
+        const info = @typeInfo(CliArgs).@"struct";
+        inline for (info.field_names, info.field_types) |field_name, field_type| {
+            if (std.mem.eql(u8, flag, "--" ++ field_name)) {
+                if (field_type == bool) {
+                    @field(self, field_name) = true;
                 } else {
-                    @field(self, field.name) = iter.next() orelse {
-                        std.debug.print("--" ++ field.name ++ " requires an argument\n", .{});
+                    @field(self, field_name) = iter.next() orelse {
+                        std.debug.print("--" ++ field_name ++ " requires an argument\n", .{});
                         std.process.exit(1);
                     };
                 }
@@ -282,7 +283,6 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 
-
 /// All live VM components created during setup. Returned by createVmComponents
 /// so callers own the resources and their lifetimes.
 const VmComponents = struct {
@@ -343,7 +343,7 @@ fn createVmComponents(
     try vm.createIrqChip();
     try vm.createPit2();
 
-    var devices: DeviceArray = .{null} ** virtio.MAX_DEVICES;
+    var devices: DeviceArray = @splat(null);
     const device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path);
     errdefer for (&devices) |*d| {
         if (d.*) |*dev| dev.deinit();
@@ -488,7 +488,7 @@ fn restoreVm(
     // 2. Re-create device backends from CLI args.
     // The snapshot tells us what device types/slots existed, but backends
     // hold OS resources (fds) that must be opened fresh.
-    var devices: [virtio.MAX_DEVICES]?VirtioMmio = .{null} ** virtio.MAX_DEVICES;
+    var devices: [virtio.MAX_DEVICES]?VirtioMmio = @splat(null);
     var device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path);
 
     defer for (&devices) |*d| {
@@ -546,7 +546,7 @@ fn restoreVmWithApi(
     try vm.createIrqChip();
     try vm.createPit2();
 
-    var devices: [virtio.MAX_DEVICES]?VirtioMmio = .{null} ** virtio.MAX_DEVICES;
+    var devices: [virtio.MAX_DEVICES]?VirtioMmio = @splat(null);
     var device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path);
     defer for (&devices) |*d| {
         if (d.*) |*dev| dev.deinit();
@@ -807,7 +807,6 @@ fn runLoopThread(runtime: *VmRuntime) void {
     const tid: i32 = @intCast(std.os.linux.gettid());
     runtime.vcpu_tid.store(tid, .release);
 
-
     runLoop(
         runtime.vcpu,
         runtime.serial,
@@ -975,7 +974,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
                                     }
                                 }
                             } else {
-                                var data: [8]u8 = .{0} ** 8;
+                                var data: [8]u8 = @splat(0);
                                 dev.handleRead(offset, data[0..len]);
                                 const run_mmio = &vcpu.kvm_run.unnamed_0.mmio;
                                 run_mmio.data = data;
