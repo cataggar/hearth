@@ -18,6 +18,7 @@ import { download } from "./download.js";
 import { getHearthDir } from "../vm/binary.js";
 import { errorMessage } from "../util.js";
 import { initKsm } from "../vm/ksm.js";
+import { buildWithZig, SetupError } from "./zig.js";
 
 const HEARTH_DIR = getHearthDir();
 const BIN_DIR = join(HEARTH_DIR, "bin");
@@ -80,26 +81,9 @@ async function setupFlint() {
     return;
   }
 
-  // Check for Zig
-  try {
-    execSync("zig version", { stdio: "pipe" });
-  } catch {
-    console.error("ERROR: Zig not found on PATH. Flint requires Zig 0.16+ to build.");
-    console.error("  Install Zig: https://ziglang.org/download/");
-    process.exit(1);
-  }
-
   const vmmDir = findVmmDir();
   console.log("  flint: building with Zig...");
-  try {
-    execSync("zig build -Doptimize=ReleaseSafe", { cwd: vmmDir, stdio: "pipe" });
-  } catch (err: unknown) {
-    if (err && typeof err === "object" && "stderr" in err) {
-      const stderr = (err as Record<string, unknown>).stderr;
-      if (Buffer.isBuffer(stderr)) console.error(stderr.toString());
-    }
-    throw err;
-  }
+  buildWithZig(vmmDir);
   copyFileSync(join(vmmDir, "zig-out", "bin", "flint"), flintPath);
   chmodSync(flintPath, 0o755);
   console.log("  flint: built and installed");
@@ -113,7 +97,7 @@ function findVmmDir(): string {
   for (const dir of candidates) {
     if (existsSync(join(dir, "build.zig"))) return dir;
   }
-  throw new Error("Could not find vmm/ directory. Run from the hearth repo root.");
+  throw new SetupError("Could not find vmm/ source module (build.zig missing). Run from the hearth repo root.");
 }
 
 async function setupKernel() {
@@ -164,19 +148,9 @@ async function setupAgent() {
     console.log("  hearth-agent: prebuilt download failed, trying Zig build...");
   }
 
-  // Fallback: build from source with Zig
-  try {
-    execSync("zig version", { stdio: "pipe" });
-  } catch {
-    console.error("ERROR: Could not download prebuilt agent and Zig not found on PATH.");
-    console.error("  Either create a GitHub release with agent binaries,");
-    console.error("  or install Zig: https://ziglang.org/download/");
-    process.exit(1);
-  }
-
   const agentDir = findAgentDir();
   console.log("  hearth-agent: building with Zig...");
-  execSync("zig build", { cwd: agentDir, stdio: "pipe" });
+  buildWithZig(agentDir);
   copyFileSync(join(agentDir, "zig-out", "bin", "hearth-agent"), agentPath);
   chmodSync(agentPath, 0o755);
   console.log("  hearth-agent: built");
@@ -190,7 +164,7 @@ function findAgentDir(): string {
   for (const dir of candidates) {
     if (existsSync(join(dir, "build.zig"))) return dir;
   }
-  throw new Error("Could not find agent/ directory. Run from the hearth repo root.");
+  throw new SetupError("Could not find agent/ source module (build.zig missing). Run from the hearth repo root.");
 }
 
 async function setupRootfs() {

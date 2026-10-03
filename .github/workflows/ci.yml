@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   typecheck:
     runs-on: ubuntu-latest
@@ -29,3 +32,235 @@ jobs:
       - run: npm ci
       - name: Run unit tests
         run: npx vitest run src/vm/ksm.test.ts src/environment/hearthfile.test.ts src/environment/defaults.test.ts
+
+  zig-setup:
+    name: Source-build toolchain checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Check compiler requirements and both source-build paths
+        run: npx vitest run src/cli/setup.test.ts -t "source builds"
+
+  zig-flint:
+    name: Flint builds and unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Linux KVM headers and native build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential libc6-dev linux-libc-dev
+      - name: Install Zig via ghr
+        uses: cataggar/ghr/actions/install@v0.6.1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tools: |
+            cataggar/zig@v0.17.0 RWSGOq2NVecA2UPNdBUZykf1CCb147pkmdtYxgb3Ti+JO/wCYvhbAb/U
+      - name: Verify exact compiler version
+        run: |
+          zig version
+          test "$(zig version)" = 0.17.0
+      - name: Check Flint formatting
+        run: zig fmt --check vmm/build.zig vmm/build.zig.zon vmm/src
+      - name: Build and test Flint in debug and safe modes
+        working-directory: vmm
+        run: |
+          set -euo pipefail
+          mkdir -p ../.ci-logs
+          for mode in debug safe; do
+            zig build -Dtarget=x86_64-linux -Doptimize="$mode" --summary all 2>&1 | tee "../.ci-logs/flint-build-$mode.log"
+            zig build test -Dtarget=x86_64-linux -Doptimize="$mode" --summary all 2>&1 | tee "../.ci-logs/flint-test-$mode.log"
+          done
+      - name: Retain Flint failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flint-failure-logs
+          path: .ci-logs/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  zig-agent:
+    name: Guest agent (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-linux, aarch64-linux]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install native libc development dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential libc6-dev
+      - name: Install Zig via ghr
+        uses: cataggar/ghr/actions/install@v0.6.1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tools: |
+            cataggar/zig@v0.17.0 RWSGOq2NVecA2UPNdBUZykf1CCb147pkmdtYxgb3Ti+JO/wCYvhbAb/U
+      - name: Verify exact compiler version
+        run: |
+          zig version
+          test "$(zig version)" = 0.17.0
+      - name: Check guest-agent formatting
+        run: zig fmt --check agent/build.zig agent/build.zig.zon agent/src
+      - name: Build the guest agent in safe mode
+        working-directory: agent
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../.ci-logs
+          zig build -Dtarget="$TARGET" -Doptimize=safe --summary all 2>&1 | tee "../.ci-logs/agent-$TARGET.log"
+      - name: Retain guest-agent failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-failure-logs-${{ matrix.target }}
+          path: .ci-logs/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  zig-kvm:
+    name: Flint KVM integration
+    # Full ephemeral hosted VMs support KVM; ubuntu-slim containers do not.
+    # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+    # https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install KVM, kernel download, and initrd prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libc6-dev linux-libc-dev acl curl python3 \
+            libarchive-tools cpio gzip busybox-static
+      - name: Verify accessible and functional KVM
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-logs
+          if ! test -c /dev/kvm; then
+            echo "::error::Hosted runner has no /dev/kvm. KVM integration is blocked, not skipped; use a KVM-capable ephemeral hosted runner."
+            exit 1
+          fi
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          python3 - <<'PY' 2>&1 | tee .ci-logs/kvm-prerequisites.log
+          import fcntl
+          import os
+          import platform
+
+          print(platform.platform())
+          if not os.access("/dev/kvm", os.R_OK | os.W_OK):
+              raise SystemExit("KVM integration blocked: /dev/kvm is not readable and writable")
+          fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC)
+          try:
+              version = fcntl.ioctl(fd, 0xAE00, 0)  # KVM_GET_API_VERSION
+              if version != 12:
+                  raise SystemExit(f"Unsupported KVM API version: {version}")
+              vm = fcntl.ioctl(fd, 0xAE01, 0)  # KVM_CREATE_VM
+              os.close(vm)
+              print("KVM API 12 and VM creation: OK")
+          finally:
+              os.close(fd)
+          PY
+      - name: Install the exact 5.10.245 guest kernel and check initrd tools
+        run: |
+          set -euo pipefail
+          mkdir -p .ci/guest/initrd
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/joshuaisaact/hearth/releases/download/kernel-5.10.245/bzImage \
+            --output .ci/guest/bzImage
+          echo "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208  .ci/guest/bzImage" | sha256sum --check
+          install -m 0644 .ci/guest/bzImage /tmp/vmlinuz-minimal
+          test -r /tmp/vmlinuz-minimal
+          test -s /tmp/vmlinuz-minimal
+          for tool in bsdcpio cpio gzip busybox timeout; do
+            command -v "$tool"
+          done
+          printf '#!/bin/sh\nexit 0\n' > .ci/guest/initrd/init
+          chmod +x .ci/guest/initrd/init
+          (cd .ci/guest/initrd && printf 'init\n' | bsdcpio -o -H newc) | gzip > .ci/guest/initrd.cpio.gz
+          gzip -dc .ci/guest/initrd.cpio.gz | bsdcpio -t | grep -Fx init
+      - name: Install Zig via ghr
+        uses: cataggar/ghr/actions/install@v0.6.1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tools: |
+            cataggar/zig@v0.17.0 RWSGOq2NVecA2UPNdBUZykf1CCb147pkmdtYxgb3Ti+JO/wCYvhbAb/U
+      - name: Verify exact compiler version
+        run: |
+          zig version
+          test "$(zig version)" = 0.17.0
+      - name: Run real KVM integration and reject skipped coverage
+        working-directory: vmm
+        run: |
+          set -euo pipefail
+          timeout --kill-after=30s 10m \
+            zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
+            2>&1 | tee ../.ci-logs/kvm-integration.log
+          python3 - <<'PY'
+          import pathlib
+          import re
+
+          log = pathlib.Path("../.ci-logs/kvm-integration.log").read_text()
+          if re.search(r"\bskip(?:ped)?\b", log, re.IGNORECASE):
+              raise SystemExit("Integration coverage was skipped; all KVM tests must execute")
+          summary = re.search(r"(\d+)/(\d+) tests passed", log)
+          expected = len(re.findall(r'^test "', pathlib.Path("src/integration_tests.zig").read_text(), re.MULTILINE))
+          if not summary or expected <= 2:
+              raise SystemExit("Missing integration test execution summary or KVM test cases")
+          passed, total = map(int, summary.groups())
+          if passed != total or total < expected:
+              raise SystemExit(f"Incomplete integration coverage: {passed}/{total} passed; expected at least {expected}")
+          print(f"Verified {passed} integration tests executed with KVM and the pinned kernel")
+          PY
+      - name: Retain KVM integration logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kvm-integration-logs
+          path: .ci-logs/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  zig-validation:
+    name: Zig validation
+    needs: [zig-setup, zig-flint, zig-agent, zig-kvm]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require successful source-build, native, cross-target, and KVM validation
+        env:
+          SETUP_RESULT: ${{ needs.zig-setup.result }}
+          FLINT_RESULT: ${{ needs.zig-flint.result }}
+          AGENT_RESULT: ${{ needs.zig-agent.result }}
+          KVM_RESULT: ${{ needs.zig-kvm.result }}
+        run: |
+          set -euo pipefail
+          printf 'Source-build checks: %s\nFlint: %s\nGuest agent: %s\nKVM integration: %s\n' \
+            "$SETUP_RESULT" "$FLINT_RESULT" "$AGENT_RESULT" "$KVM_RESULT"
+          test "$SETUP_RESULT" = success
+          test "$FLINT_RESULT" = success
+          test "$AGENT_RESULT" = success
+          test "$KVM_RESULT" = success
