@@ -262,14 +262,43 @@ jobs:
           if ! command -v strace; then
             sudo apt-get install -y --no-install-recommends strace
           fi
+          id
+          getfacl -n /dev/kvm
+          stat /dev/kvm zig-out/bin/flint
+          cat /proc/self/attr/current
+          python3 - <<'PY' 2>&1 | tee ../.ci-logs/kvm-direct-probes.log
+          import fcntl
+          import os
+          import subprocess
+
+          for label, extra in (("normal", 0), ("largefile", 0x8000)):
+              try:
+                  fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC | extra)
+              except OSError as error:
+                  print(f"Python {label} open failed: {error}", flush=True)
+                  continue
+              try:
+                  print(f"Python {label} KVM API: {fcntl.ioctl(fd, 0xAE00, 0)}", flush=True)
+              finally:
+                  os.close(fd)
+          result = subprocess.run(
+              ["zig-out/bin/flint", "/nonexistent/hearth-ci-diagnostic-kernel"],
+              capture_output=True, text=True, timeout=15,
+          )
+          print(f"Direct Flint exit status: {result.returncode}")
+          print(result.stdout)
+          print(result.stderr)
+          PY
           status=0
           timeout --kill-after=30s 2m \
-            strace -f -e trace=open,openat,openat2,clone,clone3,getuid,geteuid,getgid,getegid,setuid,setgid,setresuid,setresgid,setfsuid,setfsgid,setgroups \
+            strace -f -e trace=open,openat,openat2,fork,vfork,clone,clone3,execve,getuid,geteuid,getgid,getegid,setuid,setgid,setresuid,setresgid,setfsuid,setfsgid,setgroups,prctl,seccomp,capset,unshare,setns,landlock_create_ruleset,landlock_add_rule,landlock_restrict_self \
               -o ../.ci-logs/kvm-syscalls.log \
               zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
               2>&1 | tee ../.ci-logs/kvm-trace-test.log || status=$?
           printf 'Diagnostic integration exit status: %s\n' "$status"
-          grep -E '/dev/kvm|[gs]et.*[ug]id|clone' ../.ci-logs/kvm-syscalls.log | tail -80
+          getfacl -n /dev/kvm
+          sudo journalctl --dmesg --since '10 minutes ago' --no-pager | tee ../.ci-logs/kvm-kernel.log
+          grep -E '/dev/kvm|[gs]et.*[ug]id|clone|prctl|seccomp|landlock|unshare|setns' ../.ci-logs/kvm-syscalls.log | tail -80
           exit "$status"
       - name: Retain KVM integration logs
         if: always()
