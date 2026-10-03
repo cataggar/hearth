@@ -3,7 +3,7 @@ const posix = @import("posix.zig");
 const linux = std.os.linux;
 const c = @import("libc");
 
-test "fork preserves blocking pipes, nonblocking wait and dup2 redirection" {
+test "fork and exec preserve blocking pipes, nonblocking wait and dup2 redirection" {
     const output = try posix.pipe();
     defer posix.close(output[0]);
     const gate = posix.pipe() catch |err| {
@@ -26,8 +26,13 @@ test "fork preserves blocking pipes, nonblocking wait and dup2 redirection" {
         _ = posix.setsid() catch linux.exit_group(126);
         posix.dup2(output[1], 1) catch linux.exit_group(126);
         posix.close(output[1]);
-        _ = posix.write(1, "redirected") catch linux.exit_group(126);
-        linux.exit_group(7);
+        var argv: [8:null]?[*:0]const u8 = @splat(null);
+        argv[0] = "/bin/sh";
+        argv[1] = "-c";
+        argv[2] = "printf redirected; exit 7";
+        const envp = [_:null]?[*:0]const u8{};
+        _ = linux.execve("/bin/sh", @ptrCast(&argv), @ptrCast(&envp));
+        linux.exit_group(126);
     }
 
     posix.close(output[1]);
