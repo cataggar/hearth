@@ -82,7 +82,40 @@ Works over any network where the Mac can reach the server (ZeroTier, Tailscale, 
 npx hearth setup
 ```
 
-Builds the Flint VMM from source (requires Zig 0.16+), downloads a guest kernel, builds the agent binary, creates an Ubuntu rootfs via Docker, and captures a base snapshot. Takes ~1-2 minutes on first run, idempotent after that.
+Builds the Flint VMM from source (requires Zig 0.17.0), downloads a guest kernel, builds the agent binary, creates an Ubuntu rootfs via Docker, and captures a base snapshot. Takes ~1-2 minutes on first run, idempotent after that. The guest-agent source-build fallback uses the same compiler version.
+
+Install the signed compiler using [ghr](https://github.com/cataggar/ghr):
+
+```bash
+ghr install cataggar/zig@v0.17.0 RWSGOq2NVecA2UPNdBUZykf1CCb147pkmdtYxgb3Ti+JO/wCYvhbAb/U
+zig version
+```
+
+The second argument is the public verification key. Both Zig packages pin their
+C translation dependency so Linux KVM and guest libc bindings are generated for
+the selected target.
+
+### Zig development and CI
+
+```bash
+cd vmm
+zig build
+zig build test
+zig build -Doptimize=safe
+zig build test -Doptimize=safe
+```
+
+The guest agent builds from `agent/` with `zig build -Dtarget=x86_64-linux` or
+`zig build -Dtarget=aarch64-linux`. Cross-building the agent does not imply an
+AArch64 Flint VMM or native AArch64 runtime coverage.
+
+CI installs signed Zig 0.17.0 through `cataggar/ghr/actions/install`, checks
+formatting, builds/tests Flint, and builds both guest-agent targets alongside the
+existing TypeScript jobs. KVM integration is a separate hosted Linux job with
+explicit prerequisites: accessible `/dev/kvm`, the guest bzImage at
+`/tmp/vmlinuz-minimal`, static BusyBox, and `bsdcpio`. Run it locally from `vmm/`
+with `zig build integration-test -Doptimize=safe`. Missing prerequisites or an
+entirely skipped integration suite are not passing KVM coverage.
 
 ## Environments
 
