@@ -106,8 +106,9 @@ zig build test -Doptimize=safe
 ```
 
 The guest agent builds from `agent/` with `zig build -Dtarget=x86_64-linux` or
-`zig build -Dtarget=aarch64-linux`. Cross-building the agent does not imply an
-AArch64 Flint VMM or native AArch64 runtime coverage.
+`zig build -Dtarget=aarch64-linux`. These target forms retain a static musl
+binary; explicit GNU targets default to glibc 2.34 or newer. Cross-building the
+agent does not imply an AArch64 Flint VMM or native AArch64 runtime coverage.
 
 CI installs signed Zig 0.17.0 through `cataggar/ghr/actions/install`, checks
 formatting, builds/tests Flint, and builds both guest-agent targets alongside the
