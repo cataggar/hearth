@@ -201,8 +201,10 @@ test "API boot and VM status" {
 
     // Configure and boot
     var boot_cmd_buf: [512]u8 = undefined;
-    const boot_cmd = std.fmt.bufPrint(&boot_cmd_buf,
-        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}", .{ DEFAULT_KERNEL, initrd },
+    const boot_cmd = std.fmt.bufPrint(
+        &boot_cmd_buf,
+        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
+        .{ DEFAULT_KERNEL, initrd },
     ) catch unreachable;
 
     var r = try httpRequest(sock_path, "PUT", "/boot-source", boot_cmd);
@@ -245,8 +247,10 @@ test "API pause and resume" {
     sleep_ms(500);
 
     var boot_cmd_buf: [512]u8 = undefined;
-    const boot_cmd = std.fmt.bufPrint(&boot_cmd_buf,
-        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}", .{ DEFAULT_KERNEL, initrd },
+    const boot_cmd = std.fmt.bufPrint(
+        &boot_cmd_buf,
+        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
+        .{ DEFAULT_KERNEL, initrd },
     ) catch unreachable;
 
     var r = try httpRequest(sock_path, "PUT", "/boot-source", boot_cmd);
@@ -299,8 +303,10 @@ test "snapshot requires pause" {
     sleep_ms(500);
 
     var boot_cmd_buf: [512]u8 = undefined;
-    const boot_cmd = std.fmt.bufPrint(&boot_cmd_buf,
-        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}", .{ DEFAULT_KERNEL, initrd },
+    const boot_cmd = std.fmt.bufPrint(
+        &boot_cmd_buf,
+        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
+        .{ DEFAULT_KERNEL, initrd },
     ) catch unreachable;
 
     var r = try httpRequest(sock_path, "PUT", "/boot-source", boot_cmd);
@@ -311,7 +317,10 @@ test "snapshot requires pause" {
     sleep_ms(2000);
 
     // Snapshot without pausing should fail
-    const snap_resp = try httpRequest(sock_path, "PUT", "/snapshot/create",
+    const snap_resp = try httpRequest(
+        sock_path,
+        "PUT",
+        "/snapshot/create",
         "{\"snapshot_path\":\"/tmp/flint-test.vmstate\",\"mem_file_path\":\"/tmp/flint-test.mem\"}",
     );
     defer allocator.free(snap_resp);
@@ -346,8 +355,10 @@ test "snapshot create and restore" {
     sleep_ms(500);
 
     var boot_cmd_buf: [512]u8 = undefined;
-    const boot_cmd = std.fmt.bufPrint(&boot_cmd_buf,
-        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}", .{ DEFAULT_KERNEL, initrd },
+    const boot_cmd = std.fmt.bufPrint(
+        &boot_cmd_buf,
+        "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
+        .{ DEFAULT_KERNEL, initrd },
     ) catch unreachable;
 
     var r = try httpRequest(sock_path, "PUT", "/boot-source", boot_cmd);
@@ -362,8 +373,10 @@ test "snapshot create and restore" {
     allocator.free(r);
 
     var snap_cmd_buf: [512]u8 = undefined;
-    const snap_cmd = std.fmt.bufPrint(&snap_cmd_buf,
-        "{{\"snapshot_path\":\"{s}\",\"mem_file_path\":\"{s}\"}}", .{ vmstate, memfile },
+    const snap_cmd = std.fmt.bufPrint(
+        &snap_cmd_buf,
+        "{{\"snapshot_path\":\"{s}\",\"mem_file_path\":\"{s}\"}}",
+        .{ vmstate, memfile },
     ) catch unreachable;
 
     r = try httpRequest(sock_path, "PUT", "/snapshot/create", snap_cmd);

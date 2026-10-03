@@ -49,7 +49,7 @@ pub fn init(tap_name: [*:0]const u8) !Self {
     errdefer _ = linux.close(fd);
 
     // Create TAP device with IFF_TAP | IFF_NO_PI | IFF_VNET_HDR
-    var ifr: [40]u8 = .{0} ** 40; // struct ifreq is 40 bytes (name[16] + union[24])
+    var ifr: [40]u8 = @splat(0); // struct ifreq is 40 bytes (name[16] + union[24])
     const name_len = std.mem.indexOfSentinel(u8, 0, tap_name);
     if (name_len >= IFNAMSIZ) return error.TapNameTooLong;
     @memcpy(ifr[0..name_len], tap_name[0..name_len]);
@@ -227,7 +227,7 @@ fn receiveFrame(self: Self, mem: *Memory, queue: *Queue, head: u16) !u32 {
 
     const rc: isize = @bitCast(linux.readv(self.tap_fd, @ptrCast(&iov), @intCast(desc_count)));
     if (rc < 0) {
-        const errno: linux.E = @enumFromInt(@as(u16, @intCast(-rc)));
+        const errno: linux.E = @fromBackingInt(@intCast(@as(u16, @intCast(-rc))));
         if (errno == .AGAIN) {
             return error.WouldBlock;
         }

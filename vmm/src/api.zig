@@ -207,14 +207,14 @@ fn handleBootSource(request: *http.Server.Request, body: ?[]const u8, allocator:
 
     // Free old allocations before overwriting (handles repeated PUT /boot-source)
     if (config.kernel_path) |old| allocator.free(old);
-    config.kernel_path = allocator.dupeZ(u8, parsed.value.kernel_image_path) catch {
+    config.kernel_path = allocator.dupeSentinel(u8, parsed.value.kernel_image_path, 0) catch {
         respondError(request, .internal_server_error, "allocation failed");
         return .err;
     };
 
     if (parsed.value.initrd_path) |p| {
         if (config.initrd_path) |old| allocator.free(old);
-        config.initrd_path = allocator.dupeZ(u8, p) catch {
+        config.initrd_path = allocator.dupeSentinel(u8, p, 0) catch {
             respondError(request, .internal_server_error, "allocation failed");
             return .err;
         };
@@ -222,7 +222,7 @@ fn handleBootSource(request: *http.Server.Request, body: ?[]const u8, allocator:
 
     if (parsed.value.boot_args) |a| {
         if (config.boot_args) |old| allocator.free(old);
-        config.boot_args = allocator.dupeZ(u8, a) catch {
+        config.boot_args = allocator.dupeSentinel(u8, a, 0) catch {
             respondError(request, .internal_server_error, "allocation failed");
             return .err;
         };
@@ -247,7 +247,7 @@ fn handleDrive(request: *http.Server.Request, body: ?[]const u8, allocator: std.
     defer parsed.deinit();
 
     if (config.disk_path) |old| allocator.free(old);
-    config.disk_path = allocator.dupeZ(u8, parsed.value.path_on_host) catch {
+    config.disk_path = allocator.dupeSentinel(u8, parsed.value.path_on_host, 0) catch {
         respondError(request, .internal_server_error, "allocation failed");
         return .err;
     };
@@ -271,7 +271,7 @@ fn handleNetIface(request: *http.Server.Request, body: ?[]const u8, allocator: s
     defer parsed.deinit();
 
     if (config.tap_name) |old| allocator.free(old);
-    config.tap_name = allocator.dupeZ(u8, parsed.value.host_dev_name) catch {
+    config.tap_name = allocator.dupeSentinel(u8, parsed.value.host_dev_name, 0) catch {
         respondError(request, .internal_server_error, "allocation failed");
         return .err;
     };
@@ -306,13 +306,13 @@ fn handleVsock(request: *http.Server.Request, body: ?[]const u8, allocator: std.
         return .err;
     };
     if (config.vsock_cid) |old| allocator.free(old);
-    config.vsock_cid = allocator.dupeZ(u8, cid_str) catch {
+    config.vsock_cid = allocator.dupeSentinel(u8, cid_str, 0) catch {
         respondError(request, .internal_server_error, "allocation failed");
         return .err;
     };
 
     if (config.vsock_uds) |old| allocator.free(old);
-    config.vsock_uds = allocator.dupeZ(u8, parsed.value.uds_path) catch {
+    config.vsock_uds = allocator.dupeSentinel(u8, parsed.value.uds_path, 0) catch {
         respondError(request, .internal_server_error, "allocation failed");
         return .err;
     };
@@ -419,11 +419,11 @@ fn handleSnapshotLoad(request: *http.Server.Request, body: ?[]const u8, allocato
     }
 
     // Allocate both paths before assigning to config to avoid partial state on failure
-    const sp = allocator.dupeZ(u8, parsed.value.snapshot_path) catch {
+    const sp = allocator.dupeSentinel(u8, parsed.value.snapshot_path, 0) catch {
         respondError(request, .internal_server_error, "allocation failed");
         return .err;
     };
-    const mp = allocator.dupeZ(u8, parsed.value.mem_file_path) catch {
+    const mp = allocator.dupeSentinel(u8, parsed.value.mem_file_path, 0) catch {
         allocator.free(sp);
         respondError(request, .internal_server_error, "allocation failed");
         return .err;
