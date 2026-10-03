@@ -30,24 +30,21 @@ describe("source builds", () => {
     vi.mocked(childProcess.execFileSync).mockReset();
   });
 
-  it.each([
-    { sourceDir: "vmm", component: "flint" as const, args: ["build", "-Doptimize=safe"] },
-    { sourceDir: "agent", component: "agent" as const, args: ["build"] },
-  ])("checks the pinned compiler before building $component in safe mode", ({ sourceDir, component, args }) => {
-    buildWithZig(sourceDir, component);
+  it.each(["vmm", "agent"])("checks the pinned compiler before building %s in safe mode", (sourceDir) => {
+    buildWithZig(sourceDir);
 
     expect(childProcess.execFileSync).toHaveBeenNthCalledWith(
       1, "zig", ["version"], { encoding: "utf8", stdio: "pipe" },
     );
     expect(childProcess.execFileSync).toHaveBeenNthCalledWith(
-      2, "zig", args, { cwd: sourceDir, stdio: "pipe" },
+      2, "zig", ["build", "-Doptimize=safe"], { cwd: sourceDir, stdio: "pipe" },
     );
   });
 
   it.each(["0.16.0", "0.17.0-dev.1+abcdef", "0.18.0", ""])("rejects incompatible compiler output %j", (version) => {
     vi.mocked(childProcess.execFileSync).mockReturnValue(`${version}\n`);
 
-    expect(() => buildWithZig("agent", "agent")).toThrow(
+    expect(() => buildWithZig("agent")).toThrow(
       `Source builds require Zig 0.17.0; found ${JSON.stringify(version)}`,
     );
     expect(childProcess.execFileSync).toHaveBeenCalledTimes(1);
@@ -57,8 +54,8 @@ describe("source builds", () => {
     const cause = Object.assign(new Error("spawnSync zig ENOENT"), { code: "ENOENT" });
     vi.mocked(childProcess.execFileSync).mockImplementation(() => { throw cause; });
 
-    expect(() => buildWithZig("vmm", "flint")).toThrow(SetupError);
-    expect(() => buildWithZig("vmm", "flint")).toThrow("Zig not found on PATH. Source builds require Zig 0.17.0.");
+    expect(() => buildWithZig("vmm")).toThrow(SetupError);
+    expect(() => buildWithZig("vmm")).toThrow("Zig not found on PATH. Source builds require Zig 0.17.0.");
   });
 
   it("preserves a failed version probe rather than calling it a missing compiler", () => {
@@ -66,7 +63,7 @@ describe("source builds", () => {
     vi.mocked(childProcess.execFileSync).mockImplementation(() => { throw cause; });
 
     try {
-      buildWithZig("agent", "agent");
+      buildWithZig("agent");
       expect.fail("Expected the compiler check to fail");
     } catch (err: unknown) {
       expect(err).toBeInstanceOf(SetupError);
@@ -79,7 +76,7 @@ describe("source builds", () => {
   it("reports missing source modules before running Zig", () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
-    expect(() => buildWithZig("agent", "agent")).toThrow("Missing Zig source module at agent (build.zig not found)");
+    expect(() => buildWithZig("agent")).toThrow("Missing Zig source module at agent (build.zig not found)");
     expect(childProcess.execFileSync).not.toHaveBeenCalled();
   });
 
@@ -91,7 +88,7 @@ describe("source builds", () => {
       .mockImplementationOnce(() => { throw cause; });
 
     try {
-      buildWithZig("agent", "agent");
+      buildWithZig("agent");
       expect.fail("Expected the source build to fail");
     } catch (err: unknown) {
       expect(err).toBeInstanceOf(SetupError);
