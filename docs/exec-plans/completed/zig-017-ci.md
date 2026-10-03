@@ -1,6 +1,6 @@
 # Execution Plan: Zig 0.17.0 and ghr-based CI
 
-**Status**: In progress; hosted CI acceptance pending
+**Status**: Completed; wider runtime coverage gaps remain in #4
 **Issue**: #4
 **PR**: [#5](https://github.com/cataggar/hearth/pull/5)
 **Spec**: [Zig Toolchain and CI](../../product-specs/zig-toolchain-ci.md)
@@ -91,11 +91,22 @@ not increase. The large tail/I/O differences are sensitive to fixture scheduling
 and are not claimed as proven compiler speedups. Use 0.17 on both sides of the
 subsequent VirtIO experiments.
 
-### Remaining merge and coverage gates
+### Hosted acceptance
 
-Actual hosted PR CI, including KVM execution and the required-result gate, must
-pass before merge. Raw perf data, reports, workload runner, and fixture assets
-are retained as session artifacts. The [reproducible workload recipe](https://github.com/cataggar/hearth/pull/5#issuecomment-5973822154)
+[Run 37162651865](https://github.com/cataggar/hearth/actions/runs/37162651865)
+passed all eight PR checks on `eb18baada59b0d2876d1327a985f96ebd4286855`,
+including the stable `Zig validation` gate. The KVM job executed all seven
+integration tests in 12 seconds with the pinned guest kernel; its log explicitly
+reports `7/7 tests passed` and rejects skips or incomplete coverage. Preflight
+and execution ran as UID 1001 (`runner`), primary GID 993 (`kvm`), not root.
+Both guest target builds, native agent tests, debug/safe VMM builds and unit
+tests, source-build checks, and existing TypeScript checks passed.
+
+### Hosted validation history and remaining coverage
+
+The latest PR head must remain green before merge. Raw perf data, reports,
+workload runner, and fixture assets are retained as session artifacts.
+The [reproducible workload recipe](https://github.com/cataggar/hearth/pull/5#issuecomment-5973822154)
 is published with the PR.
 
 Hosted runs 37156441987 and 37156778320 passed the compiler, guest-target,
@@ -104,7 +115,7 @@ reported `/dev/kvm` `AccessDenied` despite successful initial VM-creation
 preflight checks. Child stderr is now visible and the explicitly scoped hidden
 CI log directory is retained. Integration artifacts are built before refreshing
 the runner-user device ACL and recording access immediately before execution.
-This change is locally verified but is not yet proven to resolve hosted access.
+The ACL refresh did not resolve hosted access, as later diagnostics established.
 
 Run 37157089601 and its failed-job retry could not fetch the locked translate-c
 dependency from Codeberg (`ReadFailed`), so neither reached the new runtime
@@ -119,7 +130,7 @@ Aro remains pinned to `d0c8c4d9c55daa7ef6e40cf0f630a5b5e900989b` and its origina
 content hash. A fresh GitHub fetch and Zig 0.17 safe build of the fork succeeded.
 Both Hearth manifests use the new immutable fork revision and verified package
 hash, removing Codeberg from the dependency chain without changing compiler
-comparison code. The PR remains unmerged until actual hosted acceptance succeeds.
+comparison code. The successful hosted acceptance above uses these pins.
 
 Run 37162341668 establishes that the named runner ACL disappears between the
 successful immediate preflight and test execution. Subsequent direct Python

@@ -1,7 +1,10 @@
 # Product Spec: Zig Toolchain and CI
 
-**Status**: In progress
+**Status**: Implemented
 **Last updated**: 2026-10-03
+
+Compiler migration and hosted CI acceptance are complete. Wider installed-image
+and SDK runtime coverage gaps remain tracked in #4.
 
 ## Goal
 
