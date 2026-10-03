@@ -64,6 +64,8 @@ pub fn build(b: *std.Build) void {
     integration_build_step.dependOn(&integration_tests.step);
 
     const run_integration = b.addRunArtifact(integration_tests);
+    // KVM, the kernel, and fixture tools are runtime prerequisites, not cache inputs.
+    run_integration.has_side_effects = true;
     // Integration tests depend on the flint binary being built
     run_integration.step.dependOn(b.getInstallStep());
 
