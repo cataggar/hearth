@@ -7,6 +7,7 @@
 | [SDK API Design](sdk-api-design.md) | Draft | Public TypeScript API surface |
 | [Sandbox Lifecycle](sandbox-lifecycle.md) | Draft | Create → use → snapshot → destroy |
 | [Filesystem Operations](filesystem-operations.md) | Draft | File I/O between host and guest |
+| [Zig Toolchain and CI](zig-toolchain-ci.md) | In progress | Zig 0.17.0 migration, signed compiler installation, and actual VMM/agent CI |
 
 ## In Design
 
