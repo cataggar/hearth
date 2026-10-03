@@ -1,6 +1,6 @@
 # Execution Plan: Zig 0.17.0 and ghr-based CI
 
-**Status**: Blocked on hosted CI acceptance
+**Status**: In progress; hosted CI acceptance pending
 **Issue**: #4
 **PR**: [#5](https://github.com/cataggar/hearth/pull/5)
 **Spec**: [Zig Toolchain and CI](../../product-specs/zig-toolchain-ci.md)
@@ -33,7 +33,8 @@ The unchanged source is retained in another worktree for the 0.16 baseline.
 ## Results
 
 The three isolated workstreams were integrated and reviewed. Both packages use
-the same immutable translate-c 2.0.0 release revision and content hash.
+the same immutable translate-c 2.0.0 compatibility-fork revision and content
+hash. The fork changes only the Aro download URL, not translation code.
 
 ### Local acceptance
 
@@ -108,9 +109,17 @@ This change is locally verified but is not yet proven to resolve hosted access.
 Run 37157089601 and its failed-job retry could not fetch the locked translate-c
 dependency from Codeberg (`ReadFailed`), so neither reached the new runtime
 check. Direct official archive and archive-API requests also timed out, and the
-official GitHub mirror does not contain the locked release commit. Keep the
-verified dependency pin and merge gate intact; do not treat these failures as
-passing KVM coverage. The PR remains unmerged until hosted acceptance succeeds.
+official GitHub mirror did not contain the locked release commit. These
+failures are not passing KVM coverage.
+
+The requested GitHub mirrors now preserve the original source commits. The
+translate-c `2.0.0` compatibility fork is `62d06a5d3e93c82727544e8113e4762a315ca0ed`,
+directly atop upstream release `0da7a16c`, with exactly one Aro URL change.
+Aro remains pinned to `d0c8c4d9c55daa7ef6e40cf0f630a5b5e900989b` and its original
+content hash. A fresh GitHub fetch and Zig 0.17 safe build of the fork succeeded.
+Both Hearth manifests use the new immutable fork revision and verified package
+hash, removing Codeberg from the dependency chain without changing compiler
+comparison code. The PR remains unmerged until actual hosted acceptance succeeds.
 
 The unchanged Flint backend has no host-initiated vsock `CONNECT` listener, so
 SDK port-forward/tar-stream acceptance is already blocked on the baseline.

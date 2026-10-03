@@ -14,6 +14,9 @@ TypeScript checks.
 
 - Pin Zig 0.17.0 in package manifests and use pinned, target-aware translate-c
   dependencies for Linux KVM and guest libc headers.
+- Fetch the translate-c 2.0.0 compatibility fork and its unchanged Aro dependency
+  from GitHub using immutable commits and content hashes. No transitive source
+  fetch should depend on Codeberg availability.
 - Preserve safe optimization for installed binaries. Source-build setup checks
   the compiler version before building and reports an actionable error.
 - Install the compiler in CI with `cataggar/ghr/actions/install@v0.6.1`, selecting

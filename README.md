@@ -91,9 +91,11 @@ ghr install cataggar/zig@v0.17.0 RWSGOq2NVecA2UPNdBUZykf1CCb147pkmdtYxgb3Ti+JO/w
 zig version
 ```
 
-The second argument is the public verification key. Both Zig packages pin their
-C translation dependency so Linux KVM and guest libc bindings are generated for
-the selected target.
+The second argument is the public verification key. Both Zig packages pin the
+[translate-c 2.0.0 GitHub fork](https://github.com/cataggar/translate-c/tree/2.0.0)
+and its unchanged Aro source using immutable commits and hashes, avoiding
+Codeberg downloads. Linux KVM and guest libc bindings are generated for the
+selected target.
 
 ### Zig development and CI
 
