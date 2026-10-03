@@ -2,6 +2,7 @@ const std = @import("std");
 const Translator = @import("translate_c").Translator;
 
 pub fn build(b: *std.Build) void {
+    const optimize = b.option(std.lang.Optimize, "optimize", "Optimization mode (default: safe)") orelse .safe;
     var target_query = b.standardTargetOptionsQueryOnly(.{
         .default_target = .{ .cpu_arch = .x86_64, .os_tag = .linux },
     });
@@ -16,7 +17,7 @@ pub fn build(b: *std.Build) void {
     const translated: Translator = .init(b.dependency("translate_c", .{}), .{
         .c_source_file = b.path("src/libc.h"),
         .target = target,
-        .optimize = .safe,
+        .optimize = optimize,
         .link_libc = true,
     });
 
@@ -25,7 +26,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
-            .optimize = .safe,
+            .optimize = optimize,
             .link_libc = true,
             .imports = &.{
                 .{ .name = "libc", .module = translated.mod },
@@ -39,7 +40,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/posix.test.zig"),
             .target = target,
-            .optimize = .safe,
+            .optimize = optimize,
             .link_libc = true,
             .imports = &.{
                 .{ .name = "libc", .module = translated.mod },
