@@ -7,6 +7,23 @@
 
 ## Outcome and controls
 
+### Separate correctness prerequisite authorized at 16:18 UTC
+
+1. Preserve untouched L0 artifacts and post-ready failures.
+2. Explicitly set new jail directories root:root0755 and device nodes to the
+   configured UID/GID0600 before privilege drop, independent of umask. Use
+   no-follow opened FDs; retain private artifact umask077.
+3. Add only API receive/send syscalls proven necessary by fresh enforced-filter
+   traces. Retain all existing argument filters.
+4. Add focused real-jail mode/owner/access and real enforced-filter HTTP
+   regressions; validate Debug/Safe and actual jailed startup.
+5. Commit this prerequisite alone and report its hash to the three current
+   implementation peers. Do not performance-merge it or attribute gains to it.
+6. Freeze a distinct repaired synchronous source/binary/environment manifest,
+   complete the guest fixture and repeat G0/G1 honestly before G2 selection.
+   Host saturation and protocol liveness still require explicit controls or
+   blocked rows; the shared lock does not eliminate unrelated host load.
+
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
 and a measured keep/reject decision. This plan is complete as planning; **none of
 its builds, tests, workloads or profiles has been executed for #1**. Completion

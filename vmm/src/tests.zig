@@ -400,6 +400,46 @@ test "seccomp: all required syscalls are whitelisted" {
     try std.testing.expect(found_statx);
 }
 
+test "seccomp: Unix API additions retain argument confinement" {
+    const Eval = struct {
+        fn run(nr: u32, arg0: u32, arg2: u32) u32 {
+            var accumulator: u32 = 0;
+            var pc: usize = 0;
+            while (pc < seccomp_mod.kill_filter.len) {
+                const insn = seccomp_mod.kill_filter[pc];
+                switch (insn.code) {
+                    0x20 => accumulator = switch (insn.k) {
+                        0 => nr,
+                        4 => 0xC000003E,
+                        16 => arg0,
+                        32 => arg2,
+                        else => unreachable,
+                    },
+                    0x54 => accumulator &= insn.k,
+                    0x15 => pc += if (accumulator == insn.k) insn.jt else insn.jf,
+                    0x06 => return insn.k,
+                    else => unreachable,
+                }
+                pc += 1;
+            }
+            return 0x80000000;
+        }
+    };
+    const allow: u32 = 0x7FFF0000;
+    const kill: u32 = 0x80000000;
+    try std.testing.expectEqual(allow, Eval.run(46, 0, 0));
+    try std.testing.expectEqual(allow, Eval.run(47, 0, 0));
+    try std.testing.expectEqual(allow, Eval.run(41, 1, 0));
+    try std.testing.expectEqual(kill, Eval.run(41, 2, 0));
+    try std.testing.expectEqual(kill, Eval.run(41, 10, 0));
+    try std.testing.expectEqual(allow, Eval.run(56, 0x003D0F00, 0));
+    try std.testing.expectEqual(kill, Eval.run(56, 0x10000000, 0));
+    try std.testing.expectEqual(allow, Eval.run(10, 0, 3));
+    try std.testing.expectEqual(kill, Eval.run(10, 0, 7));
+    try std.testing.expectEqual(kill, Eval.run(290, 0, 0));
+    try std.testing.expectEqual(kill, Eval.run(425, 0, 0));
+}
+
 test "snapshot: device min size check rejects undersized data" {
     // The device snapshot minimum must be at least 144 bytes:
     // identity(16) + transport(29) + 3*queue(31) + smallest backend(6)

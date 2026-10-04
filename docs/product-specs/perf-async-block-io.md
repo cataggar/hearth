@@ -4,6 +4,38 @@
 **Last updated**: 2026-10-04
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Execution plan**: [perf-async-block-io](../exec-plans/active/perf-async-block-io.md)
+**Execution evidence**: [baseline capability results](perf-async-block-io-results.md)
+
+The untouched L0 execution verified project-local kernel/test support and retained
+actual startup perf/stack diagnostics, but the unchanged enforced-jail API is
+killed on `recvmsg` and the CLI cannot open jail device nodes created under
+private umask. G0/G1 workload acceptance and A/A gates remain incomplete.
+No asynchronous backend or qualifying performance comparison was implemented;
+this is not an optimization rejection or a performance-merge recommendation.
+Common host tools became available later; the results record the post-provisioning
+inventory explicitly. Earlier captures remain capability diagnostics only.
+Mandatory baseline sampling and frozen gates must use a newly established,
+complete post-provisioning environment.
+Fresh 16:11 UTC probes after fully verified host preparation confirm non-root
+KVM VM creation and vhost-net access but reproduce both unchanged jail failures.
+Those post-readiness startup diagnostics do not establish a workload baseline.
+
+### Authorized correctness prerequisite — 16:18 UTC
+
+Repair the demonstrated jail/API incompatibilities in a separate commit before
+resuming the experiment. Keep untouched L0 binaries, failures and all unjailed
+diagnostics distinct. Newly created jail device directories must be explicitly
+root-owned and traversable (`0755`), with no dropped-user directory write
+permission. Device nodes must be explicitly owned by the configured jail
+UID/GID with mode `0600`, independently of ambient umask; artifact umask stays
+`077`. Normalize through no-follow opened FDs before dropping privileges.
+Allow only Unix API receive/send syscalls actually observed necessary under
+the kill filter; retain AF_UNIX socket and clone/mprotect confinement.
+
+Execute focused real-jail ownership/access and enforced-filter HTTP tests.
+Declare the resulting identical repaired synchronous revision as a new
+baseline, not a performance candidate or improvement over failed L0. Then
+repeat G0/G1; no worker selection or correctness-only performance auto-merge.
 
 ## Objective and scope
 
