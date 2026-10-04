@@ -24,6 +24,14 @@ eight reported cores with SMT2. Runs use one vCPU, 512 MiB guest RAM, UID/GID
 All builds/tests/VMs/profiles/fixture preparation hold the fleet's exclusive
 `/d/hearth/.perf/fleet/host.lock`, use bounded commands and `umask 077`.
 No global device, driver, cache, NIC or security settings are changed.
+The fleet lock serializes participating experiments, **not unrelated host
+workloads**. “True idle” below means a no-traffic VM, not a fully idle host.
+Whole-host `/proc/stat`/steal-time control snapshots were not collected in this
+series; external contention is therefore unquantified. Only owned VMM-group
+CPU and separately recorded client CPU are attributed. Future repeated A/A
+windows must retain host controls as well, without inspecting or changing
+unowned workloads. None of these diagnostics establishes whole-window kernel
+CPU attribution for a future asynchronous IRQFD backend.
 
 `/dev/kvm` is unchanged 0660 root:kvm; the account has the kvm group.
 Real unprivileged preflight obtains KVM API 12, creates VM and IRQchip, and
