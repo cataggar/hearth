@@ -82,6 +82,8 @@ pub fn build(b: *std.Build) void {
     run_tests.has_side_effects = force_test_run;
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_tests.step);
+    const test_build_step = b.step("test-build", "Build unit tests without running them");
+    test_build_step.dependOn(&tests.step);
 
     // Integration tests: spawn flint binary and test end-to-end behavior.
     // Requires /dev/kvm and a kernel (override with -Dperf-test-kernel).

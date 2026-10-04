@@ -63,9 +63,21 @@ immutable translate-c/Aro pins are unaffected.
 For genuine repeated acceptance use `-Dperf-force-test-run=true`.
 The agent's `test-build` compiles the same configured POSIX artifact without
 running it; AArch64 cross-compilation is not matching-hardware execution.
+The VMM's `test-build` compiles unit tests; combine with
+`integration-test-build` to account for test-artifact compilation separately
+from actual forced execution.
 VMM integration can select a project-relative kernel with
 `-Dperf-test-kernel=.perf-zig-native/bzImage`, resolving it from `vmm/` before
 guest fixture working-directory changes. This does not change installed binary
 paths, KVM permissions, CI requirements or production policy. See the
 [experiment spec](perf-zig-native.md) for support diagnostics and evidence gates;
 explicit native options do not guarantee compiler support or authorize adoption.
+
+The canonical shared jailed baseline subsequently adds checked supplementary
+group clearing (`ced7ed7`, before setgid/setuid) and private post-sudo perf
+cache/scratch/environment confinement (`e1d3be0`). These are common correctness/
+measurement prerequisites, not runtime optimizations. Fresh #6 CI-target
+Debug/safe LLVM/LLD and native/native rows execute32+7 tests and3 common-jail
+regressions each with cleared groups; defaults also execute32+7. Earlier
+Group0/profiler results remain a separate historical epoch, not retroactively
+accepted production isolation or performance.
