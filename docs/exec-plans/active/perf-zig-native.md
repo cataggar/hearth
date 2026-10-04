@@ -544,6 +544,13 @@ does not mark the remaining checkboxes complete.
   **eight** full guest/PTY/disk/lifecycle/new-process restore controls, with
   non-root/filter and task-teardown metadata. Common prerequisite tests pass
   **3/3 per CI backend/mode**.
+- Those retained controls still use `5ee81b1` and report supplementary Groups0.
+  The later peer-reported canonical correction
+  `ced7ed72b5b2f80286e37ba8c9d5eada0cb90236` clears groups before the UID/GID
+  drop; #6 has not integrated or executed it. Parent integration must apply
+  the same canonical correction to both arms and refresh identities/tests.
+  Old counts remain protocol/snapshot evidence, not cleared-group production
+  isolation; collector confinement `e1d3be0` is also not retroactive acceptance.
 - GNU safe is **not** enforced-jail accepted. Both same-backend controls time
   out before the guest channel; common prerequisite tests pass **2/3 each**,
   with the guest-boot test reporting actual **SIGSYS (-31)**. Scoped owned-child

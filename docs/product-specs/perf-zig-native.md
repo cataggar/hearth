@@ -276,6 +276,18 @@ filter state and recorded-task disappearance are retained for each control.
 The common enforced-jail prerequisite suite passes **3/3 in each of those four
 backend/mode cells**.
 
+These controls use the exact `5ee81b1` prerequisite, whose retained VMM metadata
+reports supplementary **Groups0** despite UID/GID1000 and CapEff0. A subsequent
+peer-reported common correction,
+`ced7ed72b5b2f80286e37ba8c9d5eada0cb90236`, checks `setgroups(0, NULL)` before
+the UID/GID drop. It was published after this phase and has **not** been
+integrated or executed by #6. The existing counts establish that older
+configuration's protocol/snapshot compatibility, not cleared-group production
+isolation. Parent integration must reuse the canonical correction on both arms
+and renew identity/correctness evidence; no silent baseline substitution is made.
+The peer's separate collector-cache/environment correction `e1d3be0` likewise
+does not retroactively qualify these exploratory profiles.
+
 The separately rebuilt native-CPU/GNU configuration is **not** jailed-guest
 accepted. Both LLVM/LLD and native/native same-backend controls time out before
 the guest channel is ready; their common prerequisite suites pass **2/3**,
