@@ -81,7 +81,7 @@ the manifest. Zig caches and scratch are private and project-local.
    Flint cannot traverse/open them. Exact post-exit modes are retained. This
    is not lack of host KVM: non-root host preflight obtains API 12 and creates
    a VM, and the existing unjailed KVM tests execute.
-3. **The host is not quiet.** A locked five-second idle capability control
+3. **Historical host-load limitation.** A locked five-second idle capability control
    observes **99.938% whole-host busy CPU**, with 0% iowait/steal in that window.
    Previously running, unowned PPID-1 shells are in runnable state with roughly
    16-hour histories. They were not killed, rebound or otherwise modified.
@@ -93,10 +93,12 @@ make the mandatory jail row pass. The root collector/tracer operates on owned
 VM processes; guest/VMM startup still uses the enforced jail and drops to 1000.
 No root or permission changes were applied to the host `/dev/kvm`.
 
-There were **13 jailed attempts**, all blocked before guest execution: two
+There were **13 pre-provisioning jailed attempts**, all blocked before guest execution: two
 initial API/CLI probes, an eight-probe traced/stat/record series, and three
 higher-frequency record repeats. The repeated failures are capability evidence,
 not successful baseline performance cells.
+Two additional post-readiness attempts below bring the total to **15**; none
+reached guest execution.
 
 An additional **unjailed, unprofiled capability diagnostic** verifies that the
 same fixture really boots kernel 5.10.245, mounts `/dev/vda` as ext4 at `/mnt`,
@@ -132,7 +134,7 @@ are retained in `.perf/blk-io/post-provisioning/tools-libraries.txt`. `ldd` repo
 the preserved Flint executable is not dynamic. No additional tool installation,
 VM workload or profiling run was performed by this inventory.
 
-**Every earlier capture in this report is pre-provisioning capability evidence,
+**The original captures are pre-provisioning capability evidence,
 not a fully controlled comparison or frozen performance baseline.** The
 99.938% busy control is a historical five-second window, not an assertion of
 current host utilization. Neither that window nor the startup counters may
@@ -144,6 +146,37 @@ any missing workload row. G0 remains blocked. Future mandatory baseline
 sampling must begin only after a new complete fixture/environment manifest
 and controls are established **after common provisioning**; no numeric
 baseline gates have yet been frozen.
+
+### Fully verified host readiness: recheck — 16:11 UTC
+
+After the parent declared host preparation fully verified, a new bounded
+exclusive-lock phase ran at `2026-10-04T16:11:55Z`–`16:11:56Z`. Its own
+UID1000 preflight obtained KVM API **12**, actually created and closed a VM,
+and opened/closed `/dev/vhost-net` non-root. The preserved Flint SHA-256 still
+matched the unchanged safe binary above. No runtime or security setting changed.
+
+Two fresh traced enforced-jail probes nevertheless failed before guest execution:
+
+- **API:** UID/GID1000 and the kill filter were active; after `accept4`,
+  `recvmsg` was killed by **SIGSYS** on the first configuration request.
+- **CLI:** `openat("/dev/kvm", O_RDWR|...)` returned **EACCES**. Both fresh
+  jail directories again contained root-owned `/dev` **0700** and
+  `/dev/kvm` **0600** under private umask077.
+
+These are actual **post-provisioning startup diagnostics**, not workload
+baseline samples. Common host prerequisites are no longer a blocker; the
+unchanged jail failures remain. Numeric gates cannot be frozen from executions
+that never admit a guest request. No mandatory performance row, candidate,
+new idle control, or performance comparison was executed in this phase.
+
+Raw traces, launch/exit and blocked-result manifests are in
+`post-ready-api-trace/` and `post-ready-cli-trace/`; the preflight/source/time
+manifest and exact retained wrapper are in
+`post-provisioning/readiness-recheck.json` and `post-provisioning/recheck.py`.
+The wrapper was executed with `timeout 90s python3
+.perf/blk-io/post-provisioning/recheck.py` inside the common exclusive lock.
+Recorded owned processes exited; only these probes' named device nodes and
+socket paths were cleaned.
 
 ## Executed validation
 
@@ -235,6 +268,9 @@ Raw evidence remains private in the isolated worktree:
   raw host controls, explicit blocked statuses, reproducible analysis.
 - `post-provisioning/tools-libraries.txt`: subsequent tool/library boundary;
   no workload measurements or performance qualification.
+- `post-provisioning/readiness-recheck*`, `post-ready-*-trace/`: actual
+  post-readiness non-root KVM/vhost preflight and two blocked jailed startup
+  probes; retained wrapper, traces, modes, source/binary identity and exits.
 - `smoke-unjailed-capability/`: actual guest kernel/mount/memory output,
   successful disk marker/flush counters and hash, owned exit record; no profiles.
 

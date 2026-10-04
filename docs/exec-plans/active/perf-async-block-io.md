@@ -12,7 +12,8 @@ The project-local integration kernel option and capability/diagnostic tooling
 are implemented and executed. Debug/safe unit suites each execute 31 tests;
 debug/safe existing integration suites each execute seven, including actual
 guest execution after restore. These unjailed cases do not establish async
-acceptance. Thirteen enforced-jail startup attempts fail before guest execution:
+acceptance. Thirteen pre-provisioning and two post-readiness enforced-jail
+startup attempts fail before guest execution:
 API `recvmsg` is killed by seccomp, CLI device paths have root-only permissions
 under required umask 077. Actual stat/stack data and a saturated-host idle
 control are retained. See the results for exact counts, commands and limits.
@@ -32,6 +33,17 @@ remain **pre-provisioning capability diagnostics**, not a controlled baseline.
 No workload was rerun or gate frozen from them. The unchanged jail failures
 and incomplete guest fixture still block G0; new mandatory sampling must
 establish complete fixture/environment controls after provisioning.
+
+### Fully verified host readiness checkpoint — 16:11 UTC
+
+After parent host preparation completed, a fresh bounded lock phase verified
+UID1000 KVM API12, actual VM creation, and non-root vhost-net open against the
+unchanged safe Flint hash. Fresh API and CLI jailed traces reproduce SIGSYS
+on `recvmsg` and EACCES on root0600 `/dev/kvm` beneath root0700 `/dev`.
+Host preparation is complete, but these runtime failures still prevent
+mandatory guest workload admission. The two new probes are post-provisioning
+startup diagnostics, not a baseline; no gate, idle-noise estimate or comparison
+was frozen from them. Exact evidence is linked in the results.
 
 ## Outcome and controls
 

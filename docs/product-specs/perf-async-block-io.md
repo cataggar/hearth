@@ -16,6 +16,9 @@ Common host tools became available later; the results record the post-provisioni
 inventory explicitly. Earlier captures remain capability diagnostics only.
 Mandatory baseline sampling and frozen gates must use a newly established,
 complete post-provisioning environment.
+Fresh 16:11 UTC probes after fully verified host preparation confirm non-root
+KVM VM creation and vhost-net access but reproduce both unchanged jail failures.
+Those post-readiness startup diagnostics do not establish a workload baseline.
 
 ## Objective and scope
 
