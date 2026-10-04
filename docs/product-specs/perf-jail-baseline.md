@@ -28,6 +28,17 @@ KVM metadata. There are three cases; missing prerequisites fail, not skip.
 Its small serial fixture is synchronous correctness, not a throughput,
 interactive, timer-free wake or snapshot performance acceptance.
 
+## TAP declaration limitation
+
+Unchanged `main.zig` provisions TUN before API entry only when CLI `--tap` is
+present (`need_tun = cli.tap != null`). An API network request alone does not
+retroactively provision `/dev/net/tun`. A future enforced TAP diagnostic must
+explicitly declare its owned TAP at startup; do not grant TUN broadly or infer
+device absence from an unclassified failed network window. The standalone
+fixture exercises neither TAP nor vhost device/worker isolation, and this
+prerequisite does not establish a product TAP consumer or kernel-network
+lifecycle acceptance.
+
 ## Reproduction
 
 Use the isolated peer worktree, identical compiler/dependency/guest features
