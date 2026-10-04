@@ -46,10 +46,35 @@ case "${1:-}" in
       zig cc --version > "$OUT/fixture/cc-version.txt"
     ' bash "$ROOT"
     ;;
-  probe|boot|quiet|selftest)
+  prepare-reset)
+    flock -x -w 600 "$LOCK" timeout 300 bash -euc '
+      cd "$1"
+      umask 077
+      export PATH=/home/g/.local/bin:/usr/bin:$PATH
+      OUT=.perf/vhost-net/20261004
+      NEW=$OUT/fixture-reset
+      if test -e "$NEW"; then
+        echo "refusing to overwrite reset fixture" >&2
+        exit 2
+      fi
+      mkdir -p "$NEW/guest/bin" "$NEW/guest/dev" "$NEW/guest/proc" "$NEW/guest/sys"
+      cp "$OUT/fixture/bzImage" "$NEW/bzImage"
+      cp "$OUT/fixture/guest/bin/busybox" "$NEW/guest/bin/busybox"
+      ln -s busybox "$NEW/guest/bin/sh"
+      zig cc -target x86_64-linux-musl -O2 -static -Wall -Wextra -Werror \
+        benchmarks/vhost-net/guest.c -o "$NEW/guest/bin/peer"
+      cp benchmarks/vhost-net/guest-init.sh "$NEW/guest/init"
+      chmod 700 "$NEW/guest/init"
+      (cd "$NEW/guest" && find . -print | LC_ALL=C sort | bsdcpio -o -H newc) \
+        | gzip -n > "$NEW/initrd.cpio.gz"
+      sha256sum "$NEW/bzImage" "$NEW/initrd.cpio.gz" "$NEW/guest/bin/"* \
+        benchmarks/vhost-net/guest.c benchmarks/vhost-net/guest-init.sh > "$NEW/hashes.txt"
+    ' bash "$ROOT"
+    ;;
+  probe|boot|quiet|selftest|strict|resource)
     PHASE=$1
     shift
-    flock -x -w 600 "$LOCK" timeout 900 sudo -n unshare --net -- \
+    flock -x -w 600 "$LOCK" timeout 900 sudo -n unshare --mount --net -- \
       python3 benchmarks/vhost-net/runner.py --artifact-dir "$OUT" --phase "$PHASE" "$@"
     ;;
   test)
@@ -63,7 +88,7 @@ case "${1:-}" in
     ' bash "$ROOT"
     ;;
   *)
-    echo "usage: $0 prepare|probe|boot [--boot-id ID --repetitions 10 --seconds 60]|quiet|selftest|test" >&2
+    echo "usage: $0 prepare|prepare-reset|boot|strict|selftest|test [fixture options]" >&2
     exit 2
     ;;
 esac

@@ -205,19 +205,43 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
 pub const kill_filter = buildFilter(&simple_syscalls, SECCOMP_RET_KILL_PROCESS);
 pub const log_filter = buildFilter(&simple_syscalls, SECCOMP_RET_LOG);
 
+fn withNetEvents(comptime base: anytype) [base.len + 11]SockFilter {
+    var filter: [base.len + 11]SockFilter = undefined;
+    @memcpy(filter[0..4], base[0..4]);
+    filter[4] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 290, 0, 6); // eventfd2
+    filter[5] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
+    filter[6] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 2);
+    filter[7] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0 + 8);
+    filter[8] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK, 1, 0);
+    filter[9] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+    filter[10] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
+    @memcpy(filter[11..], &base);
+    return filter;
+}
+
+pub const net_kill_filter = withNetEvents(kill_filter);
+const net_log_filter = withNetEvents(log_filter);
+
 /// Install the seccomp BPF filter. After this, unlisted syscalls kill
 /// the process (or log in audit mode for development).
 pub fn install(audit: bool) !void {
+    return installForNet(audit, false);
+}
+
+pub fn installForNet(audit: bool, enabled: bool) !void {
     const rc1: isize = @bitCast(linux.prctl(@backingInt(linux.PR.SET_NO_NEW_PRIVS), 1, 0, 0, 0));
     if (rc1 < 0) {
         log.err("prctl(NO_NEW_PRIVS) failed: {}", .{rc1});
         return error.PrctlFailed;
     }
 
-    const filter = if (audit) &log_filter else &kill_filter;
+    const filter: []const SockFilter = if (enabled)
+        (if (audit) &net_log_filter else &net_kill_filter)
+    else
+        (if (audit) &log_filter else &kill_filter);
     const prog = SockFprog{
         .len = @intCast(filter.len),
-        .filter = filter,
+        .filter = filter.ptr,
     };
 
     const rc2: isize = @bitCast(linux.seccomp(SECCOMP_SET_MODE_FILTER, 0, &prog));
@@ -230,5 +254,50 @@ pub fn install(audit: bool) !void {
         log.warn("seccomp in AUDIT mode — violations logged, not killed", .{});
     } else {
         log.info("seccomp filter installed ({} syscalls whitelisted)", .{simple_syscalls.len + 3});
+    }
+}
+
+test "explicit net filter allows only required eventfd2 and retains confinement" {
+    const cases = [_]struct { enabled: bool, action: u8, killed: bool }{
+        .{ .enabled = false, .action = 0, .killed = true },
+        .{ .enabled = true, .action = 0, .killed = false },
+        .{ .enabled = true, .action = 1, .killed = true },
+        .{ .enabled = true, .action = 2, .killed = true },
+        .{ .enabled = true, .action = 3, .killed = true },
+        .{ .enabled = true, .action = 4, .killed = true },
+        .{ .enabled = true, .action = 5, .killed = true },
+    };
+    for (cases) |case| {
+        const child: isize = @bitCast(linux.fork());
+        if (child < 0) return error.TestForkFailed;
+        if (child == 0) {
+            installForNet(false, case.enabled) catch linux.exit(90);
+            switch (case.action) {
+                0 => {
+                    const rc: isize = @bitCast(linux.eventfd(0, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK));
+                    if (rc < 0) linux.exit(91);
+                    _ = linux.close(@intCast(rc));
+                },
+                1 => _ = linux.eventfd(0, 0),
+                2 => _ = linux.socket(linux.AF.INET, linux.SOCK.STREAM, 0),
+                3 => _ = linux.mprotect(@ptrFromInt(4096), 4096, .{ .EXEC = true }),
+                4 => _ = linux.eventfd(1, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK),
+                5 => _ = linux.syscall5(.clone, linux.CLONE.NEWUSER, 0, 0, 0, 0),
+                else => unreachable,
+            }
+            linux.exit(0);
+        }
+        var status: i32 = 0;
+        while (true) {
+            const rc: isize = @bitCast(linux.waitpid(@intCast(child), &status, 0));
+            if (rc == -@as(isize, @backingInt(linux.E.INTR))) continue;
+            if (rc != child) return error.TestWaitFailed;
+            break;
+        }
+        if (case.killed) {
+            try std.testing.expectEqual(@as(i32, 31), status & 0x7f);
+        } else {
+            try std.testing.expectEqual(@as(i32, 0), status);
+        }
     }
 }

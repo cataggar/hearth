@@ -53,6 +53,7 @@ class CollectorTests(unittest.TestCase):
         args = SimpleNamespace(
             mode="rpc", host="192.0.2.2", timeout_seconds=3,
             warmup_seconds=0, seconds=60, idle_seconds=1,
+            backend="vhost", notification="common blocked-poll",
         )
         cpu = [
             {"busy_ticks": ticks, "clock_ticks_per_second": 100}
@@ -73,6 +74,8 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(result["active_seconds"], 1)
         self.assertEqual(result["active_whole_host_cpu_seconds_per_request"], 0.09)
         self.assertEqual(result["active_whole_host_cpu_seconds_per_payload_byte"], 0.09 / 64)
+        self.assertEqual(result["backend"], "vhost")
+        self.assertEqual(result["notification"], "common blocked-poll")
 
 
 class RunnerTests(unittest.TestCase):

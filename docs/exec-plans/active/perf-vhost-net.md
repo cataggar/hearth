@@ -1,12 +1,12 @@
 # Execution Plan: Evaluate Flint vhost-net
 
-**Status**: Blocked — direct-ring S1 contract mismatch; adoption unqualified
+**Status**: In progress — safe shadow-ring opt-in/common adapter; performance qualification blocked
 **Last updated**: 2026-10-04
 **Issue**: [#2](https://github.com/cataggar/hearth/issues/2)
 **Spec**: [Capability-gated vhost-net Evaluation](../../product-specs/perf-vhost-net.md)
 
 Planning is complete when this spec and plan are reviewed and persisted.
-The 2026-10-04 execution uses the unchanged source in the dedicated
+The initial 2026-10-04 execution used the unchanged source in the dedicated
 `copilot/perf-vhost-net-20261004` worktree. `benchmarks/vhost-net/` contains an
 isolated diagnostic fixture and a sequence/payload-validating collector, not a
 new SDK mode or a relevant product consumer. Actual results and exclusions are
@@ -15,6 +15,34 @@ Experiment completion requires the evidence/checklist at the end, including a
 valid keep/reject outcome. The default remains userspace.
 
 ## Execution findings (2026-10-04)
+
+**Current implementation update:** S4/common dispatcher and S5/shadow-ring
+backend/lifecycle are implemented, with the existing guest features, 12-byte
+header and format-v2 snapshot. A′ and B now have actual unjailed KVM payload,
+traffic-snapshot, cross-backend restore, reset, malformed, concurrent-client and
+fallback evidence. Enforced owner-worker inheritance is proved in two actual
+kernel probes with the exact prototype filter and owned memory/pids cgroups.
+These are focused S6 diagnostics, not complete production-jail acceptance or S7.
+The authoritative separate common C00 jail prerequisite is still unavailable;
+the current jail reproduction remains KVM AccessDenied under umask077. The new
+vhost node itself is private0600/UID-GID1000. Existing parent CPU controllers
+are not globally enabled or changed. S3 deciding A/A and S7 qualification remain
+blocked by about16 unrelated busy cores. The original default and draft-only,
+no-performance-merge disposition remain unchanged. Precise commands/counts,
+profile scope, artifacts and remaining gates are in the appended results.
+
+The paragraphs below retain the earlier chronological findings, including
+the direct-ring rejection and the then-unimplemented A′/B status; they do not
+describe the current working tree.
+
+At 18:01 UTC the coordinator requests continued safe opt-in correctness despite
+its independently verified noisy-host final-qualification blocker. The amended
+spec now proposes immutable host-private shadow vrings, authoritative private
+used progress and pending-head rollback, not an unsafe relaxation of direct-ring
+unadvertised-feature semantics. Characterize those exact-kernel conditions,
+implement the matching net-only A′/B dispatcher/lifecycle if supported, and reuse
+the exact consolidated prerequisite correctness commit. Retain all historical
+failures/rejections; no noisy-host speedup, default or auto-merge is permitted.
 
 See [actual results and exclusions](../../perf-results/vhost-net-20261004.md).
 S0 found a direct CLI/API capability but no demonstrated current consumer;
@@ -132,7 +160,7 @@ documentation can finish without #3. If hardware/tools prevent S3, report an
 experiment prerequisite blockage and retain available evidence; do not call it
 successful measurement or a blocker to this planning task.
 
-## Proposed future file surfaces
+## Initially proposed file surfaces (historical)
 
 These are proposed edits only; not files to change during planning.
 

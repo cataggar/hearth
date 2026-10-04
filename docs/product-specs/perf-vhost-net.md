@@ -1,17 +1,72 @@
 # Product Spec: Capability-gated vhost-net Evaluation
 
-**Status**: Direct-ring S1 proposal rejected; full implementation blocked, userspace unchanged
+**Status**: Safe opt-in shadow-ring investigation/implementation in progress; performance blocked
 **Last updated**: 2026-10-04
 **Issue**: [#2 — Perf-profile and evaluate a vhost-net backend for Flint](https://github.com/cataggar/hearth/issues/2)
 **Execution plan**: [perf-vhost-net](../exec-plans/active/perf-vhost-net.md)
 
-This is an experiment specification, not an implemented vhost backend.
-The userspace backend remains the default. The 2026-10-04 evaluation first
+This specifies an experimental opt-in prototype, not an accepted product backend.
+The original userspace backend remains the unrequested default. The evaluation first
 records the current backend in an isolated diagnostic TAP fixture; that fixture
 is not evidence of an existing product consumer. Backend implementation remains
-conditional on S0 relevance and the mandatory lifecycle gates.
+conditional on the mandatory lifecycle/isolation gates; adoption additionally
+requires S0 relevance and qualified performance.
 
-## Executed disposition (2026-10-04)
+### Implemented prototype and current gates
+
+Following the coordinator's explicit reopened implementation request, the
+host-private-ring candidate and a common independently blocking net dispatcher
+are implemented. `--net-backend userspace` selects the common userspace A′,
+`vhost` strictly selects B, and explicit `auto` permits diagnosed **early**
+capability fallback after complete unwind. Omitting the flag preserves original
+A. There is no SDK selector or default change. Invalid queues, resource failures
+and runtime errors are fatal, never capability fallback.
+
+Two exact-kernel private-ring probes pass nine cases/eight observations each.
+Actual unjailed nested-KVM A′/B traffic, traffic pause fences, format-v2
+cross-backend restores, unchanged private backing files, malformed rejections,
+reset generations, concurrency and fallback now execute successfully; see the
+results report for precise populations. The exact enforced owner-worker probe
+also verifies inherited UID/GID, empty groups, zero capabilities, NNP, seccomp,
+affinity and an owned memory/pids-limited cgroup, then synchronous worker join.
+
+**Full production-jail acceptance is still blocked:** the requested authoritative
+separate common C00 commit has not been supplied. A current untouched-common-jail
+reproduction still fails opening KVM because umask077 leaves root-owned `/dev`
+0700/KVM0600. Only the requested vhost node and narrowly conditional eventfd2
+policy are added here; generic repairs are not duplicated. CPU quota delegation,
+simultaneous independent-restore isolation, arbitrary injected ioctl/allocator failures, UDP/loss,
+4/8-VM and external Azure cells, long idle/tail/noise and installed SDK controls
+remain unaccepted. No prototype correctness diagnostic is a performance gate.
+
+### Reopened safe opt-in work (18:01 UTC)
+
+The coordinator independently confirms 15.961/16 busy visible cores. Quiet-host
+performance qualification, adoption and auto-merge remain blocked, but correctness
+implementation continues. Investigate an explicitly amended **host-private shadow
+split-ring** candidate rather than silently relaxing the rejected direct-ring
+descriptor contract. It must preserve existing guest features and ≤16-entry
+validated chains, reject unadvertised descriptor flags before publication, copy
+immutable descriptors into non-guest-mapped rings, and retain original payload
+GPAs in the same guest RAM memory table. Guest RAM remains MAP_PRIVATE on restore.
+
+Kernel used entries/cursors in those private rings are host-authoritative.
+The common completion adapter validates and copies them into guest used rings.
+At quiescence, it drains committed completions and rolls back only submitted but
+unconsumed available heads before format-v2 serialization; no private ring, FD,
+HVA or worker is serialized. Errorfd is sticky fatal before handoff. Prove actual
+kernel acceptance of private ring HVAs, descriptor immutability, pending-head
+rollback and close-before-unmap before runtime activation.
+
+Use one net-only independently blocking dispatcher/direct-IRQ adapter for explicit
+userspace A′ and vhost B; default unrequested userspace A stays unchanged. Mutex/
+generation fences cover MMIO configuration, ACK, reset, pause and teardown. No
+timer/heartbeat, guest feature additions, new SDK TAP mode, kernel patch or broad
+confinement relaxation. Apply the exact separate shared jail prerequisite when
+available, with narrowly requested vhost node/eventfd permissions layered on it.
+Only owned fixture/VMM and attributable kernel/network observations may be shared.
+
+## Historical disposition before the reopened shadow prototype
 
 The parent reopened exact-kernel S1 investigation after the diagnostic results.
 That investigation now includes publisher-verified Azure kernel source,
@@ -110,9 +165,10 @@ remain explicit; this experiment targets x86_64 Linux KVM.
 
 ### Capability selection and failure
 
-Proposed experiment selector: `userspace` (unchanged default), `vhost` (strict
-request), and `auto` (explicit opt-in capability fallback). These are **not
-current CLI/API options**. Probe only when a TAP backend is requested.
+The experimental CLI selector is `--net-backend userspace|vhost|auto`.
+Absence preserves original userspace A; explicit `userspace` uses common A′,
+`vhost` is strict, and `auto` is opt-in capability fallback. There is no new SDK
+or network-interface REST field. Probe only when a TAP backend is requested.
 
 Report requested and effective backend, notification/IRQ mode, negotiated
 features, and a stable reason plus failing operation/errno for unavailable

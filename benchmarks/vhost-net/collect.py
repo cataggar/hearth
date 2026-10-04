@@ -76,8 +76,8 @@ def transaction(sock, mode, sequence):
 def run(args):
     results = {
         "mode": args.mode,
-        "backend": "userspace",
-        "notification": "unchanged synchronous MMIO, direct IRQ, exit-driven RX",
+        "backend": getattr(args, "backend", "userspace"),
+        "notification": getattr(args, "notification", "unchanged synchronous MMIO, direct IRQ, exit-driven RX"),
         "warmup_seconds": args.warmup_seconds,
         "requested_seconds": args.seconds,
         "successful_requests": 0,
@@ -159,6 +159,8 @@ def main():
     parser.add_argument("--idle-seconds", type=float, default=1)
     parser.add_argument("--timeout-seconds", type=float, default=3)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--backend", default="userspace")
+    parser.add_argument("--notification", default="unchanged synchronous MMIO, direct IRQ, exit-driven RX")
     args = parser.parse_args()
     if args.seconds <= 0 or args.warmup_seconds < 0 or args.timeout_seconds <= 0 or args.idle_seconds < 0:
         parser.error("durations must be positive; warmup and idle may be zero")

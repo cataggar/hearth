@@ -35,6 +35,19 @@ static int write_all(int fd, const void *buffer, size_t size) {
 
 static void serve(int fd, unsigned port) {
     unsigned char buffer[65536];
+    if (port == 7003) {
+        if (read_all(fd, buffer, 4) || memcmp(buffer, "RSET", 4)) return;
+        if (write_all(fd, "OKAY", 4)) return;
+        signal(SIGCHLD, SIG_DFL);
+        int rc = system(
+            "echo virtio0 > /sys/bus/virtio/drivers/virtio_net/unbind && "
+            "echo virtio0 > /sys/bus/virtio/drivers/virtio_net/bind && "
+            "/bin/busybox ip addr add 192.0.2.2/30 dev eth0 && "
+            "/bin/busybox ip link set eth0 mtu 1500 up");
+        printf("PERF_RESET_%s\n", rc == 0 ? "OK" : "FAILED");
+        fflush(stdout);
+        return;
+    }
     if (port == 7000) {
         while (read_all(fd, buffer, 64) == 0)
             if (write_all(fd, buffer, 64) < 0) return;
@@ -65,7 +78,7 @@ static void serve(int fd, unsigned port) {
 int main(int argc, char **argv) {
     if (argc != 2) return 2;
     unsigned port = (unsigned)strtoul(argv[1], NULL, 10);
-    if (port < 7000 || port > 7002) return 2;
+    if (port < 7000 || port > 7003) return 2;
     signal(SIGCHLD, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
     int listener = socket(AF_INET, SOCK_STREAM, 0);

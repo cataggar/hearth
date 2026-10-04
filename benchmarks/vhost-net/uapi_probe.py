@@ -60,7 +60,7 @@ def event_count(fd):
 
 
 class Device:
-    def __init__(self, tap, backing):
+    def __init__(self, tap, backing, private_ring=False):
         self.fd = -1
         self.events = []
         backing_fd = os.open(backing, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
@@ -69,7 +69,11 @@ class Device:
             self.ram = mmap.mmap(backing_fd, SIZE, flags=mmap.MAP_PRIVATE)
         finally:
             os.close(backing_fd)
+        self.private_ring = private_ring
+        self.ring = (mmap.mmap(-1, 0x10000, flags=mmap.MAP_PRIVATE | mmap.MAP_ANONYMOUS)
+                     if private_ring else self.ram)
         self.address = ctypes.addressof(ctypes.c_char.from_buffer(self.ram))
+        self.ring_address = ctypes.addressof(ctypes.c_char.from_buffer(self.ring))
         self.indices = [0, 0]
         self.initial_tasks = set(os.listdir("/proc/self/task"))
         try:
@@ -88,8 +92,8 @@ class Device:
                 offset = queue * 0x3000
                 transact(self.fd, 1, 0x10, struct.pack("<II", queue, NUM))
                 transact(self.fd, 1, 0x11, struct.pack(
-                    "<IIQQQQ", queue, 0, self.address + offset,
-                    self.address + offset + 0x2000, self.address + offset + 0x1000, 0))
+                    "<IIQQQQ", queue, 0, self.ring_address + offset,
+                    self.ring_address + offset + 0x2000, self.ring_address + offset + 0x1000, 0))
                 transact(self.fd, 1, 0x12, struct.pack("<II", queue, 0))
                 eventfds = []
                 self.events.append(eventfds)
@@ -107,23 +111,25 @@ class Device:
         head = index % NUM
         offset = queue * 0x3000
         address = 0x10000 + queue * 0x80000 + head * 2048
-        if payload is not None:
-            self.ram[address:address + len(payload)] = payload
         if flags is None:
             flags = 2 if queue == 0 else 0
+        if self.private_ring and flags & ~3:
+            raise ValueError("UnadvertisedDescriptorFlags")
+        if payload is not None:
+            self.ram[address:address + len(payload)] = payload
         if length is None:
             length = 2048 if queue == 0 else len(payload)
-        struct.pack_into("<QIHH", self.ram, offset + head * 16,
+        struct.pack_into("<QIHH", self.ring, offset + head * 16,
                          address if descriptor_address is None else descriptor_address,
                          length, flags, 0)
-        struct.pack_into("<H", self.ram, offset + 0x1004 + head * 2, head)
+        struct.pack_into("<H", self.ring, offset + 0x1004 + head * 2, head)
         self.indices[queue] += 1
-        struct.pack_into("<H", self.ram, offset + 0x1002, self.indices[queue])
+        struct.pack_into("<H", self.ring, offset + 0x1002, self.indices[queue])
         os.eventfd_write(self.events[queue][0], 1)
         return address
 
     def used(self, queue):
-        return struct.unpack_from("<H", self.ram, queue * 0x3000 + 0x2002)[0]
+        return struct.unpack_from("<H", self.ring, queue * 0x3000 + 0x2002)[0]
 
     def observe(self, queue, timeout=3):
         ready, _, _ = select.select(self.events[queue][1:], [], [], timeout)
@@ -153,6 +159,8 @@ class Device:
             for fd in events:
                 os.close(fd)
         self.events.clear()
+        if self.private_ring:
+            self.ring.close()
         self.ram.close()
 
 
@@ -170,7 +178,7 @@ def receive(control):
     return json.loads(data)
 
 
-def worker(control_fd, output):
+def worker(control_fd, output, private_ring=False):
     os.setgroups([])
     os.setgid(1000)
     os.setuid(1000)
@@ -186,6 +194,7 @@ def worker(control_fd, output):
                "kernel": os.uname().release, "map": "file-backed MAP_PRIVATE",
                "cases": [], "framing": {"header_bytes": 12, "offloads": 0,
                                         "socket_owns_header": True}}
+    results["host_private_rings"] = private_ring
     dev = None
     try:
         tap = os.open("/dev/net/tun", os.O_RDWR | os.O_CLOEXEC)
@@ -193,7 +202,10 @@ def worker(control_fd, output):
                     struct.pack("16sH22x", IFACE.encode(), 0x0002 | 0x1000 | 0x4000))
         fcntl.ioctl(tap, 0x400454D8, struct.pack("<i", 12))
         fcntl.ioctl(tap, 0x400454D0, 0)
-        dev = Device(tap, backing)
+        dev = Device(tap, backing, private_ring)
+        results["private_ring_hva_outside_memory_table"] = (
+            dev.ring_address + 0x10000 <= dev.address
+            or dev.ring_address >= dev.address + SIZE) if private_ring else None
         results["features"] = hex(dev.features)
         results["fork_owner"] = dev.fork_owner
         results["tasks_during"] = [
@@ -229,7 +241,7 @@ def worker(control_fd, output):
         send(control, {"action": "receive", "payload": frame_tx.hex()})
         naive["payload_valid"] = receive(control)["valid"]
         results["seeded_pause_avail"] = dev.detach()
-        struct.pack_into("<H", dev.ram, 0x5002, 3)
+        struct.pack_into("<H", dev.ring, 0x5002, 3)
         dev.reattach(tap)
         dev.post(1, HEADER + frame_tx)
         seeded = dev.observe(1)
@@ -240,13 +252,24 @@ def worker(control_fd, output):
         indirect_address = 0x1A0000
         dev.ram[indirect_address:indirect_address + len(HEADER + frame_tx)] = HEADER + frame_tx
         indirect_table = struct.pack("<QIHH", indirect_address, len(HEADER + frame_tx), 0, 0)
-        dev.post(1, indirect_table, flags=4)
-        indirect = dev.observe(1)
-        indirect["name"] = "unadvertised-indirect-descriptor"
+        if private_ring:
+            try:
+                dev.post(1, indirect_table, flags=4)
+            except ValueError as error:
+                indirect = dev.observe(1, 0.1)
+                indirect["diagnostic"] = str(error)
+            else:
+                raise RuntimeError("private-ring publisher accepted INDIRECT")
+        else:
+            dev.post(1, indirect_table, flags=4)
+            indirect = dev.observe(1)
+        indirect["name"] = ("unadvertised-indirect-rejected" if private_ring
+                            else "unadvertised-indirect-descriptor")
         indirect["negotiated_indirect"] = False
         results["cases"].append(indirect)
-        send(control, {"action": "receive", "payload": frame_tx.hex()})
-        indirect["payload_valid"] = receive(control)["valid"]
+        if not private_ring:
+            send(control, {"action": "receive", "payload": frame_tx.hex()})
+            indirect["payload_valid"] = receive(control)["valid"]
         dev.post(1, HEADER + frame_tx, flags=2)
         malformed = dev.observe(1)
         malformed["name"] = "malformed-tx-direction"
@@ -257,7 +280,7 @@ def worker(control_fd, output):
         results["cases"].append(outside)
         # Repair only the rejected descriptor into a cycle, without advancing avail.
         head = (dev.indices[1] - 1) % NUM
-        struct.pack_into("<QIHH", dev.ram, 0x3000 + head * 16,
+        struct.pack_into("<QIHH", dev.ring, 0x3000 + head * 16,
                          address, len(HEADER + frame_tx), 1, head)
         os.eventfd_write(dev.events[1][0], 1)
         cycle = dev.observe(1)
@@ -284,17 +307,18 @@ def worker(control_fd, output):
         results["fd_before"] = fd_before
         results["fd_after"] = len(os.listdir("/proc/self/fd"))
         results["backing_file_unchanged"] = backing.exists() and not any(backing.read_bytes())
-        expected = [1, 2, 1, 0x7712, 4, 5, 5, 5, 5]
+        expected = ([1, 2, 1, 3, 4, 4, 4, 4, 4] if private_ring
+                    else [1, 2, 1, 0x7712, 4, 5, 5, 5, 5])
         results["checks"] = {
             "nine_case_indices": [case["used"] for case in results["cases"]] == expected,
-            "six_valid_payloads": all(case.get("payload_valid", False)
-                                       for case in results["cases"][:6]),
+            "valid_payloads": all(case.get("payload_valid", False)
+                                  for case in results["cases"][:5 + (not private_ring)]),
             "three_malformed_errors_not_completions": (
                 len(results["cases"]) == 9
                 and all(case["error"] == 1 and case["call"] == 0
                         for case in results["cases"][-3:])),
-            "avail_is_not_used": results.get("detach_avail") == [1, 6]
-            and results.get("detach_used") == [1, 5],
+            "avail_is_not_used": results.get("detach_avail") == [1, 5 if private_ring else 6]
+            and results.get("detach_used") == [1, 4 if private_ring else 5],
             "detach_fences_writes": results.get("detached_ram_unchanged", False),
             "private_backing_unchanged": results["backing_file_unchanged"],
             "fds_released": results["fd_before"] == results["fd_after"],
@@ -307,7 +331,7 @@ def worker(control_fd, output):
         raise RuntimeError("one or more kernel characterization checks failed")
 
 
-def supervise(output):
+def supervise(output, private_ring=False):
     if os.geteuid() != 0:
         raise RuntimeError("supervisor requires root in an ephemeral network namespace")
     tap = os.open("/dev/net/tun", os.O_RDWR | os.O_CLOEXEC)
@@ -329,7 +353,8 @@ def supervise(output):
         left.settimeout(15)
         child = subprocess.Popen(
             [sys.executable, __file__, "--worker-fd", str(right.fileno()),
-             "--output", str(output)], pass_fds=[right.fileno()])
+             "--output", str(output)] + (["--private-rings"] if private_ring else []),
+            pass_fds=[right.fileno()])
         right.close()
         right = None
         while True:
@@ -368,13 +393,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--worker-fd", type=int)
+    parser.add_argument("--private-rings", action="store_true")
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(f"refusing to overwrite evidence: {args.output}")
     if args.worker_fd is None:
-        supervise(args.output)
+        supervise(args.output, args.private_rings)
     else:
-        worker(args.worker_fd, args.output)
+        worker(args.worker_fd, args.output, args.private_rings)
 
 
 if __name__ == "__main__":

@@ -1,144 +1,96 @@
-# Userspace TAP diagnostic and exact-kernel characterization
+# Opt-in net prototype correctness and diagnostic fixture
 
-This fixture is instrumentation for issue #2, **not** a shipped TAP consumer,
-SDK networking mode, vhost prototype, or evidence of a performance improvement.
-Flint runtime source is unchanged. Internet/proxy/forward/transfer SDK paths use
-vsock and cannot benefit from this fixture.
+This is issue #2 instrumentation and an **unfinished experimental prototype**,
+not a shipped TAP consumer, SDK networking mode or performance improvement.
+SDK internet/proxy/forward/transfer still use vsock. The original unrequested
+Flint userspace path remains default; `--net-backend userspace` is the common
+blocking A′ adapter, `vhost` is strict B, and explicit `auto` permits fully
+unwound early capability fallback. Existing guest features/header remain fixed.
 
-Run from the issue's dedicated worktree on the provisioned nested Azure host:
+All builds/tests/VMs/profiles must use exclusive
+`/d/hearth/.perf/fleet/host.lock`, bounded commands, this dedicated worktree and
+umask077. `run.sh` already acquires/releases that lock; never nest a lock around
+it. Its root supervisor creates private network/mount namespaces and an owned
+TAP, without uplink/NAT/default route or host node/ACL changes. Flint and peers
+run UID1000 on CPUs8/9; only setup/collection is root. **Unjailed diagnostics are
+not production-jail acceptance.** Artifact directories are private and cannot
+be overwritten; use short boot IDs (UNIX socket paths must fit108bytes).
+
+Existing baseline fixture/image hashes and failures are retained unchanged.
+`prepare` creates a new current fixture only if none exists; `prepare-reset`
+builds a separately pinned control fixture without rewriting the baseline:
 
 ```sh
-bash benchmarks/vhost-net/run.sh prepare
-bash benchmarks/vhost-net/run.sh probe
-bash benchmarks/vhost-net/run.sh selftest
 bash benchmarks/vhost-net/run.sh test
-for MODE in rpc h2g g2h wake; do
-  bash benchmarks/vhost-net/run.sh boot --boot-id "$MODE-01" --modes "$MODE" --repetitions 4 --seconds 60 --profiles
-  bash benchmarks/vhost-net/run.sh boot --boot-id "$MODE-02" --modes "$MODE" --repetitions 3 --seconds 60
-  bash benchmarks/vhost-net/run.sh boot --boot-id "$MODE-03" --modes "$MODE" --repetitions 3 --seconds 60
-done
-bash benchmarks/vhost-net/run.sh quiet
+bash benchmarks/vhost-net/run.sh selftest --control-id native-new
+bash benchmarks/vhost-net/run.sh boot --boot-id b-new --net-backend vhost \
+  --repetitions 1 --seconds 2 --warmup .2 --modes rpc h2g g2h wake \
+  --traffic-snapshot --restore-backend userspace --concurrent --malformed --profiles
+bash benchmarks/vhost-net/run.sh prepare-reset
+bash benchmarks/vhost-net/run.sh boot --boot-id reset-new --net-backend vhost \
+  --fixture-id fixture-reset --reset --repetitions 1 --seconds 1 --warmup 0 \
+  --modes rpc h2g g2h wake --snapshot
+bash benchmarks/vhost-net/run.sh boot --boot-id auto-new --net-backend auto \
+  --vhost-unavailable permission --repetitions 1 --seconds 1 --warmup 0
+bash benchmarks/vhost-net/run.sh strict --boot-id strict-new --vhost-unavailable uapi
+bash benchmarks/vhost-net/run.sh resource --boot-id resource-new
 ```
 
-Build Flint unchanged first using Zig 0.17.0, `-Dtarget=x86_64-linux
--Doptimize=safe`, inside the same absolute fleet lock. The scripts acquire
-`/d/hearth/.perf/fleet/host.lock` exclusively per bounded phase; never call them
-from inside another lock. All artifacts use `umask 077` beneath
-`.perf/vhost-net/20261004/`. A boot ID cannot be overwritten. Inspect command
-exit statuses, raw output and collector errors; successful script exit is not
-successful traffic. Keep each boot phase below its 900 s execution bound; split
-healthy full-window workloads by case as above rather than batching all cases
-and repetitions into one long lock hold. The diagnostic evaluation initially
-attempted all four modes together, which failed early rather than filling their
-requested windows.
-Already-retained fixtures/probes/controls are not overwritten: reuse the pinned
-fixture and choose new boot/control IDs for further diagnostic runs.
+The native C peer validates64-byte numbered RPCs and exact0x5a bulk streams
+with byte/error ACKs. Guest init has no heartbeat/timer workaround. `wake`
+withholds host requests for1s; `idle` performs no traffic. Successful quantiles
+never erase connect/warmup/active failures. These are not iperf-equivalent
+UDP/loss/retransmission tests or deciding performance samples.
 
-The supervisor needs `sudo -n` and `unshare --net`; it creates only an ephemeral
-experiment namespace, a persistent owner-UID-1000 `hn2tap0` **inside** that
-namespace, and `192.0.2.1/30`. There is no host uplink, NAT, bridge or default
-route. Namespace deletion follows supervisor/child exit. It uses BusyBox `ip`,
-not a host iproute2 installation. Flint and host peers run as UID 1000 with the
-existing KVM-group access, on CPUs 8 and 9 respectively; the VMM does not run
-as root. The supervisor terminates only its recorded child PID and joins it.
-This is jailless baseline instrumentation, not production jail acceptance.
+`--traffic-snapshot` withholds a reader during an8MiB download, pauses before
+ACK, saves RAM twice and requires identical full-file hashes, resumes and checks
+all bytes/ACK plus fresh RPC. `--restore-backend` uses format-v2 snapshot/new
+RAM mapping, checks RPC/bulk/wake and unchanged MAP_PRIVATE backing. It is not
+simultaneous independent-restore isolation. `--concurrent` checks eight clients
+in one VM, not four/eight-VM scaling. `--reset` performs three real guest driver
+unbind/rebind cycles with new payload checks and owned FD/task observations.
+`--malformed` restores deliberately patched RAM/state into real KVM for
+flags/direction/cycle/GPA/header/head/alignment rejection, including `auto`
+not silently falling back. Capability controls bind an owned regular file over
+vhost **only in the private mount namespace**; shared device permissions remain
+unchanged.
+`resource` deliberately caps the owned process's FD limit at12/14/15 to force
+partial eventfd setup failures in strict/auto; these must be fatal, not fallback.
+The initial16-FD calibration unexpectedly allowed setup and timed out after20s;
+its raw failure remains retained, not reclassified as a successful rejection.
 
-Preparation builds `guest.c` statically with the same pinned Zig compiler's
-musl target, copies the host's static BusyBox, and verifies the existing
-5.10.245 guest-kernel release hash. It hashes compiler-built peer, BusyBox,
-initramfs, kernel, Flint and fixture source. The guest has 1 vCPU/512 MiB,
-MTU 1500, three blocking TCP listeners and **no heartbeat or timer wakeup
-workaround**. TAP offloads are explicitly disabled. Only Flint's existing
-VERSION_1/MAC/STATUS features, two split queues and 12-byte header are offered.
-Guest route, interface, queue discovery and TAP counters are retained.
-The network-only kernel download runs outside the fleet lock; verification
-and CPU-heavy preparation run inside it.
+New profiles attach only to the owned VMM (including its vhost worker) and
+owned peer, using root software stat/KVM events and49Hz/4KiB DWARF record,
+report and stacks. SIGINT after peer completion is an explicit normal collector
+stop, with raw status retained. No new all-host process metadata/stacks are
+captured. `probe`/`quiet` historical all-host capture entrypoints are disabled.
+Work on unowned ksoftirqd CPUs is not captured/attributed; global aggregate
+`/proc/stat`, softirq/softnet deltas retain whole-host context, not a complete
+product CPU estimate. BusyCPU is user+nice+system+irq+softirq/SC_CLK_TCK, without
+guest double count. All-system task-clock is not busyCPU. Nested physical Azure
+hypervisor cost/hardware PMU remain unavailable. Keep historical all-host DWARF
+and inventories private; never upload unrelated users' metadata/stack bytes.
 
-`collect.py` validates each 64-byte sequence/payload RPC, handles partial reads,
-and separately drives upload (port 7001) and download (7002). Bulk payload is
-an exact fixed `0x5a` stream, with byte count/error acknowledgement; these native
-peers are an explicitly pinned alternative fixture, **not iperf3-equivalent
-network-loss/retransmission coverage**. Warmup is 10 s; active windows default to
-60 s. `wake` sleeps the host peer for 1 s between requests, not the guest. Failed
-connect/warmup/active phases are retained; no latency or CPU/unit is invented
-for zero completions. Successful-only quantiles must never hide timeouts.
-`idle` is a separate 60 s diagnostic.
+## Exact-kernel shadow and confinement probes
 
-Profiles use root host-wide software `perf stat` and `perf record -a
---no-buildid-cache -e cpu-clock -F 49 -g --call-graph dwarf,4096`, plus actual
-`perf report --stdio`, stacks and direct KVM entry/exit trace recording when the
-capability probe succeeds. The initial retained captures used 199 Hz/8 KiB
-DWARF and the `perf kvm stat record` frontend; post-provisioning idle captures
-hit overload/timeouts/frontend aborts. Their errors remain evidence, not passed
-profiles. The current lower-volume configuration is a separately identified
-diagnostic, not an interchangeable comparison arm. Build-ID cache updates and
-supervisor/child core dumps are disabled locally; no global setting is changed.
-KVM reports use `perf kvm -i FILE stat report --stdio`; `-i` is a global
-option. This profiler writes report text to stderr, so preserve both streams.
-All CPU placement,
-process/TID inventories, `/proc/stat`, softirq/softnet and network counters are
-retained. Visible-host busy CPU is user+nice+system+irq+softirq divided by
-`SC_CLK_TCK`; guest time is already in user/nice. System-wide task-clock is not
-treated as busy CPU. Measured-window denominators do not include warmup;
-whole-command counters are separately labeled. The shared fleet lock excludes
-other agents' VM/build workloads, not all unrelated outer-host background work
-or invisible Azure hypervisor activity.
+`uapi_probe.py --private-rings` demonstrates kernel acceptance of immutable
+private vring HVAs outside the GPA table, guest-index poisoning immunity,
+trusted used progress, rejected INDIRECT publication, framing, malformed raw
+kernel behavior, bounded fence, CoW and close/join/FD cleanup. Nine cases/eight
+observations are characterization, not eight product gates. Its original
+direct-ring mode deliberately preserves the rejected behavior.
 
-The supervisor currently exercises one VM and original userspace only. It does
-not claim UDP, 4/8-VM concurrency, controlled Azure external routing, full idle
-tails, malformed queues, IRQ/reset races, vhost fallback, traffic snapshot,
-cross-backend restore, CoW or jailed isolation acceptance. Use the
+`export_filter.zig` exports the prototype's exact enforced BPF;
+`owner_probe.py` installs it after clearing groups/dropping UID/GID1000, creates
+an owner-mode kernel worker in a unique memory/pids-limited cgroup, observes
+NNP1/Seccomp2/CapEff0/affinity/inheritance and waits for synchronous close/join.
+It removes only that owned empty cgroup. It never enables global controllers;
+CPU quota delegation was absent. `jail_probe.py` separately reproduces the
+still-unrepaired common `/dev`/KVM ownership failure rather than bypassing it.
+
+See [actual results](../../docs/perf-results/vhost-net-20261004.md),
 [spec](../../docs/product-specs/perf-vhost-net.md) and
-[plan](../../docs/exec-plans/active/perf-vhost-net.md) for those mandatory gates.
-No A′/B comparison or backend selector exists here.
-
-`--snapshot` on a selected boot adds a post-workload, vCPU-only
-pause/snapshot/resume and captures the actual format-v2 net transport/queue
-fields. It writes a private 512 MiB RAM artifact. This is metadata/basic
-userspace lifecycle evidence, not traffic snapshot, restore, CoW or kernel-worker
-acceptance.
-
-Raw system-wide DWARF perf data can contain unrelated host stack bytes. Keep it
-private; do not automatically publish it or raw task inventories. A results
-summary and artifact hashes can be committed without exposing those samples.
-
-`selftest` runs the exact native guest peer and collector in a separate host
-loopback namespace (no VM/TAP) to check the fixture protocol independently.
-`quiet` retains matched 60 s stat/record controls **without a VM**; a saturated
-control is a qualification failure, not CPU cost attributable to Flint.
-
-## Exact-kernel UAPI characterization
-
-`uapi_probe.py` is a real vhost/TAP ring experiment, **not a Flint backend, real
-KVM correctness suite, production jail test or performance arm B**. Run only on
-the provisioned pinned kernel from this worktree:
-
-```sh
-umask 077
-flock -x -w 600 /d/hearth/.perf/fleet/host.lock timeout 90 bash -c '
-  cd /d/hearth/.perf/worktrees/vhost-net &&
-  umask 077 &&
-  mkdir .perf/vhost-net/s1/uapi-new &&
-  timeout 60 sudo -n unshare --net -- python3 benchmarks/vhost-net/uapi_probe.py \
-    --output "$PWD/.perf/vhost-net/s1/uapi-new/results.json"
-'
-```
-
-The output must not already exist. The root supervisor owns only an ephemeral
-network namespace, `hn2s1tap0` and its AF_PACKET peer. The vhost/TAP owner drops
-to UID/GID 1000, clears supplementary groups, sets NoNewPrivs and CPU 8, and opens
-its own device FDs. No privileged device FD is passed to Flint. Seccomp remains
-**0** in this characterization; it is not an enforced production filter.
-
-The probe configures two 256-entry split queues, bounded GPA-0 memory, only
-VERSION_1 in vhost, 12-byte TAP headers, no offloads, kick/call/error eventfds
-and file-backed MAP_PRIVATE RAM. Nine sequential cases observe checked TX/RX,
-guest used-index mutation, deliberately broken naive resume, trusted-counter
-reseeding, unnegotiated INDIRECT acceptance, invalid TX direction, out-of-range
-GPA and a cyclic chain. Eight assertions verify the expected observations,
-including undesirable acceptance; they are **not eight product acceptance
-gates**. An explicit detached kick plus incoming frame checks a bounded write
-fence; close-before-unmap checks worker disappearance, FD counts and untouched
-CoW backing. It does not prove VM IRQ/ACK handoff, arbitrary races, cross-backend
-traffic restore or cgroup limits. Exact-kernel source/provenance and actual
-results are in the [report](../../docs/perf-results/vhost-net-20261004.md).
+[active plan](../../docs/exec-plans/active/perf-vhost-net.md) for exact commands,
+counts, pins and mandatory remaining gates. Full enforced VMM jail, independent
+restore isolation, arbitrary injected ioctl/allocator failures, UDP/external/scaling cells and quiet
+A/A/performance qualification are not passed. No default or merge is justified.

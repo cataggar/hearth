@@ -11,6 +11,7 @@ const S_IFCHR: u32 = 0o020000;
 // Device major/minor encoding: (major << 8) | minor (valid for major < 4096, minor < 256)
 const DEV_KVM = (10 << 8) | 232;
 const DEV_NET_TUN = (10 << 8) | 200;
+const DEV_VHOST_NET = (10 << 8) | 238;
 
 fn check(rc: usize, comptime what: []const u8) !void {
     const signed: isize = @bitCast(rc);
@@ -31,6 +32,7 @@ pub const Config = struct {
     disk_major: u32 = 0, // block device major:minor for io.max
     disk_minor: u32 = 0,
     need_tun: bool = false,
+    need_vhost_net: bool = false,
 };
 
 pub fn setup(config: Config) !void {
@@ -70,6 +72,10 @@ pub fn setup(config: Config) !void {
     if (config.need_tun) {
         try check(linux.mkdir("dev/net", 0o755), "mkdir(/dev/net)");
         try check(linux.mknod("dev/net/tun", S_IFCHR | 0o666, DEV_NET_TUN), "mknod(/dev/net/tun)");
+    }
+    if (config.need_vhost_net) {
+        try check(linux.mknod("dev/vhost-net", S_IFCHR | 0o600, DEV_VHOST_NET), "mknod(/dev/vhost-net)");
+        try check(linux.fchownat(linux.AT.FDCWD, "dev/vhost-net", config.uid, config.gid, 0), "chown(/dev/vhost-net)");
     }
 
     // Drop privileges — last step requiring root

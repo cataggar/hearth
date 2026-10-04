@@ -8,6 +8,7 @@ import json
 import os
 import resource
 import signal
+import shutil
 import socket
 import struct
 import subprocess
@@ -37,14 +38,21 @@ def owned_file(path, data):
     os.chown(path, UID, GID)
 
 
-def command(argv, directory, name, user=False, timeout=120):
+def command(argv, directory, name, user=False, timeout=120, trigger_rx=False):
     begin = time.monotonic_ns()
     with (directory / f"{name}.stdout").open("wb") as out, (directory / f"{name}.stderr").open("wb") as err:
         child = subprocess.Popen(
             argv, cwd=ROOT, stdout=out, stderr=err, start_new_session=True,
             preexec_fn=demote if user else None,
         )
+        trigger = None
         try:
+            if trigger_rx:
+                trigger = subprocess.Popen(
+                    ["python3", "-c",
+                     "import socket,time; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); "
+                     "[(s.sendto(b'owned malformed RX trigger',('192.0.2.2',7999)),time.sleep(.05)) for _ in range(10)]"],
+                    cwd=ROOT, stdout=subprocess.DEVNULL, stderr=err, preexec_fn=demote)
             status = child.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             status = 124
@@ -56,11 +64,17 @@ def command(argv, directory, name, user=False, timeout=120):
                 except subprocess.TimeoutExpired:
                     os.killpg(child.pid, signal.SIGKILL)
                     child.wait(timeout=5)
+            if trigger is not None:
+                if trigger.poll() is None:
+                    trigger.terminate()
+                trigger.wait(timeout=5)
     for suffix in ("stdout", "stderr"):
         os.chown(directory / f"{name}.{suffix}", UID, GID)
     owned_file(directory / f"{name}.command.json", json.dumps({
         "argv": [str(value) for value in argv], "exit_status": status,
         "process_group": child.pid,
+        "actual_returncode": child.returncode,
+        "owned_pid_absent_after_join": not Path("/proc", str(child.pid)).exists(),
         "begin_monotonic_ns": begin, "end_monotonic_ns": time.monotonic_ns(),
     }, indent=2) + "\n")
     return status
@@ -88,12 +102,33 @@ def request(path, method, target, body=None):
     return response
 
 
-def inventory(directory, name):
+def inventory(directory, name, owned_pid=None):
     for filename in ("stat", "softirqs", "net/softnet_stat", "net/dev"):
         owned_file(directory / f"{name}.proc-{filename.replace('/', '-')}.txt", Path("/proc", filename).read_text())
-    command(["ps", "-eLo", "pid,tid,psr,comm,cgroup"], directory, f"{name}.tasks")
+    command(["ps", "-Lo", "pid,tid,psr,comm,cgroup", "-p", str(owned_pid or os.getpid())],
+            directory, f"{name}.owned-tasks")
     command(["/usr/bin/busybox", "ip", "addr", "show"], directory, f"{name}.addresses")
     command(["/usr/bin/busybox", "ip", "route", "show"], directory, f"{name}.routes")
+    if owned_pid is not None:
+        fields = ("Name", "Pid", "Tgid", "PPid", "Uid", "Gid", "Groups", "CapEff",
+                  "NoNewPrivs", "Seccomp", "Seccomp_filters", "Kthread", "Cpus_allowed_list")
+        tasks = {}
+        task_root = Path("/proc", str(owned_pid), "task")
+        for task in task_root.iterdir() if task_root.exists() else []:
+            try:
+                values = {}
+                for line in (task / "status").read_text().splitlines():
+                    key, _, value = line.partition(":")
+                    if key in fields:
+                        values[key] = value.strip()
+                values["cgroup"] = (task / "cgroup").read_text()
+                tasks[task.name] = values
+            except FileNotFoundError:
+                pass
+        owned_file(directory / f"{name}.owned-status.json", json.dumps(tasks, indent=2) + "\n")
+        owned_file(directory / f"{name}.owned-fds.json", json.dumps({
+            "pid": owned_pid, "fd_count": len(list(Path("/proc", str(owned_pid), "fd").iterdir())),
+        }, indent=2) + "\n")
 
 
 def freeze_tools(directory):
@@ -173,7 +208,7 @@ def probe(directory):
     owned_file(directory / "devices.json", json.dumps(capabilities, indent=2) + "\n")
 
 
-def workload(directory, mode, name, seconds, warmup, profile=None):
+def workload(directory, mode, name, seconds, warmup, profile=None, variant_override=None):
     if mode == "idle":
         warmup = 0
     peer = [
@@ -181,6 +216,11 @@ def workload(directory, mode, name, seconds, warmup, profile=None):
         "--mode", mode, "--warmup-seconds", str(warmup), "--seconds", str(seconds),
         "--output", str(directory / f"{name}.json"),
     ]
+    variant_path = directory / "variant.json"
+    if variant_path.exists():
+        variant = variant_override or json.loads(variant_path.read_text())
+        peer += ["--backend", variant["effective_backend"],
+                 "--notification", variant["notification"]]
     # perf must remain root, but the peer must not retain its privileges.
     if profile:
         peer = ["runuser", "-u", "g", "--", *peer]
@@ -229,6 +269,144 @@ def workload(directory, mode, name, seconds, warmup, profile=None):
     return status
 
 
+def scoped_profile(directory, vmm_pid, mode, name, seconds, warmup, profile):
+    variant = json.loads((directory / "variant.json").read_text())
+    peer_argv = [
+        "taskset", "-c", "9", "python3", str(directory / "source-collect.py"),
+        "--mode", mode, "--seconds", str(seconds), "--warmup-seconds", str(warmup),
+        "--backend", variant["effective_backend"], "--notification", variant["notification"],
+        "--output", str(directory / f"{name}.json"),
+    ]
+    collector = None
+    with (directory / f"{name}.peer.log").open("wb") as output:
+        peer = subprocess.Popen(peer_argv, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT,
+                                preexec_fn=demote)
+    try:
+        events = "task-clock,context-switches,cpu-migrations,page-faults,kvm:kvm_entry,kvm:kvm_exit"
+        if profile == "stat":
+            perf_argv = [
+                "perf", "stat", "-p", f"{vmm_pid},{peer.pid}", "-e", events, "-x,",
+                "-o", str(directory / f"{name}.stat.csv"),
+            ]
+        else:
+            perf_argv = [
+                "perf", "record", "-p", f"{vmm_pid},{peer.pid}", "--no-buildid-cache",
+                "-e", "cpu-clock", "-F", "49", "-g", "--call-graph", "dwarf,4096",
+                "-o", str(directory / f"{name}.perf.data"),
+            ]
+        with (directory / f"{name}.perf.log").open("wb") as output:
+            collector = subprocess.Popen(perf_argv, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT)
+        peer_status = peer.wait(timeout=seconds + warmup + 30)
+        stopped_by_supervisor = collector.poll() is None
+        if stopped_by_supervisor:
+            collector.send_signal(signal.SIGINT)
+        perf_status = collector.wait(timeout=10)
+        owned_file(directory / f"{name}.profile.json", json.dumps({
+            "peer_argv": peer_argv, "perf_argv": perf_argv, "peer_pid": peer.pid,
+            "vmm_pid": vmm_pid, "peer_status": peer_status, "perf_status": perf_status,
+            "stopped_by_supervisor_sigint": stopped_by_supervisor,
+            "scope": "owned VMM tasks (including owner vhost worker) and owned peer only",
+            "limitations": [
+                "not whole-host CPU or performance acceptance",
+                "network work on unowned ksoftirqd CPUs is not captured or attributed",
+                "aggregate /proc CPU/softirq deltas include unrelated activity",
+                "nested Azure physical-hypervisor CPU and hardware PMU unavailable",
+            ],
+        }, indent=2) + "\n")
+        expected_stop = stopped_by_supervisor and perf_status == -signal.SIGINT
+        if profile == "record" and (perf_status == 0 or expected_stop):
+            command(["perf", "report", "--stdio", "-i", str(directory / f"{name}.perf.data"),
+                     "--sort", "comm,dso,symbol"], directory, f"{name}.report")
+            command(["perf", "script", "-i", str(directory / f"{name}.perf.data"),
+                     "--show-lost-events"], directory, f"{name}.stacks")
+        return peer_status or (0 if expected_stop else perf_status)
+    finally:
+        for child in (peer, collector):
+            if child is not None and child.poll() is None:
+                child.terminate()
+                try:
+                    child.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.wait(timeout=5)
+
+
+def malformed_restore(directory, binary, transport):
+    state = (directory / "baseline.vmstate").read_bytes()
+    net_offset = len(state) - 10 - 144
+    queue = transport["queues"][0]
+    avail_entry = queue["avail_gpa"] + 4 + (queue["last_avail_idx"] % queue["size"]) * 2
+    memory = directory / "malformed.mem"
+    shutil.copyfile(directory / "baseline.mem", memory)
+    memory.chmod(0o600)
+    os.chown(memory, UID, GID)
+    fd = os.open(memory, os.O_RDWR | os.O_CLOEXEC)
+    try:
+        head = struct.unpack("<H", os.pread(fd, 2, avail_entry))[0]
+        desc = queue["desc_gpa"] + head * 16
+        patches = [
+            ("indirect", desc + 12, struct.pack("<H", 6), "UnadvertisedNetDescriptorFlags"),
+            ("direction", desc + 12, struct.pack("<H", 0), "InvalidNetDescriptorDirection"),
+            ("cycle", desc + 12, struct.pack("<HH", 3, head), "DescChainCycle"),
+            ("gpa-overflow", desc, struct.pack("<Q", 0xfffffffffffffff8), "GuestMemoryOutOfBounds"),
+            ("short-header", desc + 8, struct.pack("<IHH", 11, 2, 0), "NetBufferMissingHeader"),
+            ("invalid-head", avail_entry, struct.pack("<H", queue["size"]), "InvalidDescIndex"),
+        ]
+        results = []
+        for name, offset, patch, expected in patches:
+            original = os.pread(fd, len(patch), offset)
+            os.pwrite(fd, patch, offset)
+            for backend in ("userspace", "vhost", "auto"):
+                label = f"malformed-{name}-{backend}"
+                argv = ["taskset", "-c", "8", str(binary), "--restore",
+                        "--vmstate-path", str(directory / "baseline.vmstate"),
+                        "--mem-path", str(memory), "--tap", "hn2tap0", "--net-backend", backend]
+                status = command(argv, directory, label, user=True, timeout=10, trigger_rx=True)
+                stderr = (directory / f"{label}.stderr").read_text(errors="replace")
+                passed = status not in (0, 124) and expected in stderr and "effective=userspace reason=" not in stderr
+                results.append({"name": name, "backend": backend, "status": status,
+                                "expected_error": expected, "passed": passed,
+                                "offset": offset, "patch_hex": patch.hex()})
+            os.pwrite(fd, original, offset)
+        bad_state = bytearray(state)
+        struct.pack_into("<Q", bad_state, net_offset + 45 + 3, queue["desc_gpa"] + 1)
+        state_path = directory / "malformed.vmstate"
+        state_path.write_bytes(bad_state)
+        state_path.chmod(0o600)
+        os.chown(state_path, UID, GID)
+        for backend in ("vhost", "auto"):
+            label = f"malformed-queue-alignment-{backend}"
+            status = command(
+                ["taskset", "-c", "8", str(binary), "--restore", "--vmstate-path", str(state_path),
+                 "--mem-path", str(memory), "--tap", "hn2tap0", "--net-backend", backend],
+                directory, label, user=True, timeout=10)
+            stderr = (directory / f"{label}.stderr").read_text(errors="replace")
+            results.append({"name": "queue-alignment", "backend": backend, "status": status,
+                            "expected_error": "InvalidNetQueueAlignment",
+                            "passed": status not in (0, 124) and "InvalidNetQueueAlignment" in stderr
+                            and "effective=userspace reason=" not in stderr})
+        feature_state = bytearray(state)
+        features = struct.unpack_from("<Q", feature_state, net_offset + 25)[0]
+        struct.pack_into("<Q", feature_state, net_offset + 25, features & ~(1 << 32))
+        state_path.write_bytes(feature_state)
+        for backend in ("userspace", "vhost", "auto"):
+            label = f"malformed-features-{backend}"
+            status = command(
+                ["taskset", "-c", "8", str(binary), "--restore", "--vmstate-path", str(state_path),
+                 "--mem-path", str(memory), "--tap", "hn2tap0", "--net-backend", backend],
+                directory, label, user=True, timeout=10)
+            stderr = (directory / f"{label}.stderr").read_text(errors="replace")
+            results.append({"name": "version1-feature", "backend": backend, "status": status,
+                            "expected_error": "NetVersion1NotNegotiated",
+                            "passed": status == 1 and "NetVersion1NotNegotiated" in stderr
+                            and "effective=userspace reason=" not in stderr})
+        owned_file(directory / "malformed-results.json", json.dumps(results, indent=2) + "\n")
+        if not all(row["passed"] for row in results):
+            raise RuntimeError("real KVM malformed-queue rejection failed")
+    finally:
+        os.close(fd)
+
+
 def selftest(directory):
     private_directory(directory)
     freeze_tools(directory)
@@ -267,22 +445,98 @@ def selftest(directory):
                 child.wait(timeout=5)
 
 
+def hide_vhost(directory, kind):
+    if not kind:
+        return
+    path = directory / "unavailable-vhost-device"
+    path.write_bytes(b"")
+    path.chmod(0o600)
+    if kind == "uapi":
+        os.chown(path, UID, GID)
+    subprocess.run(["mount", "--bind", str(path), "/dev/vhost-net"], check=True)
+    owned_file(directory / "vhost-capability-control.json", json.dumps({
+        "kind": kind, "scope": "owned private mount namespace only; host node/ACL unchanged",
+    }, indent=2) + "\n")
+
+
+def strict_unavailable(args, directory):
+    private_directory(directory)
+    freeze_tools(directory)
+    setup_tap(directory)
+    hide_vhost(directory, getattr(args, "vhost_unavailable", None))
+    fixture = args.artifact_dir / getattr(args, "fixture_id", "fixture")
+    argv = [
+        "taskset", "-c", "8", str(ROOT / "vmm/zig-out/bin/flint"),
+        str(fixture / "bzImage"), str(fixture / "initrd.cpio.gz"),
+        "console=ttyS0 reboot=k panic=1 pci=off", "--tap", "hn2tap0", "--net-backend", "vhost",
+    ]
+    status = command(argv, directory, "strict", user=True, timeout=20)
+    stderr = (directory / "strict.stderr").read_text(errors="replace")
+    expected = "VhostAccessDenied" if args.vhost_unavailable == "permission" else "VhostUapiUnsupported"
+    passed = status == 1 and expected in stderr and "effective=userspace reason=" not in stderr
+    owned_file(directory / "strict-result.json", json.dumps({
+        "status": status, "expected": expected, "passed": passed,
+        "classification": "real KVM strict preactivation error; not jail acceptance",
+    }, indent=2) + "\n")
+    if not passed:
+        raise RuntimeError("strict unavailable vhost did not fail visibly and unwind")
+
+
+def resource_failures(args, directory):
+    private_directory(directory)
+    freeze_tools(directory)
+    setup_tap(directory)
+    fixture = args.artifact_dir / args.fixture_id
+    results = []
+    for limit in (12, 14, 15):
+        for backend in ("vhost", "auto"):
+            name = f"fd-limit-{limit}-{backend}"
+            argv = [
+                "prlimit", f"--nofile={limit}:{limit}", "--", "taskset", "-c", "8",
+                str(ROOT / "vmm/zig-out/bin/flint"), str(fixture / "bzImage"),
+                str(fixture / "initrd.cpio.gz"), "console=ttyS0 reboot=k panic=1 pci=off",
+                "--tap", "hn2tap0", "--net-backend", backend,
+            ]
+            status = command(argv, directory, name, user=True, timeout=20)
+            stderr = (directory / f"{name}.stderr").read_text(errors="replace")
+            passed = status == 1 and "NetEventfdFailed" in stderr and "effective=userspace reason=" not in stderr
+            results.append({"limit": limit, "backend": backend, "status": status, "passed": passed,
+                            "expected": "NetEventfdFailed, fatal resource failure; no auto fallback"})
+    owned_file(directory / "resource-results.json", json.dumps(results, indent=2) + "\n")
+    if not all(row["passed"] for row in results):
+        raise RuntimeError("forced vhost setup resource failure did not fail and unwind")
+
+
 def boot(args, directory):
     private_directory(directory)
     freeze_tools(directory)
     setup_tap(directory)
+    hide_vhost(directory, getattr(args, "vhost_unavailable", None))
     sock = directory / "flint.sock"
+    if len(str(sock).encode()) >= 108:
+        raise ValueError("fixture API socket path exceeds sockaddr_un limit; use a shorter boot ID")
     log = directory / "serial.log"
     binary = ROOT / "vmm/zig-out/bin/flint"
-    fixture = args.artifact_dir / "fixture"
+    fixture = args.artifact_dir / getattr(args, "fixture_id", "fixture")
+    backend = getattr(args, "net_backend", None)
+    argv = ["taskset", "-c", "8", str(binary), "--api-sock", str(sock)]
+    if backend:
+        argv += ["--net-backend", backend]
     with log.open("wb") as output:
         child = subprocess.Popen(
-            ["taskset", "-c", "8", str(binary), "--api-sock", str(sock)],
+            argv,
             cwd=directory, stdout=output, stderr=subprocess.STDOUT, preexec_fn=demote,
         )
+    traffic = None
     try:
         os.chown(log, UID, GID)
         owned_file(directory / "flint-pid.txt", str(child.pid) + "\n")
+        owned_file(directory / "variant.json", json.dumps({
+            "requested_backend": backend or "original-userspace",
+            "classification": "correctness diagnostic, not performance qualification",
+            "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+            "argv": argv,
+        }, indent=2) + "\n")
         deadline = time.monotonic() + 15
         while not sock.exists():
             if child.poll() is not None or time.monotonic() > deadline:
@@ -304,24 +558,78 @@ def boot(args, directory):
             if child.poll() is not None or time.monotonic() > deadline:
                 raise RuntimeError("guest TAP fixture did not become ready")
             time.sleep(0.01)
-        inventory(directory, "ready")
+        variant_path = directory / "variant.json"
+        variant = json.loads(variant_path.read_text())
+        variant["effective_backend"] = (
+            "vhost" if "effective=vhost" in log.read_text(errors="replace") else "userspace")
+        variant["notification"] = (
+            "common blocked-poll, MMIO-exit kick, direct IRQ" if backend
+            else "unchanged synchronous MMIO, direct IRQ, exit-driven RX")
+        owned_file(variant_path, json.dumps(variant, indent=2) + "\n")
+        topology_path = directory / "topology.json"
+        topology = json.loads(topology_path.read_text())
+        topology["backend"] = variant["effective_backend"]
+        topology["notifications"] = variant["notification"]
+        owned_file(topology_path, json.dumps(topology, indent=2) + "\n")
+        inventory(directory, "ready", child.pid)
         summary = []
         for repetition in range(args.repetitions):
             for mode in args.modes:
-                name = f"aa-{repetition:02d}-{mode}"
-                summary.append({"name": name, "status": workload(directory, mode, name, args.seconds, 10)})
+                name = f"{'correctness' if backend else 'aa'}-{repetition:02d}-{mode}"
+                summary.append({"name": name, "status": workload(
+                    directory, mode, name, args.seconds, getattr(args, "warmup", 10))})
         if args.profiles:
             for mode in dict.fromkeys([*args.modes, "idle"]):
                 for profile in ("stat", "record"):
                     name = f"profile-{mode}-{profile}"
                     summary.append({
                         "name": name,
-                        "status": workload(directory, mode, name, 60 if mode == "idle" else args.seconds, 10, profile),
+                        "status": scoped_profile(directory, child.pid, mode, name, args.seconds,
+                                                 0 if mode == "idle" else args.warmup, profile),
                     })
         owned_file(directory / "summary.json", json.dumps(summary, indent=2) + "\n")
         owned_file(directory / "api-final-status.txt", request(sock, "GET", "/vm"))
+        if args.reset:
+            reset_checks = []
+            for iteration in range(3):
+                status = command(
+                    ["taskset", "-c", "9", "python3", "-c",
+                     "import socket; s=socket.create_connection(('192.0.2.2',7003),5); "
+                     "s.sendall(b'RSET'); assert s.recv(4)==b'OKAY'; s.close()"],
+                    directory, f"reset-{iteration}", user=True, timeout=10)
+                deadline = time.monotonic() + 15
+                while log.read_text(errors="replace").count("PERF_RESET_OK") < iteration + 1:
+                    if child.poll() is not None or time.monotonic() > deadline:
+                        raise RuntimeError("guest virtio-net reset/rebind did not complete")
+                    time.sleep(0.01)
+                payload_status = workload(directory, "rpc", f"reset-{iteration}-rpc", 0.5, 0)
+                reset_checks.append({"iteration": iteration, "request_status": status,
+                                     "payload_status": payload_status})
+                if status or payload_status:
+                    raise RuntimeError("reset/rebind payload check failed")
+                inventory(directory, f"reset-{iteration}", child.pid)
+            owned_file(directory / "reset-results.json", json.dumps(reset_checks, indent=2) + "\n")
+        if args.concurrent:
+            status = command(
+                ["taskset", "-c", "9", "python3", str(ROOT / "benchmarks/vhost-net/client_concurrency.py"),
+                 "--output", str(directory / "concurrent.json")],
+                directory, "concurrent", user=True, timeout=60)
+            if status:
+                raise RuntimeError("concurrent payload check failed")
         if args.snapshot:
             transitions = []
+            if args.traffic_snapshot:
+                with (directory / "traffic.log").open("wb") as output:
+                    traffic = subprocess.Popen(
+                        ["taskset", "-c", "9", "python3", str(ROOT / "benchmarks/vhost-net/slow_reader.py"),
+                         "--directory", str(directory)],
+                        stdout=output, stderr=subprocess.STDOUT, preexec_fn=demote)
+                deadline = time.monotonic() + 10
+                while not (directory / "traffic-ready").exists():
+                    if traffic.poll() is not None or time.monotonic() > deadline:
+                        raise RuntimeError("in-flight peer did not become ready")
+                    time.sleep(0.01)
+                time.sleep(0.2)
             for method, route, body in (
                 ("PATCH", "/vm", {"state": "Paused"}),
                 ("PUT", "/snapshot/create", {"snapshot_path": "baseline.vmstate", "mem_file_path": "baseline.mem"}),
@@ -330,6 +638,18 @@ def boot(args, directory):
                 response = request(sock, method, route, body)
                 transitions.append({"route": route, "duration_ms": (time.monotonic_ns() - begin) / 1e6,
                                     "response": response})
+            inventory(directory, "paused", child.pid)
+            first_hash = hashlib.sha256((directory / "baseline.mem").read_bytes()).hexdigest()
+            if args.traffic_snapshot:
+                request(sock, "PUT", "/snapshot/create",
+                        {"snapshot_path": "fenced.vmstate", "mem_file_path": "fenced.mem"})
+                second_hash = hashlib.sha256((directory / "fenced.mem").read_bytes()).hexdigest()
+                owned_file(directory / "traffic-fence.json", json.dumps({
+                    "first_sha256": first_hash, "second_sha256": second_hash,
+                    "paused_ram_identical": first_hash == second_hash,
+                }, indent=2) + "\n")
+                if first_hash != second_hash:
+                    raise RuntimeError("guest RAM changed after pause acknowledgement")
             state = (directory / "baseline.vmstate").read_bytes()
             if state[:8] != b"FLINTSNP" or struct.unpack_from("<II", state, 16) != (2, 1):
                 raise RuntimeError("unexpected baseline snapshot version/device count")
@@ -338,7 +658,9 @@ def boot(args, directory):
                 raise RuntimeError("unexpected baseline net snapshot layout")
             net = state[net_offset:net_offset + 144]
             transport = {
-                "classification": "baseline vCPU-only pause/snapshot/resume; not vhost worker or traffic acceptance",
+                "classification": (
+                    "common net pause/snapshot/resume diagnostic; traffic/cross-backend restore not yet accepted"
+                    if backend else "baseline vCPU-only pause/snapshot/resume; not vhost worker or traffic acceptance"),
                 "format_version": 2, "device_id": struct.unpack_from("<I", net)[0],
                 "status": net[16], "driver_features_hex": hex(struct.unpack_from("<Q", net, 25)[0]),
                 "interrupt_status": struct.unpack_from("<I", net, 37)[0],
@@ -355,7 +677,58 @@ def boot(args, directory):
             transitions.append({"route": "/vm/resume", "duration_ms": (time.monotonic_ns() - begin) / 1e6,
                                 "response": response})
             owned_file(directory / "baseline-lifecycle.json", json.dumps(transitions, indent=2) + "\n")
+            if traffic is not None:
+                owned_file(directory / "traffic-release", "resume acknowledged\n")
+                if traffic.wait(timeout=90):
+                    raise RuntimeError("in-flight payload check failed")
+            if workload(directory, "rpc", "post-resume-rpc", 0.5, 0):
+                raise RuntimeError("post-resume payload check failed")
+            inventory(directory, "resumed", child.pid)
+            if args.restore_backend:
+                request(sock, "PATCH", "/vm", {"state": "Paused"})
+                child.terminate()
+                child.wait(timeout=5)
+                sock.unlink(missing_ok=True)
+                restore_argv = [
+                    "taskset", "-c", "8", str(binary), "--restore",
+                    "--vmstate-path", str(directory / "baseline.vmstate"),
+                    "--mem-path", str(directory / "baseline.mem"), "--tap", "hn2tap0",
+                    "--net-backend", args.restore_backend, "--api-sock", str(sock),
+                ]
+                with (directory / "restore.log").open("wb") as output:
+                    child = subprocess.Popen(restore_argv, cwd=directory, stdout=output,
+                                             stderr=subprocess.STDOUT, preexec_fn=demote)
+                owned_file(directory / "restore-pid.txt", str(child.pid) + "\n")
+                deadline = time.monotonic() + 15
+                while not sock.exists():
+                    if child.poll() is not None or time.monotonic() > deadline:
+                        raise RuntimeError("restored API did not become ready")
+                    time.sleep(0.01)
+                inventory(directory, "restored", child.pid)
+                restore_variant = {**variant, "effective_backend": args.restore_backend,
+                                   "restore_argv": restore_argv}
+                owned_file(directory / "restore-variant.json", json.dumps(restore_variant, indent=2) + "\n")
+                checks = {mode: workload(directory, mode, f"restored-{mode}", 0.5, 0,
+                                        variant_override=restore_variant)
+                          for mode in ("rpc", "h2g", "g2h", "wake")}
+                after_hash = hashlib.sha256((directory / "baseline.mem").read_bytes()).hexdigest()
+                owned_file(directory / "restore-cow.json", json.dumps({
+                    "from_backend": backend, "to_backend": args.restore_backend,
+                    "format_version": 2, "payload_checks": checks,
+                    "backing_before_sha256": first_hash, "backing_after_sha256": after_hash,
+                    "map_private_backing_unchanged": first_hash == after_hash,
+                }, indent=2) + "\n")
+                if any(checks.values()) or first_hash != after_hash:
+                    raise RuntimeError("cross-backend restore payload/CoW check failed")
+            if args.malformed:
+                request(sock, "PATCH", "/vm", {"state": "Paused"})
+                child.terminate()
+                child.wait(timeout=5)
+                malformed_restore(directory, binary, transport)
     finally:
+        if traffic is not None and traffic.poll() is None:
+            traffic.terminate()
+            traffic.wait(timeout=5)
         if child.poll() is None:
             child.terminate()
             try:
@@ -369,16 +742,31 @@ def boot(args, directory):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-dir", type=Path, required=True)
-    parser.add_argument("--phase", choices=("probe", "boot", "quiet", "selftest"), required=True)
+    parser.add_argument("--phase", choices=("probe", "boot", "quiet", "selftest", "strict", "resource"), required=True)
     parser.add_argument("--boot-id", default="boot-01")
     parser.add_argument("--repetitions", type=int, default=2)
     parser.add_argument("--seconds", type=float, default=60)
     parser.add_argument("--profiles", action="store_true")
+    parser.add_argument("--net-backend", choices=("userspace", "vhost", "auto"))
+    parser.add_argument("--warmup", type=float, default=10)
     parser.add_argument("--snapshot", action="store_true")
+    parser.add_argument("--traffic-snapshot", action="store_true")
+    parser.add_argument("--restore-backend", choices=("userspace", "vhost"))
+    parser.add_argument("--malformed", action="store_true")
+    parser.add_argument("--concurrent", action="store_true")
+    parser.add_argument("--vhost-unavailable", choices=("permission", "uapi"))
+    parser.add_argument("--fixture-id", choices=("fixture", "fixture-reset"), default="fixture")
+    parser.add_argument("--reset", action="store_true")
     parser.add_argument("--control-id")
     parser.add_argument("--modes", nargs="+", choices=("rpc", "h2g", "g2h", "wake", "idle"),
                         default=["rpc", "h2g", "g2h", "wake"])
     args = parser.parse_args()
+    if args.phase == "strict" and not args.vhost_unavailable:
+        parser.error("strict phase needs an owned unavailable-device control")
+    if args.traffic_snapshot or args.restore_backend or args.malformed:
+        args.snapshot = True
+    if args.phase in ("probe", "quiet"):
+        raise ValueError("new profiling requires a scoped owned-process/kernel collector; historical all-host stack capture is disabled")
     os.umask(0o077)
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     def terminate(_number, _frame):
@@ -414,6 +802,10 @@ def main():
             boot(args, directory)
         elif args.phase == "selftest":
             selftest(directory)
+        elif args.phase == "strict":
+            strict_unavailable(args, directory)
+        elif args.phase == "resource":
+            resource_failures(args, directory)
         else:
             private_directory(directory)
             freeze_tools(directory)

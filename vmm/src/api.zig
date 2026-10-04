@@ -635,13 +635,25 @@ fn handleVmPatch(
         log.info("VM paused", .{});
         respondOk(request);
     } else if (std.mem.eql(u8, parsed.value.state, "Resumed")) {
+        if (runtime.net_dispatch) runtime.ack_resumed.store(false, .release);
         // Atomically transition true→false; rejects if not paused
         if (runtime.paused.cmpxchgStrong(true, false, .acq_rel, .acquire) != null) {
+            if (runtime.net_dispatch) runtime.ack_resumed.store(true, .release);
             respondError(request, .bad_request, "VM is not paused");
             return;
         }
         // Clear ack_paused after unpausing so the next pause must wait for a fresh ack
         runtime.ack_paused.store(false, .release);
+        if (runtime.net_dispatch) {
+            while (!runtime.ack_resumed.load(.acquire)) {
+                if (runtime.exited.load(.acquire)) {
+                    respondError(request, .internal_server_error, "network resume failed");
+                    return;
+                }
+                const ts = std.os.linux.timespec{ .sec = 0, .nsec = 1_000_000 };
+                _ = std.os.linux.nanosleep(&ts, null);
+            }
+        }
         log.info("VM resumed", .{});
         respondOk(request);
     } else {

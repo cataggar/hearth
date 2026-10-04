@@ -14,5 +14,6 @@ exec </dev/console >/dev/console 2>&1
 /bin/peer 7000 &
 /bin/peer 7001 &
 /bin/peer 7002 &
+/bin/peer 7003 &
 echo PERF_TAP_READY
 wait

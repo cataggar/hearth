@@ -10,6 +10,9 @@ const snapshot = @import("snapshot.zig");
 const seccomp_mod = @import("seccomp.zig");
 const abi = @import("kvm/abi.zig");
 const Vcpu = @import("kvm/vcpu.zig");
+comptime {
+    _ = @import("devices/virtio/net_shadow.zig");
+}
 
 test "kvm: ioctl preserves negative syscall errors" {
     try std.testing.expectError(error.BadFd, abi.ioctl(-1, abi.c.KVM_GET_API_VERSION, 0));
