@@ -646,6 +646,81 @@ retained named ELFs and `control/{d,s}-{api,cli}/` with actual credential and
 disk proof; the owned enforced trace is retained under `jail-tests/`.
 Earlier5ee profiles and canonical assets remain distinct.
 
+## Final common-revision G0 recheck and negative decision
+
+Common runtime source is `ced7ed72b5b2f80286e37ba8c9d5eada0cb90236`;
+frozen safe ELF SHA256
+`8b1f575dfe60276f4b65a0d159756b5f1dbb6ec86bcfc2d8a3cc3a8f882395d7`.
+Original5ee/untouched L0 binaries and all prior profiles remain separate.
+Kernel/agent, signed package root and original target/dependencies/features
+are unchanged; source, ELFs, snapshot memory/state/disk hashes are frozen in
+`group-clear/frozen-manifest.json`.
+
+### Actually executed fresh capability outcomes
+
+| Capability | Actual result |
+|---|---|
+| No-heartbeat API exec, immediate startup | Trial1 passes1.621708ms; trial3 times out before idle |
+| No-heartbeat CLI exec, immediate startup | Trial2 passes1.211796ms |
+| Same connections after5s idle | **0/2 pass**, both2s socket deadlines expire; no third post-idle sample |
+| Actual packaged SQLite pause/snapshot/copy/resume | **1/1 pass**, marker and DB1337 rechecked in resumed original guest |
+| Fresh restored agent/application/disk state | **0/3 pass**, API/CLI/API each agent-accept deadline30s expires |
+| Restored guest serial/API | Heartbeat bytes in all3; API Running for API cases is diagnostic only, not restored-state acceptance |
+
+The first exact retained fresh-G0 runner stops on trial3's initial timeout.
+Two already-written idle results and that actual exception are retained and
+classified without pretending a third idle request ran. A separately saved
+`probe-group-g0.py --lifecycle-only` continuation runs the real lifecycle.
+No guest instrumentation, protocol or runtime patch is added to manufacture
+control progress. Legacy vsock liveness is distinct from future block worker
+wake correctness; no eventfd design/prerequisite is inferred.
+
+### Host control, custody and qualification limits
+
+Final locked no-owned-VM5s control: **80.01busy CPU-s /5.0075599998wall-s,
+99.8377838782%busy** (~15.978busycores). Busy includes user/nice/system/IRQ/
+softIRQ, excludes idle/iowait/steal and does not double-add guest. Independent
+earlier control79.94CPU-s/5.0003s remains distinct. Neither establishes the
+identity/cause of unowned work, nor is subtracted into normalized savings.
+Only an owner-approved quiet condition can resolve this host qualification.
+No unowned resource, security setting or global cache is changed.
+
+Final custody scan checks **234** recorded VM/supervisor/collector PIDs:
+none remains; no owned device nodes/sockets remain. Original kernel/agent/VMM
+and prior5ee repaired ELF hashes still match. All raw measurements, signed
+inputs, canonical assets and actual frozen snapshot are retained privately.
+
+**Decision: keep existing synchronous default, do not select/implement G2.**
+Required G0 capabilities and repeatable whole-system qualification fail.
+Historical6×10s QD8 read diagnostics (mean10948.49IOPS,SD531.73,CV4.857%)
+are not full10-pair/60s gates, and are a different correctness revision.
+Single flush, install/build, short exec/PTY/concurrency and lifecycle windows
+are capabilities/profiles, not missing distributions. `B/N`, numeric gates,
+resource budget and before/after candidate remain **null/unqualified**.
+Hardware cycles/instructions are unsupported; privileged software/KVM traces
+work, so missing PMU is a limitation, not an invented profiling blocker.
+Complete SMT-aware client/VM freeze, thread-creation census and attributable
+kernel I/O CPU accounting remain outstanding.
+
+There is **no measured before/after delta or performance gain**. The useful
+jail prerequisite and collector repairs are complete; async implementation,
+correctness/fault/wake/lifecycle qualification, G1 matrix and G2–G5 remain
+blocked/incomplete. Draft PR#7 is not eligible for performance merge or
+promotion. This is a reproducible negative baseline experiment, not a
+compile-only prototype or a claim that an unbuilt worker regressed.
+
+Reproduction/private evidence:
+`group-clear/fresh-g0.log`, `fresh-g0-initial-executed.py`,
+`control/fresh-idle-series.json`, `fresh-lifecycle.log`,
+`life/{original,r-1,r-2,r-3}/`, `life/fresh-capability.json`,
+`frozen-manifest.json`, `final-host-control.json`,
+`final-artifact-validation.log`, and latest `perf-cache-cleanup.json`.
+The exact executed scripts are retained. A rerun must choose a fresh
+project-private variant rather than overwrite these run directories, take
+the same absolute fleet lock, preserve077 and explicitly use this runtime
+and fixed asset hashes. Parent/owner can then resolve capability and quiet
+conditions, freeze gates, and only afterward authorize the bounded worker.
+
 ## Original diagnostic validation
 
 | Command / coverage | Actual result |

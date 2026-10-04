@@ -1,6 +1,6 @@
 # Product Spec: Evaluate Asynchronous VirtIO Block I/O
 
-**Status**: Evaluation in progress — baseline qualification incomplete; synchronous default unchanged
+**Status**: Evaluation blocked — mandatory corrected-baseline capabilities and host qualification fail; synchronous default unchanged
 **Last updated**: 2026-10-04
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Execution plan**: [perf-async-block-io](../exec-plans/active/perf-async-block-io.md)
@@ -98,6 +98,15 @@ The fixed `x86_64-linux` target and original guest features are retained.
 All observed new VMM tasks have empty supplementary groups; old5ee profiles
 remain distinct. A fresh no-owned-VM host control still measures99.9375%busy
 (79.94 busy CPU-s/5.0003wall-s). G0/G1 qualification remains blocked.
+
+Final source `ced7ed7` repeats those gates honestly:2/2 post5s idle requests
+time out; a third trial fails initial exec. Actual packaged SQLite state
+survives original pause/snapshot/copy/resume, but3/3 fresh API/CLI restores
+never reconnect their agent within30s despite guest heartbeat progress.
+Final no-owned-VM control80.01busyCPU-s/5.00756s is99.83778%busy.
+Keep sync, stop before G2, leave numeric gates/candidate null and performance
+merge ineligible.234 owned recorded PIDs are gone; original assets remain.
+The separate jail prerequisite is complete, **not** the async implementation.
 
 ## Objective and scope
 

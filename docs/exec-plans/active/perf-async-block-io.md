@@ -1,6 +1,6 @@
 # Execution Plan: Profile and Evaluate Async VirtIO Block I/O
 
-**Status**: In progress — repaired synchronous G0/G1 execution; qualification blocked, backend not selected
+**Status**: Blocked — corrected synchronous G0 rechecks fail; G1 qualification unavailable, backend not selected
 **Last updated**: 2026-10-04
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
@@ -176,6 +176,40 @@ restoring the original target resolves it without widening the filter.
 Fresh no-owned-VM locked host control79.94busyCPU-s/5.0003wall-s
 (99.9375%busy) still precludes meaningful qualification. Artifacts under
 `group-clear/`; the common correction is not an async backend or gain.
+
+### Corrected common revision final G0 and stop decision
+
+Fresh source `ced7ed72b5b2f80286e37ba8c9d5eada0cb90236` safe ELF
+`8b1f575dfe60276f4b65a0d159756b5f1dbb6ec86bcfc2d8a3cc3a8f882395d7`
+keeps guest/compiler/dependency/notification settings fixed. Timer-free
+control after5s idle fails **2/2** (API/CLI) at2s socket deadlines; the third
+API trial already fails initial exec, so no third post-idle observation is
+claimed. Exact retained runner initially stops there; a separately recorded
+`--lifecycle-only` continuation executes the lifecycle phase.
+
+The actual signed packaged-root SQLite guest writes/syncs a marker and
+checks DB1337; pause/snapshot/three-file copy/resume then rechecks both
+successfully. Three fresh restored processes (API/CLI/API) all reach filtered
+configured identity and guest heartbeat progress but **0/3** connect their
+agent within30s. Actual restored application/disk state is **not accepted**.
+These legacy control capabilities are not block-completion-wake proof and
+do not establish#3 as an automatic prerequisite.
+
+Final no-owned-VM host control **80.01busyCPU-s/5.00756wall-s,
+99.83778%busy** (~15.978cores). No owner-approved quiet condition is available
+to this task. Do not signal unowned workloads or subtract this floor into a
+saving.234 retained VM/supervisor/collector PID manifests are checked:
+none live, no owned nodes/sockets, original/previous repaired assets match.
+
+**G1 decision: keep existing synchronous default; do not enter G2.**
+Mandatory capabilities fail and full paired/cache/writeback/interactive/
+lifecycle matrix, total attributable kernel I/O CPU, SMT-aware freeze and
+numeric `B/N` gates remain unqualified. No backend, no candidate delta, no
+performance-merge eligibility. Source-of-truth implementation todo is
+blocked; separate jail prerequisite is done. This active plan stays
+incomplete until baseline liveness/restore and owner-controlled host
+conditions permit reproducible qualification. Final frozen diagnostic
+manifest, null gates/decision and raw runs are under `group-clear/`.
 
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
 and a measured keep/reject decision. Execution has started in the isolated
