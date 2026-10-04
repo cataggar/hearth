@@ -99,8 +99,10 @@ while the mandatory execution remains missing. A relevant consumer is required
 to reopen backend implementation/adoption, not to accept a negative evaluation;
 the parent coordinator may separately qualify the retained S0 rejection.
 
-After common provisioning was fully verified, a 16:27 UTC manifest freezes
-tools, linked libraries, source/image hashes and device ACLs. UID-1000 actual
+A 16:27 UTC manifest freezes #2's own observed tool/device readiness,
+linked libraries, source/image hashes and device ACLs. The later #3 handoff
+reports the formal parent final-provisioning boundary at16:28UTC, so that
+snapshot is not a qualified post-final controlled baseline. UID-1000 actual
 KVM creation and vhost GET_FEATURES close without an FD-count change. Two
 additional TAP boots attempt four network windows; all four fail (three warmup,
 one active) with zero validated active responses. Earlier samples remain
