@@ -155,6 +155,13 @@ or host permission relaxation is used.
 identify actual SIGSYS failures; it does not change the enforced filter.
 The post-connect roster is rechecked, and cleanup validates the current owned
 PID/start-time tuple rather than signalling stale recorded PIDs.
+`--api` instead configures machine/boot/vsock and executes `InstanceStart`
+through the actual jailed Unix HTTP API, then verifies the full post-connect
+thread roster. It uses the standalone `tools/perf/jail_support.py` request
+primitive, never the block benchmark. `--native-workload echo` or
+`backpressure` additionally checks the connected timer-free vsock probe after
+one second of silence; timeouts retain the operation stage and return nonzero.
+Boot/connect alone is not a successful I/O or lifecycle test.
 
 The client cpuset must exclude the VMM and its SMT siblings, including when
 explicitly supplied. Older CPU8/client0 artifacts are retained as confounded

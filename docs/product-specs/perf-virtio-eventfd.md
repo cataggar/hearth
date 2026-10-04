@@ -269,8 +269,9 @@ are blocked/failed coverage, never skipped-as-passing.
 Under the required private `umask 077`, L0 creates root-owned jail device
 directories with mode 0700 and nodes with mode 0600, then fails `/dev/kvm` open
 after dropping to UID 1000. The common isolation prerequisite explicitly assigns
-jail-local device directories (0700) and KVM/TUN nodes (0600) to the configured
-nonroot UID/GID before the privilege drop. It changes
+jail-local device directories to root-owned 0755 and KVM/TUN nodes to the
+configured nonroot UID/GID with 0600, using no-follow opened FDs and explicit
+mode normalization before the privilege drop. It changes
 neither host device permissions nor device access outside the private jail.
 It also clears supplementary groups before the configured UID/GID drop.
 
@@ -288,6 +289,25 @@ NoNewPrivs 1. This covers boot/connect, not the whole eventfd isolation matrix.
 These fixes are not C00 or an eventfd performance effect. L0 evidence remains
 tied to its frozen old binary; the corrected isolation build is labelled
 separately. Guest ring/IRQ/snapshot implementation remains unchanged.
+
+Shared prerequisite `f2f9ab4c8e7a67097f2c3f52636327e9c41d5084` additionally
+permits the actually traced Unix API `sendmsg`/`recvmsg` calls (46/47).
+Its standalone regression dependency must not import the #1 benchmark.
+Actual ownership/API traffic tests execute in Debug and Safe, including empty
+groups/capabilities and PID-generation-checked teardown. The unchanged frozen
+L0 failures remain separate.
+
+Actual enforced API `InstanceStart` subsequently dies on syscall204.
+Owned-process tracing and own-binary disassembly identify
+`Thread.getCpuCount` querying `sched_getaffinity(0,128,...)`. Permit this
+read-only query only for PID0; keep other-PID queries and affinity mutation
+denied. Real forked enforced-filter tests must verify both the query and
+continued denials, then actual CLI/API guest boot must be rerun. This ordinary
+thread-startup prerequisite is not a backend owner or eventfd change.
+The next traced denial is clone56: own `pthread_create` disassembly passes
+0x007d0f00, including musl's ignored legacy CLONE_DETACHED0x00400000 bit.
+Permit only that additional compatibility bit in the existing thread mask;
+keep namespace creation denied and verify real filtered thread create/join.
 
 The independent TAP prerequisite fixture uses the same numbered payload/FNV
 protocol as the native vsock probe over a guest TCP listener. BusyBox configures

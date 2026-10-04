@@ -35,12 +35,22 @@ separately. Earlier CPU8/client0 samples share an SMT core and remain
 supplementary; repeated CPU8/client1 L0 profiles are retained separately.
 No numeric gates are frozen, and no controlled candidate exists.
 
-Post-provisioning support work is continuing while awaiting #1's exact,
-separate prerequisite correctness commit. A native TCP/TAP fixture is being
-added without importing #2's runtime or system-wide collector. It shares the
+Post-provisioning support reused #1's exact prerequisite
+`f2f9ab4c8e7a67097f2c3f52636327e9c41d5084` (local cherry-pick2305b11)
+without importing its benchmark/results or async backend. Follow-up013234a
+makes the tests hermetic, permits the traced PID0-only affinity query and
+musl's ignored clone compatibility bit, and verifies actual filtered thread
+creation and enforced CLI/API guest boots in Debug/Safe. These effects are
+separate correctness prerequisites, not C00 or eventfd gains.
+
+A native TCP/TAP fixture was added without importing #2's runtime or system-wide collector. It shares the
 numbered/checksummed protocol with the existing guest-initiated vsock probe
 and requires a private namespace, nonroot client and verified enforced jail.
 Original frozen L0 failures and isolation-repaired diagnostics stay separate.
+After the final repairs, vsock echo/burst still time out with0/4header bytes;
+TAP validates initial64B/eight64KiB messages then fails after two seconds of
+silence. Latest host controls record78.09busyCPU seconds/4.8906wall (~15.967
+busy cores). No quiet A/A baseline or numeric gates can be inferred from this.
 
 **Hold / not eligible for performance merge.** Required remaining work is the
 baseline backpressure/credit correctness prerequisite, W1–W6 ownership,

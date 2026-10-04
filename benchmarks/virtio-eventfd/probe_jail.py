@@ -2,6 +2,7 @@
 """Inspect only this disposable jailed L0 child and its actual thread filters."""
 
 import argparse
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -10,7 +11,7 @@ import socket
 import subprocess
 import time
 
-from run import ROOT, artifact_path, command, digest, save_json
+from run import ROOT, artifact_path, command, digest, native_backpressure, native_echo, save_json
 
 INSPECT = """
 import json,pathlib,sys
@@ -56,6 +57,8 @@ def main():
     parser.add_argument("--binary", default=".perf/eventfd/fixtures/legacy/flint")
     parser.add_argument("--label", default="L0")
     parser.add_argument("--trace-syscalls", action="store_true")
+    parser.add_argument("--api", action="store_true", help="Configure and start the jailed guest through the actual Unix HTTP API")
+    parser.add_argument("--native-workload", choices=["echo", "backpressure"], help="Check the connected timer-free guest after one second of silence")
     args = parser.parse_args()
     out, jail = artifact_path(args.out), artifact_path(args.jail)
     out.mkdir(parents=True, exist_ok=False)
@@ -70,10 +73,15 @@ def main():
         "timeout", "--kill-after=2", "15",
         str(artifact_path(args.binary)),
         "--jail", str(jail), "--jail-uid", str(os.getuid()), "--jail-gid", str(os.getgid()),
-        "/bzImage", "/initrd.cpio.gz",
-        "console=ttyS0 nokaslr reboot=k panic=1 pci=off nomodules",
-        "--vsock-cid", "43", "--vsock-uds", "/vsock",
     ]
+    boot_args = "console=ttyS0 nokaslr reboot=k panic=1 pci=off nomodules"
+    if args.api:
+        workload.extend(["--api-sock", "/api.sock"])
+    else:
+        workload.extend([
+            "/bzImage", "/initrd.cpio.gz", boot_args,
+            "--vsock-cid", "43", "--vsock-uds", "/vsock",
+        ])
     argv = ["sudo", "-n"] + workload
     if args.trace_syscalls:
         argv = [
@@ -84,8 +92,10 @@ def main():
     save_json(out / "command.json", {
         "argv": argv, "cwd": str(ROOT), "started_unix": time.time(),
         "label": args.label, "binary_sha256": digest(artifact_path(args.binary)),
+        "api_boot": args.api,
+        "native_workload": args.native_workload,
     })
-    result = {"status": "failed", "threads": [], "errors": []}
+    result = {"status": "failed", "threads": [], "errors": [], "stage": "guest-connect"}
     with (out / "guest-serial.txt").open("wb") as serial, (out / "vmm.stderr").open("wb") as stderr:
         child = subprocess.Popen(argv, cwd=ROOT, stdout=serial, stderr=stderr)
         try:
@@ -102,24 +112,60 @@ def main():
                         result["errors"].append("a post-drop VMM thread retains uid/capabilities or lacks the enforced filter")
                         break
                     try:
+                        if args.api:
+                            spec = importlib.util.spec_from_file_location(
+                                "eventfd_jail_support", ROOT / "tools/perf/jail_support.py",
+                            )
+                            support = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(support)
+                            api_path = jail / "api.sock"
+                            ready_deadline = time.monotonic() + 2
+                            while not api_path.exists():
+                                if child.poll() is not None or time.monotonic() > ready_deadline:
+                                    raise RuntimeError("enforced jailed API did not become ready")
+                                time.sleep(0.02)
+                            result["api_replies"] = []
+                            requests = [
+                                ("PUT", "/machine-config", {"mem_size_mib": 512, "vcpu_count": 1}),
+                                ("GET", "/machine-config", None),
+                                ("PUT", "/boot-source", {
+                                    "kernel_image_path": "/bzImage", "initrd_path": "/initrd.cpio.gz",
+                                    "boot_args": boot_args,
+                                }),
+                                ("PUT", "/vsock", {"guest_cid": 43, "uds_path": "/vsock"}),
+                                ("PUT", "/actions", {"action_type": "InstanceStart"}),
+                            ]
+                            for method, target, body in requests:
+                                response = support.request(api_path, method, target, body)
+                                result["api_replies"].append({"method": method, "target": target, "body": response.decode()})
+                                if method == "GET" and json.loads(response) != {"mem_size_mib": 512, "vcpu_count": 1}:
+                                    raise ValueError("machine configuration did not round-trip")
                         connection, _ = listener.accept()
-                        connection.close()
-                        inspected = subprocess.run(
-                            ["sudo", "-n", "python3", "-c", INSPECT, str(child.pid)],
-                            cwd=ROOT, capture_output=True, timeout=3, check=True,
-                        )
-                        result["threads"] = json.loads(inspected.stdout)
-                        if enforced_roster(result["threads"], os.getuid(), os.getgid()):
+                        with connection:
+                            result["guest_connected"] = True
+                            inspected = subprocess.run(
+                                ["sudo", "-n", "python3", "-c", INSPECT, str(child.pid)],
+                                cwd=ROOT, capture_output=True, timeout=3, check=True,
+                            )
+                            result["threads"] = json.loads(inspected.stdout)
+                            if not enforced_roster(result["threads"], os.getuid(), os.getgid()):
+                                raise ValueError("guest-connected thread roster fails isolation checks")
+                            if args.native_workload:
+                                result["stage"] = f"native-{args.native_workload}-after-1s-silence"
+                                connection.settimeout(1)
+                                time.sleep(1)
+                                result["native_response"] = (
+                                    native_echo(connection, 0, 4096) if args.native_workload == "echo"
+                                    else native_backpressure(connection, 0, 65536)
+                                )
                             result["status"] = "passed"
-                        else:
-                            result["errors"].append("guest-connected thread roster fails isolation checks")
-                    except TimeoutError:
-                        result["errors"].append("enforced jailed guest did not connect")
+                    except TimeoutError as error:
+                        result["errors"].append(f"{result['stage']}: {error}")
                     break
                 time.sleep(0.05)
             if not result["threads"]:
                 result["errors"].append("no post-drop VMM thread roster observed")
-        except (OSError, subprocess.SubprocessError, ValueError) as error:
+        except (OSError, subprocess.SubprocessError, ValueError, RuntimeError, EOFError) as error:
             result["errors"].append(str(error))
         finally:
             # The supervisor bounds the whole owned process tree; on observed

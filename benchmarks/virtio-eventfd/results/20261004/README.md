@@ -44,10 +44,74 @@ a separate host-control interval, nonidle/steal controls (without guest-time
 double counting), and its own hash. These changes pass **16 tooling tests**;
 the two post-provision runs above predate that automatic collector and use
 the explicitly documented outer snapshots. No historical field is fabricated.
-Parent has assigned #1 an isolated prerequisite correctness commit covering
-enforced API `recvmsg` and jail ownership; #3 is requesting/reusing its exact
-SHA, excluding #1's async backend, rather than claiming its CLI-only jail
-proof establishes API/lifecycle acceptance.
+The exact shared prerequisite and further actual API startup findings are
+documented below. Earlier CLI-only proof is not promoted into API/lifecycle
+acceptance.
+
+## Shared prerequisite reused; actual CLI/API guest startup verified
+
+Reused #1 commit `f2f9ab4c8e7a67097f2c3f52636327e9c41d5084` via local
+`2305b11`, resolving prior jail ownership overlap and excluding unrelated
+#1 result/spec/plan documents and all async backend work. Its no-follow-FD
+normalization sets jail device dirs root:root0755 and nodes UID/GID0600,
+with artifact umask077/host device permissions unchanged. Existing #3
+supplementary-group clearing and ordinary poll7/epoll_pwait281 remain.
+Only traced Unix API sendmsg46/recvmsg47 are added by that commit.
+
+The isolated shared test initially fails import because it depends on the
+absent #1 block runner. Follow-up
+`013234a1eef5441deefc11bb8aa54c7e79f3429f` supplies a standalone generic
+owned-process/Unix-HTTP helper instead, with PID/start-time validation before
+termination/escalation and two deterministic stale-PID regressions.
+
+Actual API configuration succeeds but `InstanceStart` initially diesSIGSYS:
+
+1. Owned raw syscall tracing identifies204; own frozen-binary disassembly
+   proves `Thread.getCpuCount` calls sched_getaffinity(PID0,size128,...).
+   The follow-up permits **only PID0** queries; other-PID queries and
+   affinity mutation remain denied.
+2. Startup then dies on clone56. Own static `pthread_create` disassembly
+   proves flags0x007d0f00, adding only musl's ignored legacy
+   CLONE_DETACHED0x00400000 bit to the old0x003d0f00 thread mask. Namespace
+   creation, non-Unix sockets, executable mprotect and eventfd2 remain denied.
+
+The actual filtered fork/thread test verifies query plus thread create/join
+and four continued SIGSYS denials. Intermediate two layout-test failures and
+both startup failures remain raw evidence; final corrected tests pass.
+
+Final **Safe and Debug each** execute33/33 unit tests and7/7 existing
+integrations (five real guest/KVM, two CLI/error; existing heartbeat retained),
+plus4/4 standalone fixture tests (two actual enforced-jail node/API cases
+and two deterministic PID-generation cases). Final untraced enforced guest
+boots are **4/4 pass**: CLI and API in each optimization. API boot accepts
+five configuration/start exchanges and reaches the guest-initiated native
+vsock connection. Its complete three-task roster (main, existing vCPU thread,
+KVM helper) has all UID/GID1000, no groups/capabilities, Seccomp2/NNP1.
+One additional traced Safe API boot passes. All private jails are cleaned
+after owned processes join. No audit/filter bypass or root VM is used.
+
+These are ordinary correctness prerequisites, **not C00/backend owners or
+performance gains**. The frozen untouched-L0 binary/hash/failures remain
+unchanged. API boot is not active-I/O pause/snapshot/error-path acceptance.
+
+After all repairs, same-source separately labelled `repaired-safe` checks
+still fail required no-heartbeat operations:
+
+* Native4KiB echo after one-second silence: **1/1 fail**, sequence0 receives
+  0/4header bytes; zero round trips.
+* Native eight64KiB slow-reader burst after one-second silence: **1/1 fail**,
+  sequence0 receives0/4header bytes; zero completed bursts.
+* TAP idle-wake: **1/1 fail**, initial64B and eight64KiB messages validate,
+  sequence16 after two-second silence receives0/4header bytes. Later bulk
+  phase does not execute. All current VMM task credentials/filter are verified.
+  VMM all-thread CPU0.03s/4.890601wall is only a diagnostic; host control is
+  **78.09busyCPU seconds** (~15.967busy cores), idle/iowait0.12s, steal0.
+
+Neither repaired startup nor these saturated failed workload windows provides
+quiet A/A gates, a complete baseline/matrix or any accelerated candidate.
+Failure timeouts are not finite latency/speedup denominators.
+[Shared/repaired prerequisite raw evidence](repaired-prerequisites.tar.gz)
+is separate from original L0 and includes only owned processes/scoped traces.
 
 ## Independent native TAP prerequisite (post-provisioning)
 
@@ -147,6 +211,8 @@ Important immutable pins:
 | Timer-free native guest probe | `09d24f0b42ab2d9035a480591be051427a572cbcb3f03b0ac8f08932abd46baa` |
 | Unchanged safe guest agent | `b2dfc29e8fafde8e7f0c88a0a624dd6400cde24e5c77ee572a4a56468329ff88` |
 | Fixed safe isolation-control Flint, **not C00** | `c0c4ff843d69f2d1462435f97081f655f74b6cbf759f54bd6da94e49d1349ff8` |
+| Final repaired Safe Flint, **not C00** | `d867268921392bb4a2e449398b2320d901c68b59acbc95e0176fdbb0dbaac2b2` |
+| Final repaired Debug Flint, **not C00** | `5f2d0c068b4eae9d7a9b6ac006b76affe563c62c87ec4d923408c861d29f9542` |
 | translate-c fork revision | `62d06a5d3e93c82727544e8113e4762a315ca0ed` |
 | translate-c package | `translate_c-2.0.0-Q_BUWlpOBwBWvgGBM20tJq-GXgPio3v3UD39rXEn70KN` |
 | Resolved Aro package, from generated dependency table | `aro-0.0.0-JSD1QtuBNwCASyBtNF3pqTl_W3oAJQGEVyFAtrBSE_Pa` |
@@ -249,7 +315,7 @@ same data with scoped `-f` succeeds in separate recovery artifacts.
 The corrected-affinity collection succeeds directly; no failed run is
 silently converted into a passing benchmark.
 
-## Separately validated isolation prerequisite
+## Initial separately validated isolation prerequisite (historical)
 
 L0 under `umask 077` makes root-owned 0700 jail directories/0600 nodes,
 then gets KVM `AccessDenied` after UID drop. The surgical prerequisite assigns
@@ -279,19 +345,22 @@ All commands below were bounded and held the exclusive host lock; builds used
 
 | Command, from worktree root unless noted | Actual passing count |
 |---|---:|
-| `python3 -m unittest discover -s benchmarks/virtio-eventfd -p 'test_*.py'` | 14 tooling tests |
-| From `vmm/`: `zig build test -Dtarget=x86_64-linux -Doptimize=safe --summary all` | 32 unit tests |
-| Same with `-Doptimize=debug` | 32 unit tests |
+| `python3 -m unittest discover -s benchmarks/virtio-eventfd -p 'test_*.py'` | Latest16 tooling tests |
+| From `vmm/`: `zig build test -Dtarget=x86_64-linux -Doptimize=safe --summary all` | Latest33 unit tests |
+| Same with `-Doptimize=debug` | Latest33 unit tests |
 | From `vmm/`: `zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe -Dintegration-kernel=../.perf/eventfd/fixtures/bzImage --summary all` | Seven integrations: **five real guest/KVM cases + two CLI/error cases** |
 | Same with `-Doptimize=debug` | Same seven, no skips |
+| `python3 -m unittest discover -s tools/perf -p test_jail_prerequisites.py -v` | Safe/Debug each4: two actual jailed node/API cases, two deterministic cleanup cases |
+| `probe_jail.py --binary <final repaired Safe/Debug> [--api] ...` | Final four actual enforced CLI/API guest boot/connect checks, complete rosters |
 | `zig fmt --check` on all modified Zig sources/build file | Pass |
 | `probe_jail.py --binary vmm/zig-out/bin/flint --label isolation-control-fixed --out .perf/eventfd/results/jail-fixed-roster --jail .perf/eventfd/jail-fixed-roster` | One actual enforced guest boot/connect and complete task-credential check |
 
-The new enforced-filter unit case executes three real forked child scenarios:
-readiness succeeds; AF_INET socket and eventfd2 each die with SIGSYS. Existing
+The latest enforced-filter unit case executes five real forked child scenarios:
+readiness/current affinity/thread create+join succeed; AF_INET socket, eventfd2,
+other-PID affinity query and affinity mutation each die with SIGSYS. Existing
 integration tests retain their heartbeat and quiescent snapshot semantics;
 they are not new active-I/O or cross-mode restore tests. Original 31-test
-pre-change safe/debug runs are retained separately; cached reruns are not
+pre-change safe/debug and initial32-test correction runs remain separate; cached reruns are not
 counted as additional executions.
 
 ## Durable artifacts, blockers and resumption
@@ -317,7 +386,7 @@ Remaining blockers/work:
 3. Establish actual guest IRQ trigger/ACK/EOI policy; implement and stress
    independent exact per-queue IOEVENTFD and compatible IRQFD/resampling,
    unwind/fallback and C00/C10/C01/C11, without silently downgraded samples.
-4. Missing required TAP, complete disk, concurrency, interactive stdin,
+4. Missing sustained/full required TAP, complete disk, concurrency, interactive stdin,
    active-I/O/reset/failure and actual cross-mode guest-restore matrix is
    **unexecuted**, not skipped-as-passing. Host tools now exist.
 5. Repeat matched baseline/control/idle data, freeze numeric benefit/
