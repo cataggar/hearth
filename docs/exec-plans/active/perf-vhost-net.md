@@ -678,6 +678,19 @@ explicit maintenance decision. No default change merely because a module loads.
 Rollback selects userspace for new/restarted VMs and restores compatible
 snapshots through a proven quiesced handoff; do not live-switch active workers.
 
+## Evidence storage maintenance
+
+The shared storage warning did not justify deleting raw evidence or starting
+another VM/image workload. Own completed fence witnesses retained all original
+bytes, paths and distinct inodes: nine unsupported XFS reflink attempts are
+preserved, followed by verified zero-only sparsification recovering
+4,293,562,368 allocated bytes. All 18 complete RAM hashes remain unchanged;
+canonical baseline allocation is untouched. See the results report and private
+`storage-{reflink,sparse}.{py,json,sha256}` epochs. This is artifact maintenance,
+not correctness/performance progress. Shared supplementary-group clearing,
+full-jail isolation/lifecycle acceptance, current TAP relevance and quiet
+deciding performance qualification remain blocked; no checklist gate closes.
+
 ## Completion checklist
 
 - [x] Write the product spec first and this issue-linked executable plan.
