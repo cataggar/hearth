@@ -6,7 +6,6 @@ optionally retains its actual enforced-filter trace.
 """
 
 import fcntl
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -14,18 +13,18 @@ import stat
 import subprocess
 import time
 import unittest
+from unittest.mock import patch
+
+import jail_support
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("blk_io", ROOT / "tools/perf/blk-io.py")
-blk = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(blk)
 
 
-class JailedApi(blk.OwnedVm):
+class JailedApi(jail_support.OwnedVm):
     def __init__(self):
-        folder = ROOT / ".perf/blk-io/jail-tests"
+        folder = ROOT / ".perf/jail-tests"
         folder.mkdir(mode=0o700, parents=True, exist_ok=True)
-        super().__init__(folder / f"{os.getpid()}-{time.time_ns()}", 8)
+        super().__init__(folder / f"{os.getpid()}-{time.time_ns()}")
         self.binary = Path(os.environ.get(
             "FLINT_JAIL_TEST_BINARY", ROOT / "vmm/zig-out/bin/flint",
         )).resolve()
@@ -49,9 +48,9 @@ class JailedApi(blk.OwnedVm):
                 argv, cwd=self.path, stdout=self.stdout, stderr=self.stderr,
                 start_new_session=True,
             )
-            blk.save_json(self.path / "launch.json", {
+            jail_support.save_json(self.path / "launch.json", {
                 "argv": argv, "supervisor_pid": self.process.pid,
-                "binary_sha256": blk.sha256(self.binary), "artifact_umask": "077",
+                "binary_sha256": jail_support.sha256(self.binary), "artifact_umask": "077",
                 "uid": os.getuid(), "gid": os.getgid(),
             })
             deadline = time.monotonic() + 10
@@ -62,7 +61,8 @@ class JailedApi(blk.OwnedVm):
                     raise TimeoutError("jailed API socket did not become ready")
                 time.sleep(0.02)
             self.pid = self.find_vm_pid()
-            blk.save_json(self.path / "pid.json", {"vmm_pid": self.pid})
+            self.pid_start_ticks = jail_support.start_ticks(self.pid)
+            jail_support.save_json(self.path / "pid.json", {"vmm_pid": self.pid})
             return self
         except BaseException:
             self.close()
@@ -106,7 +106,7 @@ class JailPrerequisites(unittest.TestCase):
                 "device": {"uid": device.st_uid, "gid": device.st_gid,
                            "mode": oct(stat.S_IMODE(device.st_mode))},
             }
-            blk.save_json(vm.path / "permissions.json", observed)
+            jail_support.save_json(vm.path / "permissions.json", observed)
             self.assertEqual((directory.st_uid, directory.st_gid), (0, 0))
             self.assertEqual(stat.S_IMODE(directory.st_mode), 0o755)
             self.assertTrue(stat.S_ISCHR(device.st_mode))
@@ -133,6 +133,8 @@ class JailPrerequisites(unittest.TestCase):
             fields = dict(line.split(":", 1) for line in status.splitlines() if ":" in line)
             self.assertEqual(list(map(int, fields["Uid"].split())), [os.getuid()] * 4)
             self.assertEqual(list(map(int, fields["Gid"].split())), [os.getgid()] * 4)
+            self.assertFalse(fields["Groups"].strip())
+            self.assertEqual(fields["CapEff"].strip(), "0000000000000000")
             self.assertEqual(fields["NoNewPrivs"].strip(), "1")
             self.assertEqual(fields["Seccomp"].strip(), "2")
             self.assertIn(b"seccomp filter installed", (vm.path / "stderr.log").read_bytes())
@@ -142,7 +144,56 @@ class JailPrerequisites(unittest.TestCase):
                 response = json.loads(vm.api("GET", "/machine-config"))
                 self.assertEqual(response, {"mem_size_mib": memory, "vcpu_count": 1})
                 replies.append(response)
-            blk.save_json(vm.path / "checked-api-replies.json", replies)
+            jail_support.save_json(vm.path / "checked-api-replies.json", replies)
+
+
+class OwnedCleanup(unittest.TestCase):
+    def fixture(self):
+        class Supervisor:
+            pid = 999
+            returncode = None
+            kill_called = False
+
+            def poll(self):
+                return self.returncode
+
+            def terminate(self):
+                self.returncode = -15
+
+            def kill(self):
+                self.kill_called = True
+                self.returncode = -9
+
+            def wait(self, timeout):
+                if self.returncode is None:
+                    raise subprocess.TimeoutExpired("owned-supervisor", timeout)
+                return self.returncode
+
+        vm = jail_support.OwnedVm(ROOT / ".perf")
+        vm.process = Supervisor()
+        vm.pid, vm.pid_start_ticks = 123, 10
+        return vm
+
+    def test_reused_vmm_pid_is_never_signalled(self):
+        vm = self.fixture()
+        with patch.object(vm, "find_vm_pid", return_value=123), \
+                patch.object(jail_support, "start_ticks", return_value=20), \
+                patch.object(jail_support, "save_json"), \
+                patch.object(jail_support.subprocess, "run") as signal:
+            vm.close()
+        signal.assert_not_called()
+        self.assertEqual(vm.process.returncode, -15)
+
+    def test_pid_generation_is_rechecked_before_kill_escalation(self):
+        vm = self.fixture()
+        with patch.object(vm, "find_vm_pid", return_value=123), \
+                patch.object(jail_support, "start_ticks", side_effect=[10, 20]), \
+                patch.object(jail_support, "save_json"), \
+                patch.object(jail_support.subprocess, "run") as signal:
+            vm.close()
+        self.assertEqual(signal.call_count, 1)
+        self.assertEqual(signal.call_args.args[0], ["sudo", "-n", "kill", "-TERM", "123"])
+        self.assertTrue(vm.process.kill_called)
 
 
 if __name__ == "__main__":

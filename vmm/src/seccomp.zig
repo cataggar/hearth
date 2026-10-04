@@ -2,10 +2,11 @@
 // Whitelists the minimum syscalls needed to run a KVM VM with
 // virtio devices and an API socket. Everything else kills the process.
 //
-// Three syscalls have argument-level filtering:
+// Four syscalls have argument-level filtering:
 //   clone  — only thread-creation flags (blocks CLONE_NEWUSER escape)
 //   socket — only AF_UNIX (blocks network exfiltration)
 //   mprotect — blocks PROT_EXEC (no shellcode execution)
+//   sched_getaffinity — current process only (thread startup)
 
 const std = @import("std");
 const linux = std.os.linux;
@@ -62,16 +63,18 @@ fn bpf_jump(code: u16, k: u32, jt: u8, jf: u8) SockFilter {
 const AF_UNIX: u32 = 1;
 const PROT_EXEC: u32 = 4;
 // Thread-creation clone flags (everything else is blocked — especially CLONE_NEWUSER)
-const ALLOWED_CLONE_FLAGS: u32 = 0x003D0F00;
+const ALLOWED_CLONE_FLAGS: u32 = 0x007D0F00;
 // CLONE_VM|FS|FILES|SIGHAND|THREAD|SYSVSEM|SETTLS|PARENT_SETTID|CHILD_CLEARTID
+// plus musl's ignored legacy CLONE_DETACHED bit.
 
 // Syscall numbers for argument-filtered calls
 const SYS_MPROTECT: u32 = 10;
 const SYS_SOCKET: u32 = 41;
 const SYS_CLONE: u32 = 56;
+const SYS_SCHED_GETAFFINITY: u32 = 204;
 
 // Simple whitelist — allowed unconditionally (no argument checks).
-// clone, socket, mprotect are excluded; they have argument-level filters below.
+// clone, socket, mprotect and sched_getaffinity have argument filters below.
 const simple_syscalls = [_]u32{
     // Core I/O
     0, // read
@@ -150,19 +153,20 @@ const simple_syscalls = [_]u32{
 /// Build the BPF filter at comptime. Layout:
 ///   [0-3]      header: load arch, verify x86_64, load nr
 ///   [4..4+N-1] simple syscall checks (unconditional allow)
-///   [4+N..+2]  filtered syscall dispatch (jump to arg check blocks)
-///   [4+N+3]    default KILL
-///   [4+N+4..]  argument check blocks for clone, socket, mprotect
+///   [4+N..+3]  filtered syscall dispatch (jump to arg check blocks)
+///   [4+N+4]    default KILL
+///   [4+N+5..]  argument check blocks
 ///   [last]      ALLOW
-fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simple.len + 20]SockFilter {
+fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simple.len + 24]SockFilter {
     const N = simple.len;
-    // Total: 4 header + N simple + 3 dispatch + 1 kill + 4 clone + 3 socket + 4 mprotect + 1 allow = N+20
-    const ALLOW_POS = N + 19;
-    const CLONE_BLK = 4 + N + 4;
-    const SOCKET_BLK = 4 + N + 8;
-    const MPROT_BLK = 4 + N + 11;
+    // 4 header + N simple + 4 dispatch + 1 kill + 14 argument checks + 1 allow.
+    const ALLOW_POS = N + 23;
+    const CLONE_BLK = 4 + N + 5;
+    const SOCKET_BLK = 4 + N + 9;
+    const MPROT_BLK = 4 + N + 12;
+    const AFFINITY_BLK = 4 + N + 16;
 
-    var f: [N + 20]SockFilter = undefined;
+    var f: [N + 24]SockFilter = undefined;
 
     // Header: verify arch, load syscall nr
     f[0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARCH);
@@ -179,9 +183,10 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
     f[4 + N + 0] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_CLONE, @intCast(CLONE_BLK - (4 + N + 0) - 1), 0);
     f[4 + N + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_SOCKET, @intCast(SOCKET_BLK - (4 + N + 1) - 1), 0);
     f[4 + N + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_MPROTECT, @intCast(MPROT_BLK - (4 + N + 2) - 1), 0);
+    f[4 + N + 3] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_SCHED_GETAFFINITY, @intCast(AFFINITY_BLK - (4 + N + 3) - 1), 0);
 
     // Default: kill (or log)
-    f[4 + N + 3] = bpf_stmt(BPF_RET | BPF_K, default_action);
+    f[4 + N + 4] = bpf_stmt(BPF_RET | BPF_K, default_action);
 
     // Clone check: only allow thread-creation flags (block CLONE_NEWUSER etc.)
     f[CLONE_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
@@ -199,6 +204,10 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
     f[MPROT_BLK + 1] = bpf_stmt(BPF_ALU | BPF_AND | BPF_K, PROT_EXEC);
     f[MPROT_BLK + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (MPROT_BLK + 2) - 1), 0);
     f[MPROT_BLK + 3] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+
+    f[AFFINITY_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
+    f[AFFINITY_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (AFFINITY_BLK + 1) - 1), 0);
+    f[AFFINITY_BLK + 2] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 
     // ALLOW
     f[ALLOW_POS] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
@@ -233,6 +242,6 @@ pub fn install(audit: bool) !void {
     if (audit) {
         log.warn("seccomp in AUDIT mode — violations logged, not killed", .{});
     } else {
-        log.info("seccomp filter installed ({} syscalls whitelisted)", .{simple_syscalls.len + 3});
+        log.info("seccomp filter installed ({} syscalls whitelisted)", .{simple_syscalls.len + 4});
     }
 }

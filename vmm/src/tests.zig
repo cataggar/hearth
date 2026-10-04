@@ -11,9 +11,9 @@ const seccomp_mod = @import("seccomp.zig");
 const abi = @import("kvm/abi.zig");
 const Vcpu = @import("kvm/vcpu.zig");
 
-test "seccomp: enforced readiness calls retain socket and eventfd restrictions" {
+test "seccomp: enforced readiness and own-affinity query retain restrictions" {
     const linux = std.os.linux;
-    for (0..3) |scenario| {
+    for (0..5) |scenario| {
         const child: isize = @bitCast(linux.syscall0(.fork));
         if (child < 0) return error.ForkFailed;
         if (child == 0) {
@@ -23,6 +23,20 @@ test "seccomp: enforced readiness calls retain socket and eventfd restrictions" 
                 unreachable;
             };
             if (scenario == 0) {
+                var cpus: [128]u8 = @splat(0);
+                const affinity: isize = @bitCast(linux.syscall3(.sched_getaffinity, 0, cpus.len, @intFromPtr(&cpus)));
+                if (affinity <= 0) {
+                    _ = linux.syscall1(.exit_group, 45);
+                    unreachable;
+                }
+                const Entry = struct {
+                    fn run() void {}
+                };
+                const thread = std.Thread.spawn(.{}, Entry.run, .{}) catch {
+                    _ = linux.syscall1(.exit_group, 46);
+                    unreachable;
+                };
+                thread.join();
                 var pollfds: [0]linux.pollfd = .{};
                 const polled: isize = @bitCast(linux.poll(&pollfds, 0, 0));
                 if (polled != 0) {
@@ -41,8 +55,13 @@ test "seccomp: enforced readiness calls retain socket and eventfd restrictions" 
                 unreachable;
             } else if (scenario == 1) {
                 _ = linux.socket(linux.AF.INET, linux.SOCK.STREAM, 0);
-            } else {
+            } else if (scenario == 2) {
                 _ = linux.syscall2(.eventfd2, 0, 0);
+            } else if (scenario == 3) {
+                var cpus: [128]u8 = @splat(0);
+                _ = linux.syscall3(.sched_getaffinity, 1, cpus.len, @intFromPtr(&cpus));
+            } else {
+                _ = linux.syscall3(.sched_setaffinity, 0, 0, 0);
             }
             _ = linux.syscall1(.exit_group, 44);
             unreachable;
@@ -363,17 +382,16 @@ test "seccomp: filter starts with arch check and ends with allow" {
     try std.testing.expectEqual(@as(u16, 0x06), filter[filter.len - 1].code); // BPF_RET
     try std.testing.expectEqual(@as(u32, 0x7FFF0000), filter[filter.len - 1].k); // ALLOW
 
-    // Default action sits right after dispatch block (index 4 + N_simple + 3)
-    // Layout: [header:4] [simple:N] [dispatch:3] [default:1] [clone:4] [socket:3] [mprotect:4] [allow:1]
-    const N = filter.len - 20; // simple_syscalls.len
-    try std.testing.expectEqual(@as(u32, 0x80000000), filter[4 + N + 3].k); // KILL_PROCESS
+    // Layout: header4, simpleN, dispatch4, default1, argument checks14, allow1.
+    const N = filter.len - 24;
+    try std.testing.expectEqual(@as(u32, 0x80000000), filter[4 + N + 4].k); // KILL_PROCESS
 }
 
 test "seccomp: log filter uses LOG as default action" {
     const filter = &seccomp_mod.log_filter;
-    const N = filter.len - 20;
+    const N = filter.len - 24;
     // Default action position uses LOG instead of KILL
-    try std.testing.expectEqual(@as(u32, 0x7FFC0000), filter[4 + N + 3].k); // RET_LOG
+    try std.testing.expectEqual(@as(u32, 0x7FFC0000), filter[4 + N + 4].k); // RET_LOG
 }
 
 test "snapshot: header version validation" {
@@ -481,11 +499,15 @@ test "seccomp: Unix API additions retain argument confinement" {
     try std.testing.expectEqual(kill, Eval.run(41, 2, 0));
     try std.testing.expectEqual(kill, Eval.run(41, 10, 0));
     try std.testing.expectEqual(allow, Eval.run(56, 0x003D0F00, 0));
+    try std.testing.expectEqual(allow, Eval.run(56, 0x007D0F00, 0));
     try std.testing.expectEqual(kill, Eval.run(56, 0x10000000, 0));
     try std.testing.expectEqual(allow, Eval.run(10, 0, 3));
     try std.testing.expectEqual(kill, Eval.run(10, 0, 7));
     try std.testing.expectEqual(kill, Eval.run(290, 0, 0));
     try std.testing.expectEqual(kill, Eval.run(425, 0, 0));
+    try std.testing.expectEqual(allow, Eval.run(204, 0, 0));
+    try std.testing.expectEqual(kill, Eval.run(204, 1, 0));
+    try std.testing.expectEqual(kill, Eval.run(203, 0, 0));
 }
 
 test "snapshot: device min size check rejects undersized data" {

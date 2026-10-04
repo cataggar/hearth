@@ -140,6 +140,13 @@ umask 077
 python3 -m unittest discover -s tools/perf -p test_jail_prerequisites.py -v
 ```
 
+The regression fixture is standalone: it imports no block-performance runner.
+It checks two actual enforced-jail ownership/API cases and two deterministic
+stale-PID teardown cases. API guest thread startup permits only a read-only
+PID0 affinity query and musl's ignored legacy `CLONE_DETACHED` flag in the
+existing thread mask; other-PID affinity queries, affinity mutation, namespace
+creation, non-Unix sockets and executable `mprotect` remain denied.
+
 ## Environments
 
 Environments are pre-built, snapshotted sandbox configurations. Go from "I have a repo" to "isolated VM with code cloned, deps installed, and Claude Code ready" in one command.
