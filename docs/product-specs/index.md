@@ -17,12 +17,15 @@
 
 ## Performance Experiments
 
+Shared correctness foundation:
+[canonical jailed-baseline prerequisites](perf-jail-baseline.md).
+
 All open performance issues have a spec and an active execution plan. These are
 planned experiments, not implemented optimizations or measured improvements.
 
 | Issue | Spec | Execution plan | Status |
 |-------|------|----------------|--------|
-| [#1](https://github.com/cataggar/hearth/issues/1) | [Asynchronous VirtIO Block I/O](perf-async-block-io.md) | [Plan](../exec-plans/active/perf-async-block-io.md) | Planned |
+| [#1](https://github.com/cataggar/hearth/issues/1) | [Asynchronous VirtIO Block I/O](perf-async-block-io.md) | [Plan](../exec-plans/active/perf-async-block-io.md) | Opt-in; qualification blocked |
 | [#2](https://github.com/cataggar/hearth/issues/2) | [vhost-net Evaluation](perf-vhost-net.md) | [Plan](../exec-plans/active/perf-vhost-net.md) | Planned |
 | [#3](https://github.com/cataggar/hearth/issues/3) | [VirtIO Eventfd Acceleration](perf-virtio-eventfd.md) | [Plan](../exec-plans/active/perf-virtio-eventfd.md) | Planned |
 | [#6](https://github.com/cataggar/hearth/issues/6) | [Zig Native Backend and Linker](perf-zig-native.md) | [Plan](../exec-plans/active/perf-zig-native.md) | Planned |

@@ -275,6 +275,14 @@ Raw commands, initial compile/test/harness failures, final acceptances, ELFs,
 private rosters, snapshots and profiles: `.perf/blk-io/worker-correctness/`
 and `.perf/blk-io/jail-tests/`. Full outcome: linked execution evidence.
 
+Canonical prerequisite-only local commit `7dfee42` now packages exactly the
+common jail/filter/unit repair onto `b06ec0a`, with an independent standalone
+fixture rather than the async/perf runner. Archived-only Debug/Safe each32units
+and3actual enforced CLI/API cases pass; original L0 fixture0/3accepted is
+preserved. Owned local ref/private verified bundle keep the exact commit
+available for all three peers without any merge or other branch push. Peer
+Native-row execution/convergence is not inferred from local LLVM acceptance.
+
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
 and a measured keep/reject decision. Execution has started in the isolated
 `copilot/perf-async-block-20261004` worktree. Completion of implementation remains

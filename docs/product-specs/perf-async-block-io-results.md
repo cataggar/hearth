@@ -164,6 +164,40 @@ numeric gates, attributable kernel totals and legacy control readiness remain
 mandatory. Shared prerequisite convergence with#3 is still pending. Keep
 default sync, retain draftPR7, no auto-merge or performance merge recommendation.
 
+### Standalone common prerequisite custody — follow-up
+
+For peers needing an identical repaired synchronous baseline without borrowing
+the async implementation or performance runner, canonical local commit
+`7dfee42ed68fe1703744d6318f4be632113034b0` has **one parent, documentation base
+`b06ec0a`**, and only five changed files: jail, seccomp, focused32-case unit
+file, [standalone jail fixture](../../tools/perf/test_jail_baseline.py), and its
+[contract/commands](perf-jail-baseline.md). Runtime blobs exactly match the
+already validated `ced7ed7` common repairs; no main/VM/compiler/dependency/
+worker/reactor changes are included.
+
+The commit was archived inside this isolated worktree and actually built/
+executed independently: frozen-target LLVM Debug/Safe each **32/32units and
+3/3standalone real enforced-jail cases**. The fixture tests API receive/send,
+umask077 root0755directories/configuredUID0600nodes/host device invariance,
+empty inherited groups/caps and all actual task filters, and CLI/API guest
+disk write/fsync/read/hash. It also passes3/3 against each current Debug/Safe
+opt-in binary with the default sync selection. It does not claim Native-row,
+snapshot, resource-budget or performance acceptance. An initial long AF_UNIX
+address fixture error was fixed and retained; original untouched L0 executes
+the same final fixture with **0/3accepted,3errors**, separately preserved.
+
+The canonical commit is held by owned local ref
+`refs/copilot/async-block/canonical-jail-baseline` and private verified bundle
+`.perf/blk-io/canonical-prerequisite/jail-baseline-7dfee42.bundle` (requires
+`b06ec0a`). No merge, main/peer branch push or alternate worktree was performed.
+Peers in this shared repository can cherry-pick the exact local hash; the
+bundle preserves portability without publishing a second branch or raw images.
+Commands, initial/final logs, input ELFs, independent source archive and owned
+PID cleanup are in `.perf/blk-io/canonical-prerequisite/`.
+Local acceptance is verified; shared prerequisite convergence remains pending
+peer adoption. Quiet-host/performance qualification and synchronous default
+decisions are unchanged.
+
 ## Frozen source and assets
 
 Execution started at documentation-only base
