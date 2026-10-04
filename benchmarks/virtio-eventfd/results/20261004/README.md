@@ -249,6 +249,26 @@ kernel scheduling attribution, mixed4/8-VM qualification, unexercised actual
 save-on-halt/old↔new legacy compatibility and remaining mask/congestion gates.
 Keep all modes experimental and L0 default. No performance merge/auto-merge.
 
+### Durable controlled evidence and cleanup
+
+[Controlled raw evidence](controlled-eventfd-evidence.tar.gz), **3,521,787 bytes**,
+SHA256 `bf9e8e12b79acd50a5e11a5c3ae96447a230e8eaed7a60407c4dc595c28317b6`,
+contains **2,487 individually hashed/readback-verified own receipts**, including
+build/test logs, all operation arrays/controls, losses/failures, isolation rosters,
+actual trace aggregates, scoped stack reports and final cleanup audit. Its
+manifest identifies source/tool hashes and exclusions. Existing four W0/
+prerequisite archives and their checksums are untouched.
+No VM state/memory/disk images, third-party guest binaries, raw perf/decoded
+scheduler data or foreign task names are included.
+
+Implementation commits are `f717ef6` (controlled runtime/tests) and `ffdec29`
+(tested tooling/matrix/stress/report). The final recorded-generation audit
+checks **365 owned VM/supervisor generations**: zero same-generation live
+VMMs, zero supervisor numeric PIDs present, zero invalid teardown receipts.
+All bounded phases have ended; the fleet lock is released. Seventeen tooling
+tests, final Python syntax and Zig formatting checks pass.
+The active plan remains blocked qualification, not moved to completed.
+
 ## W1 historical initial C00 correctness, not performance adoption
 
 Safe musl control build `487dce3da0911bb5f80ee9d7ae7c0b4efaaf70abac93f2ab7520b7016d7e66d1`
