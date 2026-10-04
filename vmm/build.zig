@@ -47,9 +47,14 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_tests.step);
 
     // Integration tests: spawn flint binary and test end-to-end behavior.
-    // Requires /dev/kvm and a kernel at /tmp/vmlinuz-minimal.
+    // Requires /dev/kvm and a verified, project-local kernel.
     // Run with: zig build integration-test
     // Compile without prerequisites: zig build integration-test-build
+    const integration_options = b.addOptions();
+    integration_options.addOption([]const u8, "kernel_path", b.pathResolve(&.{
+        b.root.toString(b.allocator) catch @panic("OOM"),
+        b.option([]const u8, "integration-kernel", "Path to the integration guest kernel (relative to vmm/)") orelse "../.ci/guest/bzImage",
+    }));
     const integration_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/integration_tests.zig"),
@@ -59,6 +64,7 @@ pub fn build(b: *std.Build) void {
     });
     integration_tests.root_module.link_libc = true;
     integration_tests.root_module.addImport("kvm_abi", kvm.mod);
+    integration_tests.root_module.addOptions("integration_options", integration_options);
 
     const integration_build_step = b.step("integration-test-build", "Build integration tests without running them");
     integration_build_step.dependOn(&integration_tests.step);

@@ -1,8 +1,8 @@
 // Integration tests for flint.
 // Spawn the flint binary and test end-to-end behavior.
-// Requires /dev/kvm, /tmp/vmlinuz-minimal, bsdcpio, gzip, and static /usr/bin/busybox.
+// Requires /dev/kvm, a verified project-local kernel, bsdcpio, gzip, and static /usr/bin/busybox.
 //
-// Run with: zig build integration-test
+// Run with: zig build integration-test -Dintegration-kernel=../.ci/guest/bzImage
 
 const std = @import("std");
 const linux = std.os.linux;
@@ -10,7 +10,7 @@ const process = std.process;
 
 const FLINT_BIN = "zig-out/bin/flint";
 const FIXTURE_FLINT_BIN = "../../zig-out/bin/flint";
-const DEFAULT_KERNEL = "/tmp/vmlinuz-minimal";
+const DEFAULT_KERNEL = std.fmt.comptimePrint("{s}", .{@import("integration_options").kernel_path});
 const INIT_SCRIPT =
     \\#!/bin/sh
     \\set -eu

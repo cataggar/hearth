@@ -1,9 +1,17 @@
 # Product Spec: Evaluate Asynchronous VirtIO Block I/O
 
-**Status**: Planned
+**Status**: Blocked at G0 — synchronous default unchanged; no backend selected
 **Last updated**: 2026-10-04
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Execution plan**: [perf-async-block-io](../exec-plans/active/perf-async-block-io.md)
+**Execution evidence**: [baseline capability results](perf-async-block-io-results.md)
+
+The 2026-10-04 execution verified project-local kernel/test support and retained
+actual startup perf/stack diagnostics, but the unchanged enforced-jail API is
+killed on `recvmsg` and the CLI cannot open jail device nodes created under
+private umask. G0/G1 workload acceptance and A/A gates remain incomplete.
+No asynchronous backend or qualifying performance comparison was implemented;
+this is not an optimization rejection or a performance-merge recommendation.
 
 ## Objective and scope
 
@@ -183,7 +191,9 @@ Do not tune margins after seeing candidate outcomes.
 
 ## Non-goals and open decisions
 
-No implementation/benchmarking is performed by this planning change. No
+The original planning change performed no implementation/benchmarking. Current
+baseline capability execution is recorded above; no qualifying disk benchmark
+or backend implementation has passed its gate. No
 compiler migration, notification optimization, guest PMU exposure, SMP/
 multiqueue/new block features, storage/image redesign, unrelated vsock CONNECT
 repair, SDK API expansion or broad cleanup belongs to this experiment.

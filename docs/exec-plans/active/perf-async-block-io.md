@@ -1,16 +1,35 @@
 # Execution Plan: Profile and Evaluate Async VirtIO Block I/O
 
-**Status**: Planned
+**Status**: Blocked at G0 — baseline capabilities diagnosed, backend not selected
 **Last updated**: 2026-10-04
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
+**Actual results**: [baseline capability execution](../../product-specs/perf-async-block-io-results.md)
+
+## Execution checkpoint — 2026-10-04
+
+The project-local integration kernel option and capability/diagnostic tooling
+are implemented and executed. Debug/safe unit suites each execute 31 tests;
+debug/safe existing integration suites each execute seven, including actual
+guest execution after restore. These unjailed cases do not establish async
+acceptance. Thirteen enforced-jail startup attempts fail before guest execution:
+API `recvmsg` is killed by seccomp, CLI device paths have root-only permissions
+under required umask 077. Actual stat/stack data and a saturated-host idle
+control are retained. See the results for exact counts, commands and limits.
+
+G0 is **partial/blocked**; G1 matrix, A/A noise and frozen numeric gates do not
+exist. G2–G5 must not start from these startup diagnostics. Keep the synchronous
+default. No worker/selector/force-sync implementation, performance gain, default
+promotion or merge eligibility is claimed. This plan remains active rather than
+being moved to completed.
 
 ## Outcome and controls
 
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
-and a measured keep/reject decision. This plan is complete as planning; **none of
-its builds, tests, workloads or profiles has been executed for #1**. Completion
-of implementation remains governed by the checklist below.
+and a measured keep/reject decision. Execution has started in the isolated
+`copilot/perf-async-block-20261004` worktree. Completion of implementation remains
+governed by the checklist below; a baseline-only diagnostic is not backend
+acceptance.
 
 Use the spec's compatibility and numeric gates rather than duplicating them.
 Hold compiler, guest image, backing storage and legacy MMIO/IRQ notification
@@ -60,10 +79,10 @@ use isolated worktrees for prototypes and integrate at a declared gate.
 Prior art is the [completed compiler plan](../completed/zig-017-ci.md) and its
 [published runner](https://github.com/cataggar/hearth/pull/5#issuecomment-5973822154).
 Reuse its API/control framing, not its temporary-path handling or limited
-write/fsync workload. The existing KVM suite hardcodes a kernel outside the
-project at `/tmp/vmlinuz-minimal`; first make its fixture kernel configurable
-with a verified project-relative path during implementation. Do not create
-that external file or pretend a new test option already exists.
+write/fsync workload. At the source baseline the KVM suite hardcoded a kernel outside the project.
+Execution now implements `-Dintegration-kernel=<path-relative-to-vmm>`; the
+default and CI path are `../.ci/guest/bzImage`. The verified #1 fixture uses
+`../.perf/blk-io/fixture/bzImage`. No external kernel file is created or used.
 
 **Gate evidence:** verified manifest and smoke results, working raw software
 perf capture, supported workload rows and explicitly blocked rows. Missing
@@ -180,8 +199,8 @@ the hardcoded external kernel prerequisite:
 zig fmt --check vmm/build.zig vmm/build.zig.zon vmm/src
 (cd vmm && zig build test -Dtarget=x86_64-linux -Doptimize=debug --summary all)
 (cd vmm && zig build test -Dtarget=x86_64-linux -Doptimize=safe --summary all)
-(cd vmm && zig build install integration-test-build -Dtarget=x86_64-linux -Doptimize=safe --summary all)
-(cd vmm && zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off)
+(cd vmm && zig build install integration-test-build -Dtarget=x86_64-linux -Doptimize=safe -Dintegration-kernel=../.perf/blk-io/fixture/bzImage --summary all)
+(cd vmm && zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe -Dintegration-kernel=../.perf/blk-io/fixture/bzImage --summary all --color off)
 ```
 
 Preflight real `/dev/kvm` open/VM creation and kernel/fixture tools under the same

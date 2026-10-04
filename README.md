@@ -115,9 +115,17 @@ agent does not imply an AArch64 Flint VMM or native AArch64 runtime coverage.
 CI installs signed Zig 0.17.0 through `cataggar/ghr/actions/install`, checks
 formatting, builds/tests Flint, and builds both guest-agent targets alongside the
 existing TypeScript jobs. KVM integration is a separate hosted Linux job with
-explicit prerequisites: accessible `/dev/kvm`, the guest bzImage at
-`/tmp/vmlinuz-minimal`, static BusyBox, and `bsdcpio`. Run it locally from `vmm/`
-with `zig build integration-test -Doptimize=safe`. Missing prerequisites or an
+explicit prerequisites: accessible `/dev/kvm`, a verified project-local guest
+bzImage, static BusyBox, and `bsdcpio`. CI uses `.ci/guest/bzImage`. Run locally
+from `vmm/`:
+
+```bash
+zig build integration-test -Doptimize=safe \
+  -Dintegration-kernel=../.ci/guest/bzImage
+```
+
+The kernel option resolves relative to `vmm/`, independently of each test
+fixture's working directory. Missing prerequisites or an
 entirely skipped integration suite are not passing KVM coverage.
 
 The hosted job adds its runner user to `kvm` and starts KVM steps with `sg kvm`,
