@@ -1,6 +1,6 @@
 # Product Spec: VirtIO ioeventfd/irqfd Performance Experiment
 
-**Status**: Planned
+**Status**: Blocked after partial W0; acceleration remains unimplemented/disabled
 
 **Last updated**: 2026-10-04
 
@@ -18,8 +18,17 @@ without busy waiting, periodic kicks, or timer-driven device polling.
 
 This is a falsifiable experiment, not a promised acceleration. A rejected
 prototype with reproducible profiles, correctness findings, and a keep/reject
-decision satisfies the investigation. No implementation or new measurements
-have been performed for this planning document.
+decision satisfies the investigation. W0 environment verification and untouched
+baseline collection have produced real liveness/backpressure failures and
+software profiles. This is **not** a completed/rejected prototype. No owner topology, IRQ policy, accelerated
+mode, numeric gate, or default promotion has been selected.
+
+**Actual results and durable evidence**:
+[2026-10-04 W0 report](../../benchmarks/virtio-eventfd/results/20261004/README.md).
+Timer-free native traffic stalls after silence; eight 64 KiB slow-reader
+messages also stall with a separately labelled heartbeat. C00/C10/C01/C11,
+their correctness/lifecycle tests and the required full performance matrix
+remain outstanding. No performance merge or default adoption is eligible.
 
 The work follows [architecture](../../ARCHITECTURE.md) and
 [core beliefs](../design-docs/core-beliefs.md): preserve hardware isolation,
@@ -51,9 +60,8 @@ eventfd, transport notification, or IRQ acknowledgement correctness. The seven
 [`integration_tests.zig`](../../vmm/src/integration_tests.zig) cases exercise
 usage/error, userspace boot, API status/pause/resume and snapshots with a
 BusyBox serial heartbeat. They do not test block/TAP/vsock under active I/O or
-prove halted-vCPU liveness. The kernel path is currently hardcoded outside the
-project; the future harness must allow an explicitly pinned project-relative
-fixture rather than depending on that location.
+prove halted-vCPU liveness. W0 now adds `-Dintegration-kernel`, resolving project-relative fixtures before
+child working directories change; the historical CI default remains compatible.
 
 The completed [Zig migration plan](../exec-plans/completed/zig-017-ci.md)
 reports an Azure nested-KVM compiler comparison, not eventfd results. Its
@@ -255,6 +263,31 @@ KVM; missing fixtures, unavailable required modes, timeouts and skipped cases
 are blocked/failed coverage, never skipped-as-passing.
 
 ## Default, rollback and open decisions
+
+### W0 isolation prerequisite
+
+Under the required private `umask 077`, L0 creates root-owned jail device
+directories with mode 0700 and nodes with mode 0600, then fails `/dev/kvm` open
+after dropping to UID 1000. The common isolation prerequisite explicitly assigns
+jail-local device directories (0700) and KVM/TUN nodes (0600) to the configured
+nonroot UID/GID before the privilege drop. It changes
+neither host device permissions nor device access outside the private jail.
+It also clears supplementary groups before the configured UID/GID drop.
+
+A real enforced child then revealed SIGSYS after its first KVM return.
+Owned-process raw syscall tracing and frozen-binary disassembly identify
+`epoll_pwait` (281), emitted by Zig's `epoll_wait` wrapper, missing from the
+whitelist. The existing vsock backend also uses `poll` (7), verified in its
+source and baseline software stacks. Only these two ordinary readiness calls
+are added; `eventfd2` remains denied. A real forked enforced-filter test permits
+readiness while still killing AF_INET socket creation and eventfd2.
+The fixed jailed guest actually connects; its complete observed two-task roster
+has UID/GID 1000, no supplementary groups/capabilities, Seccomp 2 and
+NoNewPrivs 1. This covers boot/connect, not the whole eventfd isolation matrix.
+
+These fixes are not C00 or an eventfd performance effect. L0 evidence remains
+tied to its frozen old binary; the corrected isolation build is labelled
+separately. Guest ring/IRQ/snapshot implementation remains unchanged.
 
 Legacy delivery remains the default while planned and during experiments.
 Prefer the simplest passing mode, including ioeventfd-only or irqfd-only;

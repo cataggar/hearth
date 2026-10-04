@@ -1,6 +1,6 @@
 # Execution Plan: Profile VirtIO ioeventfd/irqfd
 
-**Status**: Planned
+**Status**: Blocked after partial W0; W1–W8 not executed
 
 **Date**: 2026-10-04
 
@@ -13,8 +13,35 @@
 Produce a reproducible keep/reject decision for queue-kick ioeventfd and
 completion-interrupt irqfd, independently and combined, on **nested Azure
 KVM**. Preserve correctness, snapshot/lifecycle semantics and isolation.
-No implementation, benchmark, test execution, or default decision has occurred
-in this plan. Completing planning does not complete the issue's experiments.
+W0 verification and baseline collection have produced reproducible failures
+and profiles. No accelerated mode or
+default decision has occurred. Completing W0 does not complete this experiment.
+
+### Current execution
+
+The dedicated branch is `copilot/perf-virtio-eventfd-20261004`, based on the
+docs-only `b06ec0a`; VMM and agent sources initially match `b07f73b`.
+All compilation, VM execution, profiling and fixture preparation use the shared
+exclusive `/d/hearth/.perf/fleet/host.lock`, bounded commands and private
+project-relative artifacts under `.perf/eventfd/`. Provisioning and profiling
+tools added during W0 are not C00 servicing changes or performance gains.
+
+The [actual W0 results](../../../benchmarks/virtio-eventfd/results/20261004/README.md)
+record all failures, tests, software profiles and raw evidence. Native
+no-heartbeat liveness fails; eight 64 KiB slow-reader messages stall even with
+the diagnostic heartbeat. Private jail ownership and missing ordinary
+readiness syscalls were corrected and actual enforced boot/connect verified
+separately. Earlier CPU8/client0 samples share an SMT core and remain
+supplementary; repeated CPU8/client1 L0 profiles are retained separately.
+No numeric gates are frozen, and no controlled candidate exists.
+
+**Hold / not eligible for performance merge.** Required remaining work is the
+baseline backpressure/credit correctness prerequisite, W1–W6 ownership,
+validation, IRQ/lifecycle and controlled modes, plus TAP/concurrency/active-I/O
+and cross-mode restore coverage and W3/W7 matched gates/matrix. The plan stays
+active/blocked, not completed. Existing benchmark commands below that describe
+future selectors/matrix runners remain proposals; only the W0 tool README
+documents implemented options.
 
 Keep userspace TAP and synchronous block I/O throughout the attributed
 experiment. Coordinate reusable control/readiness plumbing with [#2
@@ -73,7 +100,10 @@ on EOI and requires userspace to requeue still-pending device interrupts.
 
 ## Workstreams and real dependencies
 
-All items below are proposed, not completed.
+W0 is partially executed; the remaining workstreams below are proposed, not
+completed. Seven integration cases pass per optimization mode, but only five
+boot a real guest; two exercise CLI errors. Their serial heartbeat does not
+satisfy no-heartbeat or active-device lifecycle coverage.
 
 | ID | Workstream / deliverable | Prerequisites |
 |---|---|---|

@@ -12,3 +12,6 @@ agent/.zig-cache/
 agent/zig-out/
 vmm/.zig-cache/
 vmm/zig-out/
+.perf/
+__pycache__/
+*.py[cod]

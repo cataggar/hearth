@@ -116,8 +116,11 @@ CI installs signed Zig 0.17.0 through `cataggar/ghr/actions/install`, checks
 formatting, builds/tests Flint, and builds both guest-agent targets alongside the
 existing TypeScript jobs. KVM integration is a separate hosted Linux job with
 explicit prerequisites: accessible `/dev/kvm`, the guest bzImage at
-`/tmp/vmlinuz-minimal`, static BusyBox, and `bsdcpio`. Run it locally from `vmm/`
-with `zig build integration-test -Doptimize=safe`. Missing prerequisites or an
+`/tmp/vmlinuz-minimal`, static BusyBox, and `bsdcpio`. A project-relative pinned
+kernel can instead be selected locally from `vmm/` with
+`zig build integration-test -Doptimize=safe -Dintegration-kernel=../path/to/bzImage`.
+The option is resolved from `vmm/`, including for child VMMs with private fixture
+working directories. Missing prerequisites or an
 entirely skipped integration suite are not passing KVM coverage.
 
 The hosted job adds its runner user to `kvm` and starts KVM steps with `sg kvm`,

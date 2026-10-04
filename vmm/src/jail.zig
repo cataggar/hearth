@@ -61,18 +61,22 @@ pub fn setup(config: Config) !void {
     try check(linux.umount2("old_root", linux.MNT.DETACH), "umount2(old_root)");
     _ = linux.rmdir("old_root");
 
-    // Create device nodes inside the jail (only what the VMM needs).
-    // Use mode 0666 — safe because we're inside a private mount namespace,
-    // so only this process can see these device nodes.
-    try check(linux.mkdir("dev", 0o755), "mkdir(/dev)");
-    try check(linux.mknod("dev/kvm", S_IFCHR | 0o666, DEV_KVM), "mknod(/dev/kvm)");
+    // Assign private nodes before dropping privileges; do not depend on the
+    // invoking process having a permissive umask.
+    try check(linux.mkdir("dev", 0o700), "mkdir(/dev)");
+    try check(linux.fchownat(-100, "dev", config.uid, config.gid, 0), "chown(/dev)");
+    try check(linux.mknod("dev/kvm", S_IFCHR | 0o600, DEV_KVM), "mknod(/dev/kvm)");
+    try check(linux.fchownat(-100, "dev/kvm", config.uid, config.gid, 0), "chown(/dev/kvm)");
 
     if (config.need_tun) {
-        try check(linux.mkdir("dev/net", 0o755), "mkdir(/dev/net)");
-        try check(linux.mknod("dev/net/tun", S_IFCHR | 0o666, DEV_NET_TUN), "mknod(/dev/net/tun)");
+        try check(linux.mkdir("dev/net", 0o700), "mkdir(/dev/net)");
+        try check(linux.fchownat(-100, "dev/net", config.uid, config.gid, 0), "chown(/dev/net)");
+        try check(linux.mknod("dev/net/tun", S_IFCHR | 0o600, DEV_NET_TUN), "mknod(/dev/net/tun)");
+        try check(linux.fchownat(-100, "dev/net/tun", config.uid, config.gid, 0), "chown(/dev/net/tun)");
     }
 
     // Drop privileges — last step requiring root
+    try check(linux.syscall2(.setgroups, 0, 0), "setgroups");
     try check(linux.setgid(config.gid), "setgid");
     try check(linux.setuid(config.uid), "setuid");
 

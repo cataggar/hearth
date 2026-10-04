@@ -11,6 +11,57 @@ const seccomp_mod = @import("seccomp.zig");
 const abi = @import("kvm/abi.zig");
 const Vcpu = @import("kvm/vcpu.zig");
 
+test "seccomp: enforced readiness calls retain socket and eventfd restrictions" {
+    const linux = std.os.linux;
+    for (0..3) |scenario| {
+        const child: isize = @bitCast(linux.syscall0(.fork));
+        if (child < 0) return error.ForkFailed;
+        if (child == 0) {
+            _ = linux.prctl(@backingInt(linux.PR.SET_DUMPABLE), 0, 0, 0, 0);
+            seccomp_mod.install(false) catch {
+                _ = linux.syscall1(.exit_group, 40);
+                unreachable;
+            };
+            if (scenario == 0) {
+                var pollfds: [0]linux.pollfd = .{};
+                const polled: isize = @bitCast(linux.poll(&pollfds, 0, 0));
+                if (polled != 0) {
+                    _ = linux.syscall1(.exit_group, 41);
+                    unreachable;
+                }
+                const opened: isize = @bitCast(linux.epoll_create1(linux.EPOLL.CLOEXEC));
+                if (opened < 0) {
+                    _ = linux.syscall1(.exit_group, 42);
+                    unreachable;
+                }
+                var events: [1]linux.epoll_event = undefined;
+                const ready: isize = @bitCast(linux.epoll_wait(@intCast(opened), &events, events.len, 0));
+                _ = linux.close(@intCast(opened));
+                _ = linux.syscall1(.exit_group, if (ready == 0) 0 else 43);
+                unreachable;
+            } else if (scenario == 1) {
+                _ = linux.socket(linux.AF.INET, linux.SOCK.STREAM, 0);
+            } else {
+                _ = linux.syscall2(.eventfd2, 0, 0);
+            }
+            _ = linux.syscall1(.exit_group, 44);
+            unreachable;
+        }
+        var status: u32 = 0;
+        while (true) {
+            const waited: isize = @bitCast(linux.syscall4(.wait4, @intCast(child), @intFromPtr(&status), 0, 0));
+            if (waited == -@as(isize, @backingInt(linux.E.INTR))) continue;
+            try std.testing.expectEqual(child, waited);
+            break;
+        }
+        if (scenario == 0) {
+            try std.testing.expectEqual(@as(u32, 0), status);
+        } else {
+            try std.testing.expectEqual(@backingInt(linux.SIG.SYS), status & 0x7f);
+        }
+    }
+}
+
 test "kvm: ioctl preserves negative syscall errors" {
     try std.testing.expectError(error.BadFd, abi.ioctl(-1, abi.c.KVM_GET_API_VERSION, 0));
     try std.testing.expectError(error.BadFd, abi.ioctlVoid(-1, abi.c.KVM_GET_API_VERSION, 0));

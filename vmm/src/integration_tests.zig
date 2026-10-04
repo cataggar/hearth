@@ -1,8 +1,8 @@
 // Integration tests for flint.
 // Spawn the flint binary and test end-to-end behavior.
-// Requires /dev/kvm, /tmp/vmlinuz-minimal, bsdcpio, gzip, and static /usr/bin/busybox.
+// Requires /dev/kvm, the configured kernel, bsdcpio, gzip, and static /usr/bin/busybox.
 //
-// Run with: zig build integration-test
+// Run with: zig build integration-test -Dintegration-kernel=../path/to/bzImage
 
 const std = @import("std");
 const linux = std.os.linux;
@@ -10,7 +10,9 @@ const process = std.process;
 
 const FLINT_BIN = "zig-out/bin/flint";
 const FIXTURE_FLINT_BIN = "../../zig-out/bin/flint";
-const DEFAULT_KERNEL = "/tmp/vmlinuz-minimal";
+const DEFAULT_KERNEL = @import("integration_options").kernel;
+var kernel_buffer: [4096]u8 = undefined;
+var kernel_path: [:0]const u8 = "";
 const INIT_SCRIPT =
     \\#!/bin/sh
     \\set -eu
@@ -39,9 +41,19 @@ fn deinitIo() void {
 }
 
 fn requireKernel() !void {
-    const rc: isize = @bitCast(linux.open(DEFAULT_KERNEL, .{ .ACCMODE = .RDONLY }, 0));
+    if (std.fs.path.isAbsolute(DEFAULT_KERNEL)) {
+        kernel_path = try std.fmt.bufPrintSentinel(&kernel_buffer, "{s}", .{DEFAULT_KERNEL}, 0);
+    } else {
+        var cwd: [4096]u8 = undefined;
+        const cwd_len: isize = @bitCast(linux.getcwd(&cwd, cwd.len));
+        if (cwd_len <= 0) return error.KernelPathResolveFailed;
+        kernel_path = try std.fmt.bufPrintSentinel(&kernel_buffer, "{s}/{s}", .{
+            cwd[0 .. @as(usize, @intCast(cwd_len)) - 1], DEFAULT_KERNEL,
+        }, 0);
+    }
+    const rc: isize = @bitCast(linux.open(kernel_path, .{ .ACCMODE = .RDONLY }, 0));
     if (rc < 0) {
-        std.debug.print("integration requires a kernel at {s}\n", .{DEFAULT_KERNEL});
+        std.debug.print("integration requires a kernel at {s}\n", .{kernel_path});
         return error.KernelUnavailable;
     }
     _ = linux.close(@intCast(rc));
@@ -229,7 +241,7 @@ test "boot to userspace" {
     // Use spawn+kill since the VM doesn't exit cleanly
     var child = try process.spawn(io(), .{
         .cwd = .{ .path = fixture.dir() },
-        .argv = &.{ FIXTURE_FLINT_BIN, DEFAULT_KERNEL, "initrd.cpio.gz" },
+        .argv = &.{ FIXTURE_FLINT_BIN, kernel_path, "initrd.cpio.gz" },
         .stdout = .pipe,
         .stderr = .inherit,
     });
@@ -267,7 +279,7 @@ test "API boot and VM status" {
     const boot_cmd = std.fmt.bufPrint(
         &boot_cmd_buf,
         "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
-        .{ DEFAULT_KERNEL, "initrd.cpio.gz" },
+        .{ kernel_path, "initrd.cpio.gz" },
     ) catch unreachable;
 
     var r = try checkedRequest(sock_path, "PUT", "/boot-source", boot_cmd, "204");
@@ -310,7 +322,7 @@ test "API pause and resume" {
     const boot_cmd = std.fmt.bufPrint(
         &boot_cmd_buf,
         "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
-        .{ DEFAULT_KERNEL, "initrd.cpio.gz" },
+        .{ kernel_path, "initrd.cpio.gz" },
     ) catch unreachable;
 
     var r = try checkedRequest(sock_path, "PUT", "/boot-source", boot_cmd, "204");
@@ -363,7 +375,7 @@ test "snapshot requires pause" {
     const boot_cmd = std.fmt.bufPrint(
         &boot_cmd_buf,
         "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
-        .{ DEFAULT_KERNEL, "initrd.cpio.gz" },
+        .{ kernel_path, "initrd.cpio.gz" },
     ) catch unreachable;
 
     var r = try checkedRequest(sock_path, "PUT", "/boot-source", boot_cmd, "204");
@@ -414,7 +426,7 @@ test "snapshot create and restore" {
     const boot_cmd = std.fmt.bufPrint(
         &boot_cmd_buf,
         "{{\"kernel_image_path\":\"{s}\",\"initrd_path\":\"{s}\"}}",
-        .{ DEFAULT_KERNEL, "initrd.cpio.gz" },
+        .{ kernel_path, "initrd.cpio.gz" },
     ) catch unreachable;
 
     var r = try checkedRequest(sock_path, "PUT", "/boot-source", boot_cmd, "204");

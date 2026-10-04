@@ -25,6 +25,30 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
+    const eventfd_preflight = b.addExecutable(.{
+        .name = "eventfd-preflight",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/eventfd_preflight.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    eventfd_preflight.root_module.addImport("kvm_abi", kvm.mod);
+    const preflight_step = b.step("eventfd-preflight", "Probe real KVM eventfd capabilities without enabling acceleration");
+    preflight_step.dependOn(&b.addRunArtifact(eventfd_preflight).step);
+
+    const guest_probe = b.addExecutable(.{
+        .name = "eventfd-guest-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/eventfd_guest_probe.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.step("eventfd-guest-probe", "Build the blocking, heartbeat-free guest-initiated vsock probe")
+        .dependOn(&b.addInstallArtifact(guest_probe, .{}).step);
+
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     run_cmd.addPassthruArgs();
@@ -47,7 +71,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_tests.step);
 
     // Integration tests: spawn flint binary and test end-to-end behavior.
-    // Requires /dev/kvm and a kernel at /tmp/vmlinuz-minimal.
+    // Requires /dev/kvm and a configured Linux kernel fixture.
     // Run with: zig build integration-test
     // Compile without prerequisites: zig build integration-test-build
     const integration_tests = b.addTest(.{
@@ -59,6 +83,10 @@ pub fn build(b: *std.Build) void {
     });
     integration_tests.root_module.link_libc = true;
     integration_tests.root_module.addImport("kvm_abi", kvm.mod);
+    const integration_options = b.addOptions();
+    const integration_kernel = b.option([]const u8, "integration-kernel", "Path to the integration kernel (resolved from vmm/)") orelse "/tmp/vmlinuz-minimal";
+    integration_options.addOption([]const u8, "kernel", integration_kernel);
+    integration_tests.root_module.addOptions("integration_options", integration_options);
 
     const integration_build_step = b.step("integration-test-build", "Build integration tests without running them");
     integration_build_step.dependOn(&integration_tests.step);

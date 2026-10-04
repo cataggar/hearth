@@ -78,6 +78,7 @@ const simple_syscalls = [_]u32{
     1, // write
     2, // open (Zig's linux.open() emits raw open syscall)
     3, // close
+    7, // poll (vsock socket readiness)
     8, // lseek
     16, // ioctl (KVM, FIONBIO, TUNSETIFF)
     17, // pread64 (virtio-blk)
@@ -133,6 +134,7 @@ const simple_syscalls = [_]u32{
     // Epoll (run loop device polling)
     232, // epoll_wait
     233, // epoll_ctl
+    281, // epoll_pwait (Zig's epoll_wait wrapper)
     291, // epoll_create1
 
     // Timers / sleep
