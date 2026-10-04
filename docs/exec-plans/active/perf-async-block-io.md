@@ -131,6 +131,28 @@ counts, failures, inputs and exact scripts are in the results. The separate
 repair todo is done; implementation todo remains in progress and this plan
 must not move to completed or recommend performance merge.
 
+### Collector cache confinement follow-up
+
+Explicitly scope `PERF_BUILDID_DIR` and project `TMPDIR` inside `sudo -n env` for every collector
+and decoder; an outer user environment can be discarded by sudo. Disable
+debuginfod lookup in that same scoped environment. Use a private nonsymlink
+project cache and reject insecure/preexisting cache paths before elevation.
+Permit report/script to read a deliberately exact-file ownership-transferred
+private perf artifact with their force-read option, never overwrite evidence.
+Preserve historical collector argv and diagnostics: their root build-ID cache
+location was not explicitly scoped and must not be asserted private. Do not
+inspect, modify or clean a global/root cache. Validate the new setup with
+focused harness regressions and a real owned jailed collector/decoder phase;
+this changes tooling only, not VMM runtime or a performance gate.
+
+Implemented tooling validation passes9 focused tests and12 complete Python
+cases each against the unchanged Debug/Safe binaries. Actual jailed scoped
+stat/record and force-read decoders pass; accepted record647samples/zero lost.
+Own roster reports two flint-safe TIDs and one kvm-nx-lpage-re TID, all
+Kthread0/Seccomp2; supplementary Groups0 remains in the runtime and any
+group-clearing common follow-up must be separately coordinated. See results
+for exact argv, cache/scratch0700, ownership transfer and historical limits.
+
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
 and a measured keep/reject decision. Execution has started in the isolated
 `copilot/perf-async-block-20261004` worktree. Completion of implementation remains

@@ -53,6 +53,23 @@ def run_logged(argv, output, timeout=120, cwd=ROOT):
     return {"argv": argv, "exit_code": result.returncode, "log": str(output.relative_to(ROOT))}
 
 
+def privileged_perf(argv):
+    if not ARTIFACTS.resolve().is_relative_to(ROOT.resolve()):
+        raise ValueError("perf paths must remain inside the project")
+    for name in ("perf-buildid-cache", "perf-scratch"):
+        directory = ARTIFACTS / name
+        if directory.is_symlink():
+            raise ValueError("perf paths must be nonsymlink project directories")
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        info = directory.stat()
+        if info.st_uid != os.getuid() or info.st_mode & 0o777 != 0o700:
+            raise PermissionError("perf paths must be caller-owned with mode0700")
+    cache = ARTIFACTS / "perf-buildid-cache"
+    return ["sudo", "-n", "--", "env", f"PERF_BUILDID_DIR={cache.resolve()}",
+            f"TMPDIR={(ARTIFACTS / 'perf-scratch').resolve()}",
+            "DEBUGINFOD_URLS=", "perf", *argv]
+
+
 def receive_exact(connection, length):
     data = bytearray()
     while len(data) < length:
@@ -179,9 +196,9 @@ def inventory():
         "libc": ["ldd", "--version"],
         "busybox": ["busybox", "--help"],
         "ext4": ["mke2fs", "-V"],
-        "hardware-probe": ["sudo", "-n", "perf", "stat", "-e", "cycles,instructions", "--", "sleep", "0.2"],
-        "software-probe": ["sudo", "-n", "perf", "stat", "-e",
-                           "task-clock,context-switches,cpu-migrations,page-faults", "--", "sleep", "0.2"],
+        "hardware-probe": privileged_perf(["stat", "-e", "cycles,instructions", "--", "sleep", "0.2"]),
+        "software-probe": privileged_perf(["stat", "-e",
+                           "task-clock,context-switches,cpu-migrations,page-faults", "--", "sleep", "0.2"]),
         "trace-events": ["sudo", "-n", "cat", "/sys/kernel/tracing/available_events"],
     }
     results = {name: run_logged(argv, path / f"{name}.txt") for name, argv in commands.items()}
@@ -285,12 +302,12 @@ class OwnedVm:
                 if not self.jailed or self.trace_startup:
                     raise ValueError("startup perf requires a jailed, untraced baseline")
                 if self.startup_perf == "stat":
-                    collector = ["perf", "stat", "-x,", "-o", str(self.path / "perf-stat.csv"),
+                    collector = ["stat", "-x,", "-o", str(self.path / "perf-stat.csv"),
                                  "-e", "task-clock,context-switches,cpu-migrations,page-faults"]
                 else:
-                    collector = ["perf", "record", "-q", "-e", "cpu-clock", "-F", str(self.startup_frequency),
+                    collector = ["record", "-q", "-e", "cpu-clock", "-F", str(self.startup_frequency),
                                  "-g", "--call-graph", "dwarf", "-o", str(self.path / "perf.data")]
-                argv = ["sudo", "-n", "--", *collector, "--", *argv[3:]]
+                argv = [*privileged_perf(collector), "--", *argv[3:]]
             self.process = subprocess.Popen(
                 argv, cwd=self.path, stdout=self.stdout, stderr=self.stderr,
                 start_new_session=True,
@@ -471,13 +488,13 @@ def smoke(args):
         data = path / "perf.data"
         if args.startup_perf == "record" and data.exists():
             reports = {
-                "report": ["perf", "report", "--stdio", "--percent-limit", "0.5", "-i", str(data)],
-                "header": ["perf", "report", "--stdio", "--header-only", "-i", str(data)],
-                "buildids": ["perf", "buildid-list", "-i", str(data)],
-                "samples": ["perf", "script", "-i", str(data), "-F", "comm,pid,tid,event"],
+                "report": ["report", "--force", "--stdio", "--percent-limit", "0.5", "-i", str(data)],
+                "header": ["report", "--force", "--stdio", "--header-only", "-i", str(data)],
+                "buildids": ["buildid-list", "-i", str(data)],
+                "samples": ["script", "--force", "-i", str(data), "-F", "comm,pid,tid,event"],
             }
             save_json(path / "perf-reports.json", {
-                name: run_logged(["sudo", "-n", *argv], path / f"perf-{name}.txt")
+                name: run_logged(privileged_perf(argv), path / f"perf-{name}.txt")
                 for name, argv in reports.items()
             })
 

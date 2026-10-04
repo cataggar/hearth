@@ -89,5 +89,40 @@ class ProtocolTests(unittest.TestCase):
         existing.__truediv__.assert_not_called()
 
 
+class PerfCacheTests(unittest.TestCase):
+    def test_insecure_existing_cache_is_rejected_without_changing_permissions(self):
+        root = MODULE.ARTIFACTS / "perf-cache-tests/insecure"
+        root.mkdir(mode=0o700, parents=True)
+        cache = root / "perf-buildid-cache"
+        cache.mkdir(mode=0o700)
+        cache.chmod(0o755)
+        try:
+            with mock.patch.object(MODULE, "ARTIFACTS", root):
+                with self.assertRaises(PermissionError):
+                    MODULE.privileged_perf(["stat", "--", "true"])
+            self.assertEqual(cache.stat().st_mode & 0o777, 0o755)
+        finally:
+            cache.rmdir()
+            root.rmdir()
+
+    def test_symlink_cache_is_rejected_without_touching_its_target(self):
+        root = MODULE.ARTIFACTS / "perf-cache-tests/symlink"
+        root.mkdir(mode=0o700, parents=True)
+        target = root / "target"
+        target.mkdir(mode=0o700)
+        target.chmod(0o755)
+        cache = root / "perf-buildid-cache"
+        cache.symlink_to(target, target_is_directory=True)
+        try:
+            with mock.patch.object(MODULE, "ARTIFACTS", root):
+                with self.assertRaises(ValueError):
+                    MODULE.privileged_perf(["record", "--", "true"])
+            self.assertEqual(target.stat().st_mode & 0o777, 0o755)
+        finally:
+            cache.unlink()
+            target.rmdir()
+            root.rmdir()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -545,6 +545,59 @@ interactive and100 lifecycle observations, all-worker/attributable kernel CPU,
 frozen numeric gates and the conditional G2–G5 experiment. Prerequisite done
 does not mean the async plan is done. No backend/default/performance merge.
 
+## Explicit root perf cache/scratch confinement follow-up
+
+Collector and decoder commands now put project-local `PERF_BUILDID_DIR` and
+`TMPDIR` **inside `sudo -n env`**, with `DEBUGINFOD_URLS` empty. The harness
+rejects symlink, foreign-owned or non0700 cache/scratch directories before
+elevation. Root report/script use force-read for the deliberately exact-file
+ownership-transferred private artifact, not overwrite an existing capture.
+Future private profile wrappers use the same helper. No VMM runtime changes.
+
+Historical collector argv did **not explicitly scope the root build-ID cache**;
+their location must not be asserted private or used as a fully controlled
+comparison. No global/root cache is inspected, modified or cleaned in this
+follow-up. Existing raw commands/evidence remain unchanged.
+
+Validation under the fleet lock:
+
+- **9/9 focused framing/cache regressions pass**, including rejecting a
+  symlink and an insecure existing directory without touching their targets.
+- **12/12 Python cases each against Debug/Safe binaries pass**, including the
+  three real enforced-jail regressions; no skips. Earlier32-unit/7-integration
+  results remain separately executed coverage, not newly rerun here.
+- A real owned jailed guest performs checked fio during scoped software/KVM
+  stat and199Hz DWARF recording. Root report/script succeed after the single
+  owned600-mode perf.data is deliberately chowned to UID1000 and decoded with
+  force-read. Accepted record: **647 samples, zero lost**. Cache/scratch roots
+  are0700; this capture creates **zero build-ID cache entries**, so no cache
+  population claim is made. This is tooling acceptance, not a gain/noise gate.
+
+The actual roster contains two `flint-safe` TIDs and one
+`kvm-nx-lpage-re`-named TID; **all three report Kthread0, UID/GID1000,
+CapEff0, NoNewPrivs1, Seccomp2** on this kernel. Do not relabel that kernel
+helper as an unfiltered userspace I/O worker, or infer its precise role from
+Kthread alone. All listed TIDs are collected; complete thread-creation/kernel
+I/O attribution still is not established.
+
+The roster also records **supplementary Groups0** retained by this synchronous
+revision. Clearing inherited groups is not part of `5ee81b1`; any common
+credential-hygiene follow-up must be coordinated and revalidated as a new
+correctness revision, never silently mixed into these profiles or attributed
+as an optimization. Divergent peer directory/filter patches are not this
+identical corrected configuration.
+
+Post-validation cleanup checks185 recorded VM/supervisor/collector PIDs:
+none remains, with no owned device nodes/sockets. Original kernel/agent/VMM
+and repaired safe binary hashes still match. This count uses the retained
+launch/*pid manifests, not a whole-host process inventory.
+
+Artifacts: `prerequisite/perf-cache-validation*.log`,
+`prerequisite/perf-cache-all-tests.log`, `perf-cache-cleanup.json`,
+distinct `perf-cache-check/` and final
+`perf-cache-check-2/` with exact post-sudo argv, checked guest outputs,
+thread roster, force-read reports/script and `acceptance.json`.
+
 ## Original diagnostic validation
 
 | Command / coverage | Actual result |

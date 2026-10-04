@@ -74,6 +74,14 @@ additional environmental limits, not optimization gains. The separate jail
 prerequisite todo is done; the implementation todo remains in progress.
 See the results before treating any mandatory row or gate as accepted.
 
+Collector tooling now explicitly scopes build-ID cache/scratch after sudo and
+disables debuginfod lookup; real jailed collection/force-read decoding and
+focused regressions pass. Historical root cache locations were not explicitly
+scoped, and no global cache is inspected or cleaned. Own thread credential
+roster retains supplementary Groups0; a shared group-clearing correction is
+not silently incorporated into prior profiles. Tooling acceptance is not a
+backend decision or isolation/performance promotion.
+
 ## Objective and scope
 
 Determine whether moving backing-file operations off Flint's vCPU loop improves
