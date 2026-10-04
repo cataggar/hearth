@@ -22,6 +22,10 @@ header and format-v2 snapshot. A′ and B now have actual unjailed KVM payload,
 traffic-snapshot, cross-backend restore, reset, malformed, concurrent-client and
 fallback evidence. Enforced owner-worker inheritance is proved in two actual
 kernel probes with the exact prototype filter and owned memory/pids cgroups.
+Two later actual simultaneous KVM restores in independent namespaces prove
+that mutating A with343,932,928 checked bytes leaves paused B's entire RAM and
+the shared backing unchanged; A's RAM differs, both repetitions pass and all
+owned VMs/supervisors join. This is unjailed CoW isolation, not jail acceptance.
 These are focused S6 diagnostics, not complete production-jail acceptance or S7.
 The authoritative separate common C00 jail prerequisite is still unavailable;
 the current jail reproduction remains KVM AccessDenied under umask077. The new

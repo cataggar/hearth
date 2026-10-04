@@ -46,7 +46,22 @@ UDP/loss/retransmission tests or deciding performance samples.
 ACK, saves RAM twice and requires identical full-file hashes, resumes and checks
 all bytes/ACK plus fresh RPC. `--restore-backend` uses format-v2 snapshot/new
 RAM mapping, checks RPC/bulk/wake and unchanged MAP_PRIVATE backing. It is not
-simultaneous independent-restore isolation. `--concurrent` checks eight clients
+simultaneous independent-restore isolation by itself. `cow_isolation.py` separately
+starts two real KVM vhost restores of one backing file in distinct owned namespaces,
+pauses B, drives checked bulk into A and requires B's full RAM and shared backing
+to remain unchanged while A's RAM differs. Run it under one exclusive bounded
+fleet lock with a root supervisor; it never acquires a nested lock.
+For example, after a retained `--snapshot` boot:
+
+```sh
+flock -x -w 600 /d/hearth/.perf/fleet/host.lock timeout 180 bash -c '
+  cd /d/hearth/.perf/worktrees/vhost-net && umask 077 &&
+  sudo -n python3 benchmarks/vhost-net/cow_isolation.py \
+    --source .perf/vhost-net/20261004/final-b3 --output .perf/vhost-net/cow-new
+'
+```
+
+`--concurrent` checks eight clients
 in one VM, not four/eight-VM scaling. `--reset` performs three real guest driver
 unbind/rebind cycles with new payload checks and owned FD/task observations.
 `--malformed` restores deliberately patched RAM/state into real KVM for
@@ -92,5 +107,5 @@ See [actual results](../../docs/perf-results/vhost-net-20261004.md),
 [spec](../../docs/product-specs/perf-vhost-net.md) and
 [active plan](../../docs/exec-plans/active/perf-vhost-net.md) for exact commands,
 counts, pins and mandatory remaining gates. Full enforced VMM jail, independent
-restore isolation, arbitrary injected ioctl/allocator failures, UDP/external/scaling cells and quiet
+jailed restore isolation, arbitrary injected ioctl/allocator failures, UDP/external/scaling cells and quiet
 A/A/performance qualification are not passed. No default or merge is justified.

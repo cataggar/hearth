@@ -6,8 +6,10 @@ import json
 import os
 import shutil
 import stat
+import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True
 import runner
 
 

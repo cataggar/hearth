@@ -29,13 +29,16 @@ reset generations, concurrency and fallback now execute successfully; see the
 results report for precise populations. The exact enforced owner-worker probe
 also verifies inherited UID/GID, empty groups, zero capabilities, NNP, seccomp,
 affinity and an owned memory/pids-limited cgroup, then synchronous worker join.
+Two simultaneous unjailed KVM restores of one backing file now also verify
+that a paused guest's entire RAM is unchanged while the other receives checked
+bulk traffic, with unchanged common backing and different mutated guest RAM.
 
 **Full production-jail acceptance is still blocked:** the requested authoritative
 separate common C00 commit has not been supplied. A current untouched-common-jail
 reproduction still fails opening KVM because umask077 leaves root-owned `/dev`
 0700/KVM0600. Only the requested vhost node and narrowly conditional eventfd2
 policy are added here; generic repairs are not duplicated. CPU quota delegation,
-simultaneous independent-restore isolation, arbitrary injected ioctl/allocator failures, UDP/loss,
+fully jailed independent-restore isolation, arbitrary injected ioctl/allocator failures, UDP/loss,
 4/8-VM and external Azure cells, long idle/tail/noise and installed SDK controls
 remain unaccepted. No prototype correctness diagnostic is a performance gate.
 
