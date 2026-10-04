@@ -17,13 +17,14 @@
 
 ## Performance Experiments
 
-All open performance issues have a spec and an active execution plan. These are
-planned experiments, not implemented optimizations or measured improvements.
+All open performance issues have a spec and an active execution plan. These
+documents do not themselves establish implemented optimizations or measured
+improvements; #2 has an executed rejection/blocked qualification below.
 
 | Issue | Spec | Execution plan | Status |
 |-------|------|----------------|--------|
 | [#1](https://github.com/cataggar/hearth/issues/1) | [Asynchronous VirtIO Block I/O](perf-async-block-io.md) | [Plan](../exec-plans/active/perf-async-block-io.md) | Planned |
-| [#2](https://github.com/cataggar/hearth/issues/2) | [vhost-net Evaluation](perf-vhost-net.md) | [Plan](../exec-plans/active/perf-vhost-net.md) | Planned |
+| [#2](https://github.com/cataggar/hearth/issues/2) | [vhost-net Evaluation](perf-vhost-net.md) | [Plan](../exec-plans/active/perf-vhost-net.md) / [Results](../perf-results/vhost-net-20261004.md) | Reject adoption; qualification blocked |
 | [#3](https://github.com/cataggar/hearth/issues/3) | [VirtIO Eventfd Acceleration](perf-virtio-eventfd.md) | [Plan](../exec-plans/active/perf-virtio-eventfd.md) | Planned |
 | [#6](https://github.com/cataggar/hearth/issues/6) | [Zig Native Backend and Linker](perf-zig-native.md) | [Plan](../exec-plans/active/perf-zig-native.md) | Planned |
 

@@ -1,12 +1,34 @@
 # Product Spec: Capability-gated vhost-net Evaluation
 
-**Status**: Planned
+**Status**: Evaluation blocked; reject current vhost adoption, userspace unchanged
 **Last updated**: 2026-10-04
 **Issue**: [#2 — Perf-profile and evaluate a vhost-net backend for Flint](https://github.com/cataggar/hearth/issues/2)
 **Execution plan**: [perf-vhost-net](../exec-plans/active/perf-vhost-net.md)
 
-This is an experiment specification, not an implementation or measured result.
-The userspace backend remains the default.
+This is an experiment specification, not an implemented vhost backend.
+The userspace backend remains the default. The 2026-10-04 evaluation first
+records the current backend in an isolated diagnostic TAP fixture; that fixture
+is not evidence of an existing product consumer. Backend implementation remains
+conditional on S0 relevance and the mandatory lifecycle gates.
+
+## Executed disposition (2026-10-04)
+
+The [execution evidence](../perf-results/vhost-net-20261004.md) records three
+unchanged nested-Azure boots, 120 unsuccessful requested TAP workload runs,
+seven validated active RPC responses, actual system-wide software/KVM profiles,
+and a successful independent native-peer protocol check. No current product
+TAP consumer was demonstrated. Pre-existing unrelated host processes saturated
+nearly all 16 logical CPUs; a quiet-host total-CPU/noise qualification is not
+available. The full active-window and tail observation floors are not met.
+
+Reject/defer adding a vhost backend for the current product. This is **not**
+a measured vhost loss or improvement: A′ and B were not implemented or run.
+Non-root vhost feature probing succeeds after host provisioning, but device
+presence does not prove 12-byte framing, worker quiescence, authoritative used
+cursors, snapshot portability, CoW, confinement or resource isolation. Those
+mandatory contracts remain unproven. The execution plan stays active/blocked
+rather than claiming implementation completion or recommending a performance
+merge. There is no new selector, SDK mode, jail relaxation or runtime change.
 
 ## Objective and applicability
 

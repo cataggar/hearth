@@ -1,14 +1,52 @@
 # Execution Plan: Evaluate Flint vhost-net
 
-**Status**: Planned
+**Status**: Blocked after S0 rejection and unsuccessful S3 qualification
 **Last updated**: 2026-10-04
 **Issue**: [#2](https://github.com/cataggar/hearth/issues/2)
 **Spec**: [Capability-gated vhost-net Evaluation](../../product-specs/perf-vhost-net.md)
 
 Planning is complete when this spec and plan are reviewed and persisted.
-Nothing below has been implemented or benchmarked by this planning task.
+The 2026-10-04 execution uses the unchanged source in the dedicated
+`copilot/perf-vhost-net-20261004` worktree. `benchmarks/vhost-net/` contains an
+isolated diagnostic fixture and a sequence/payload-validating collector, not a
+new SDK mode or a relevant product consumer. Actual results and exclusions are
+recorded separately; recipes below are not themselves execution evidence.
 Experiment completion requires the evidence/checklist at the end, including a
 valid keep/reject outcome. The default remains userspace.
+
+## Execution findings (2026-10-04)
+
+See [actual results and exclusions](../../perf-results/vhost-net-20261004.md).
+S0 found a direct CLI/API capability but no demonstrated current consumer;
+the SDK still uses vsock. The diagnostic fixture is not product demand.
+
+The unchanged safe binary boots a real VirtIO-MMIO/TAP guest on nested Azure.
+Across three boots, all 120 requested network runs fail before completing their
+60 s active windows (106 connection failures, 13 warmup failures, one active
+timeout). Seven active RPC responses validate exact sequence/payload. Host-wide
+`perf stat`, software call-stack recordings/reports and KVM traces were retained
+for RPC, both bulk directions, wakeup attempts and idle. A native host-loopback
+protocol check passes independently. Existing debug/safe unit tests pass
+31/31 each; six focused fixture tests pass (five collector cases and launcher
+cleanup on a post-spawn metadata failure).
+
+The baseline cannot establish deciding CPU/unit noise or credible tails.
+Pre-existing unrelated processes consume nearly all 16 host CPUs despite the
+fleet lock. No such resources were killed or reconfigured. The device appeared
+after parent provisioning: UID 1000 `VHOST_GET_FEATURES` succeeds, but no owner,
+memory table, queue, eventfd or TAP backend was activated. Exact kernel worker
+fences/used-cursor authority and production jail/resource contracts are unproven.
+
+Current disposition: **reject/defer backend adoption for lack of relevance;
+full execution remains blocked**. A′, B, their before/after deltas, vhost
+correctness, UDP, 4/8-VM concurrency, external Azure TAP and installed-image SDK
+controls are not passed. Baseline installed VMM/kernel/rootfs assets are absent;
+forward/transfer CONNECT support is also missing in the unchanged source.
+Frozen gate rules and raw artifacts are referenced by the results document.
+Do not claim a completed implementation or qualified performance comparison
+while the mandatory execution remains missing. A relevant consumer is required
+to reopen backend implementation/adoption, not to accept a negative evaluation;
+the parent coordinator may separately qualify the retained S0 rejection.
 
 ## Source-backed starting point
 
@@ -521,8 +559,9 @@ npx vitest run src/sandbox/sandbox.test.ts \
 Retain prerequisite diagnoses, actual executed/failed/skipped counts, kernel/
 tool versions and logs. Tools/images unavailable are `blocked` prerequisites;
 unavailable optional vhost capability is `unsupported`; data/correctness failure
-is `failed`. Neither is measured success. No such runtime tests are run during
-this documentation-only task.
+is `failed`. Neither is measured success. These recipes were unrun in the
+original planning task; the execution findings above distinguish actual
+baseline/fixture validation from unrun vhost acceptance.
 
 ## Decision, risks and rollback
 
@@ -557,7 +596,7 @@ snapshots through a proven quiesced handoff; do not live-switch active workers.
 
 - [x] Write the product spec first and this issue-linked executable plan.
 - [x] Ground applicability, lifecycle and coverage gaps in existing source.
-- [ ] Identify a real TAP workload or record no-current-consumer rejection.
+- [x] Identify a real TAP workload or record no-current-consumer rejection.
 - [ ] Retain unchanged nested-Azure baseline stat/record/report, KVM availability,
   full manifest/raw samples and frozen numerical/noise gates.
 - [ ] Resolve kernel/header/feature/cursor/jail and dispatcher contracts.
