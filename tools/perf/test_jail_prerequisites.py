@@ -10,6 +10,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import time
@@ -143,6 +144,56 @@ class JailPrerequisites(unittest.TestCase):
                 self.assertEqual(response, {"mem_size_mib": memory, "vcpu_count": 1})
                 replies.append(response)
             blk.save_json(vm.path / "checked-api-replies.json", replies)
+
+    def test_real_api_boots_guest_under_enforced_thread_and_epoll_filters(self):
+        kernel = Path(os.environ.get("FLINT_JAIL_TEST_KERNEL", ROOT / ".ci/guest/bzImage"))
+        self.assertEqual(blk.sha256(kernel), blk.KERNEL_HASH)
+        with JailedApi() as vm:
+            shutil.copyfile(kernel, vm.path / "bzImage")
+            root = vm.path / "initrd-root"
+            root.mkdir(mode=0o700)
+            (root / "bin").mkdir(mode=0o700)
+            (root / "dev").mkdir(mode=0o700)
+            shutil.copyfile("/usr/bin/busybox", root / "bin/busybox")
+            (root / "bin/busybox").chmod(0o700)
+            (root / "bin/sh").symlink_to("busybox")
+            (root / "init").write_text(
+                "#!/bin/sh\nset -eu\n"
+                "[ -c /dev/console ] || /bin/busybox mknod /dev/console c 5 1\n"
+                "exec </dev/console >/dev/console 2>&1\n"
+                "echo JAIL_GUEST_BOOT_OK\n"
+                "while :; do /bin/busybox sleep 1; done\n"
+            )
+            (root / "init").chmod(0o700)
+            entries = [".", *(str(path.relative_to(root)) for path in sorted(root.rglob("*")))]
+            with (vm.path / "cpio.log").open("wb") as errors, \
+                    (vm.path / "initrd.cpio.gz").open("wb") as output:
+                pack = subprocess.Popen(
+                    ["bsdcpio", "-o", "-H", "newc", "--null"], cwd=root,
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors,
+                )
+                compress = None
+                try:
+                    compress = subprocess.Popen(["gzip", "-n"], stdin=pack.stdout, stdout=output)
+                    pack.stdout.close()
+                    pack.communicate(("\0".join(entries) + "\0").encode(), timeout=30)
+                    self.assertEqual(pack.returncode, 0)
+                    self.assertEqual(compress.wait(timeout=30), 0)
+                finally:
+                    for child in (pack, compress):
+                        if child is not None and child.poll() is None:
+                            child.kill()
+                            child.wait(timeout=5)
+            vm.api("PUT", "/boot-source", {
+                "kernel_image_path": "/bzImage", "initrd_path": "/initrd.cpio.gz",
+                "boot_args": "console=ttyS0 reboot=k panic=1 pci=off rdinit=/init",
+            })
+            vm.api("PUT", "/actions", {"action_type": "InstanceStart"})
+            deadline = time.monotonic() + 15
+            while b"JAIL_GUEST_BOOT_OK" not in (vm.path / "stdout.log").read_bytes():
+                self.assertIsNone(vm.process.poll(), "jailed guest process exited")
+                self.assertLess(time.monotonic(), deadline, "jailed guest never reached userspace")
+                time.sleep(0.05)
 
 
 if __name__ == "__main__":

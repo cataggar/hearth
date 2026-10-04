@@ -64,6 +64,19 @@ was frozen from them. Exact evidence is linked in the results.
    Host saturation and protocol liveness still require explicit controls or
    blocked rows; the shared lock does not eliminate unrelated host load.
 
+The minimal prerequisite is committed as `f2f9ab4`. Full-boot traces reveal
+two later denials. The bounded follow-up preserves intended semantics by
+filtering `sched_getaffinity` to PID0 and `epoll_pwait` to a null signal mask;
+it does not permit scheduler mutation or a new completion/wake mechanism.
+Run argument-confinement regression and real jailed boot before declaring
+the repaired synchronous baseline usable.
+Later traces also require nonblocking vsock poll and Zig's ignored
+CLONE_DETACHED bit. The final narrowly filtered compatibility configuration
+passes32 units and7 existing KVM cases per Debug/Safe mode,10 Python tests
+per mode including real enforced guest boot, and two traced jailed disk/agent
+smokes. Details and intermediate failures are in the results. G0/G1 workload
+and noise qualification remain outstanding; no worker was selected.
+
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
 and a measured keep/reject decision. Execution has started in the isolated
 `copilot/perf-async-block-20261004` worktree. Completion of implementation remains

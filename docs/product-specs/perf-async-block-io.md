@@ -19,6 +19,9 @@ complete post-provisioning environment.
 Fresh 16:11 UTC probes after fully verified host preparation confirm non-root
 KVM VM creation and vhost-net access but reproduce both unchanged jail failures.
 Those post-readiness startup diagnostics do not establish a workload baseline.
+The separate repairs below now pass real enforced API/CLI guest capability
+checks; the original L0 failures remain historical evidence, not current
+failures of the repaired configuration or a performance comparison.
 
 ### Authorized correctness prerequisite — 16:18 UTC
 
@@ -36,6 +39,17 @@ Execute focused real-jail ownership/access and enforced-filter HTTP tests.
 Declare the resulting identical repaired synchronous revision as a new
 baseline, not a performance candidate or improvement over failed L0. Then
 repeat G0/G1; no worker selection or correctness-only performance auto-merge.
+
+Full-boot traces after that minimal commit additionally prove Zig 0.17 needs
+self `sched_getaffinity` for API thread startup and `epoll_pwait` with a null
+signal mask for the already-intended epoll wait. A separate compatibility
+follow-up may allow only PID0 affinity reads and null-mask epoll waits, not
+scheduler changes, other-process affinity inspection, or altered signal masks.
+Keep each trace/revision distinct and test the new argument checks.
+The next traced stage proves the existing vsock loop needs nonblocking `poll`
+(timeout0), and Zig's thread flags include `CLONE_DETACHED`0x400000. Linux UAPI
+declares that bit unused/ignored; recognizing it does not permit another
+active clone capability. All namespace/process-escape flags stay denied.
 
 ## Objective and scope
 

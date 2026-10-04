@@ -182,6 +182,8 @@ socket paths were cleaned.
 
 ## Separate correctness prerequisite — authorized at 16:18 UTC
 
+The minimal repair is commit `f2f9ab4c8e7a67097f2c3f52636327e9c41d5084`.
+
 The parent required a minimal separate repair rather than stopping at the
 initial failures. Jail device directories are now explicitly root:root **0755**;
 new device nodes are explicitly configured UID:GID **0600**, through no-follow
@@ -230,6 +232,47 @@ runner diagnostics are under `prerequisite-tests/`. The distinct
 `repaired-sync/` tree contains the repaired binary, fresh full-boot traces and
 `prerequisite-smoke.json`; its input symlinks point only to the preserved
 project-local fixture/tools. All VM/test/build phases held the common lock.
+
+### Separate trace-proven compatibility follow-up
+
+The next capture preserves the `204`/`281` repairs separately, then proves
+API thread creation also emits **CLONE_DETACHED0x400000**, and the existing CLI
+vsock loop emits **poll7 with timeout0**. Linux's actual installed UAPI
+`/usr/include/linux/sched.h` declares CLONE_DETACHED **unused, ignored**.
+Recognizing that bit permits no new active namespace/clone capability.
+
+The follow-up therefore adds argument-filtered **self-only PID0 affinity
+reads**, **null-mask epoll waits** (both pointer halves checked), and
+**nonblocking timeout0 poll**. It recognizes only the ignored clone bit,
+retaining the original active flag restriction. AF_INET/AF_INET6,
+CLONE_NEWUSER/NEWNS, executable mprotect, other-process affinity, nonnull
+signal masks, blocking poll, eventfd and io_uring remain denied by regression.
+No new worker, completion wake mechanism or timer is introduced.
+
+Final follow-up validation:
+
+- **32/32 units each Debug/Safe**, including generated-filter confinement.
+- **7/7 existing KVM integration each Debug/Safe**, actual resumed guest marker.
+- **10/10 Python tests each Debug/Safe**, including three real-jail cases:
+  private-umask ownership/access, six HTTP exchanges, and actual guest userspace
+  after enforced API thread/epoll setup. No skips.
+- **2/2 additional traced real jailed API/CLI disk+agent smokes pass**, with
+  marker hash and guest sync. These still use the declared existing10ms
+  heartbeat and are capability evidence, not async wake/performance acceptance.
+
+An intermediate unit run exposed two stale layout assertions (30/32);
+the assertions were corrected for the new filtered dispatch layout, then the
+complete final suites passed. All failed runs remain retained, not passing.
+
+Final repaired synchronous safe SHA-256:
+`0f7b0d55937df5fa2945ef05aedaea7f046b94795be259469f87e89c16775f93`.
+Distinct stages are `repaired-sync/`, `repaired-sync-compat/` and
+`repaired-sync-usable/`; final raw evidence includes `compat-smoke.json`,
+per-mode traces/launches/exits, and `prerequisite/usable-*.log`.
+Untouched L0 remains unchanged. Prerequisite correctness is now established;
+the fio/package/build fixture, complete G0/G1 workload matrix, post-provisioning
+A/A and total-host noise controls still require execution. No performance
+benefit, frozen gate, prototype selection or promotion is inferred from repair.
 
 ## Executed validation
 
@@ -298,8 +341,8 @@ violate the profile-first experiment. G2–G5 remain unexecuted; the plan stays
 active/blocked. No default promotion, rollback claim, auto-merge or performance
 merge recommendation is made.
 
-Next work: resolve the unchanged jail API/device-permission incompatibilities
-without broadening isolation; reserve/control a host suitable for total CPU
+Next work: use the declared repaired synchronous configuration identically on
+both sides; reserve/control a host suitable for total CPU
 attribution; provision the pinned fio/higher-QD and offline package/build
 fixtures; execute the full synchronous matrix/A/A profiles and freeze gates.
 Only then choose a bounded worker, implement the specified coupled ownership,

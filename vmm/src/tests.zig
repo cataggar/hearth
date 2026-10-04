@@ -312,17 +312,16 @@ test "seccomp: filter starts with arch check and ends with allow" {
     try std.testing.expectEqual(@as(u16, 0x06), filter[filter.len - 1].code); // BPF_RET
     try std.testing.expectEqual(@as(u32, 0x7FFF0000), filter[filter.len - 1].k); // ALLOW
 
-    // Default action sits right after dispatch block (index 4 + N_simple + 3)
-    // Layout: [header:4] [simple:N] [dispatch:3] [default:1] [clone:4] [socket:3] [mprotect:4] [allow:1]
-    const N = filter.len - 20; // simple_syscalls.len
-    try std.testing.expectEqual(@as(u32, 0x80000000), filter[4 + N + 3].k); // KILL_PROCESS
+    // Default action follows the argument-filtered dispatch instructions.
+    const N = filter.len - 35;
+    try std.testing.expectEqual(@as(u32, 0x80000000), filter[4 + N + 6].k);
 }
 
 test "seccomp: log filter uses LOG as default action" {
     const filter = &seccomp_mod.log_filter;
-    const N = filter.len - 20;
+    const N = filter.len - 35;
     // Default action position uses LOG instead of KILL
-    try std.testing.expectEqual(@as(u32, 0x7FFC0000), filter[4 + N + 3].k); // RET_LOG
+    try std.testing.expectEqual(@as(u32, 0x7FFC0000), filter[4 + N + 6].k); // RET_LOG
 }
 
 test "snapshot: header version validation" {
@@ -369,7 +368,7 @@ test "api: isValidBasename rejects path traversal" {
 
 test "seccomp: all required syscalls are whitelisted" {
     const filter = &seccomp_mod.kill_filter;
-    // The filter allows simple_syscalls + 3 argument-filtered syscalls (clone, socket, mprotect).
+    // The filter allows simple_syscalls plus argument-filtered syscalls.
     // Verify key syscalls are present by checking the filter jumps to ALLOW.
     // Each simple syscall is a JEQ instruction that jumps to ALLOW on match.
     var found_fdatasync = false;
@@ -399,7 +398,7 @@ test "seccomp: all required syscalls are whitelisted" {
 
 test "seccomp: Unix API additions retain argument confinement" {
     const Eval = struct {
-        fn run(nr: u32, arg0: u32, arg2: u32) u32 {
+        fn evaluate(nr: u32, arg0: u32, arg2: u32, mask: u64) u32 {
             var accumulator: u32 = 0;
             var pc: usize = 0;
             while (pc < seccomp_mod.kill_filter.len) {
@@ -410,6 +409,8 @@ test "seccomp: Unix API additions retain argument confinement" {
                         4 => 0xC000003E,
                         16 => arg0,
                         32 => arg2,
+                        48 => @truncate(mask),
+                        52 => @truncate(mask >> 32),
                         else => unreachable,
                     },
                     0x54 => accumulator &= insn.k,
@@ -421,6 +422,10 @@ test "seccomp: Unix API additions retain argument confinement" {
             }
             return 0x80000000;
         }
+
+        fn run(nr: u32, arg0: u32, arg2: u32) u32 {
+            return evaluate(nr, arg0, arg2, 0);
+        }
     };
     const allow: u32 = 0x7FFF0000;
     const kill: u32 = 0x80000000;
@@ -430,11 +435,21 @@ test "seccomp: Unix API additions retain argument confinement" {
     try std.testing.expectEqual(kill, Eval.run(41, 2, 0));
     try std.testing.expectEqual(kill, Eval.run(41, 10, 0));
     try std.testing.expectEqual(allow, Eval.run(56, 0x003D0F00, 0));
+    try std.testing.expectEqual(allow, Eval.run(56, 0x007D0F00, 0));
     try std.testing.expectEqual(kill, Eval.run(56, 0x10000000, 0));
+    try std.testing.expectEqual(kill, Eval.run(56, 0x00020000, 0));
     try std.testing.expectEqual(allow, Eval.run(10, 0, 3));
     try std.testing.expectEqual(kill, Eval.run(10, 0, 7));
     try std.testing.expectEqual(kill, Eval.run(290, 0, 0));
     try std.testing.expectEqual(kill, Eval.run(425, 0, 0));
+    try std.testing.expectEqual(allow, Eval.run(204, 0, 0));
+    try std.testing.expectEqual(kill, Eval.run(204, 1, 0));
+    try std.testing.expectEqual(allow, Eval.evaluate(281, 0, 0, 0));
+    try std.testing.expectEqual(kill, Eval.evaluate(281, 0, 0, 1));
+    try std.testing.expectEqual(kill, Eval.evaluate(281, 0, 0, 1 << 32));
+    try std.testing.expectEqual(allow, Eval.run(7, 0, 0));
+    try std.testing.expectEqual(kill, Eval.run(7, 0, 1));
+    try std.testing.expectEqual(kill, Eval.run(7, 0, 0xFFFFFFFF));
 }
 
 test "snapshot: device min size check rejects undersized data" {
