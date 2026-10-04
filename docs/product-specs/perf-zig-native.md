@@ -191,6 +191,12 @@ disk/vsock resources and executes commands and reads preserved guest/disk state.
 Exec exit/output/timeout/signals, files, block write/fsync/read, spawn, PTY
 input/output/resize and repeated pause/resume are checked. This is correctness
 evidence, not latency/tail qualification; TAP/concurrent lifecycle remain absent.
+These CLI guest/profile invocations do **not** supply `--jail`: they establish
+unjailed VMM compatibility only, not jailed/seccomp sandbox acceptance.
+The issue #1 peer separately reports an unchanged jailed baseline exiting on
+the first machine-config request after UID1000/seccomp setup; #6 has not
+independently reproduced or attributed that failure. No filter bypass or
+isolation change is authorized by the unjailed results.
 The baseline agent mishandles JSON-escaped shell quotes: an initial PTY command
 printed `input:"hello"` instead of `input:hello`. Its failing evidence is retained;
 the frozen acceptance command avoids embedded double quotes without changing

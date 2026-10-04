@@ -473,6 +473,10 @@ does not mark the remaining checkboxes complete.
   framing are not accepted: the initial baseline PTY quoted command exposes
   pre-existing JSON-escape behavior; the harness uses a fixed quote-free command,
   not an agent/runtime fix. No-heartbeat and SDK CONNECT gaps remain unqualified.
+  Guest/profile CLI commands omit `--jail`; they are unjailed compatibility
+  evidence, not jailed/seccomp acceptance. Issue #1 reports a separate unchanged
+  jailed baseline failure after UID1000/filter setup; #6 has not independently
+  reproduced or attributed it and has not weakened isolation to obtain results.
 - **W3 incomplete, size rejection established:** same-patch LLVM/LLD Debug/safe
   binaries are 7,638,200/6,827,040 bytes; native/native 22,914,417/21,779,241.
   Native grows **200.00%/219.01%**, failing the frozen 10% output-size gate.
