@@ -132,6 +132,19 @@ The hosted job adds its runner user to `kvm` and starts KVM steps with `sg kvm`,
 so new processes inherit access without running as root or making the device
 world-writable. A one-off device ACL is insufficient on runners that reset it.
 
+Jailed startup needs privileged mount/device bootstrap, then drops to the
+configured UID/GID before VM interaction and installs the kill seccomp filter.
+New jail device directories are root-owned `0755`; device nodes are owned by
+that UID/GID with `0600`, independent of ambient umask. This does not change
+host device permissions or the private artifact umask. From the repository
+root, the KVM-capable CI job also executes these non-root regressions (with
+`sudo -n` available for bootstrap):
+
+```bash
+umask 077
+python3 -m unittest discover -s tools/perf -p test_jail_prerequisites.py -v
+```
+
 ## Environments
 
 Environments are pre-built, snapshotted sandbox configurations. Go from "I have a repo" to "isolated VM with code cloned, deps installed, and Claude Code ready" in one command.

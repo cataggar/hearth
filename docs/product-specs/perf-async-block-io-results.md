@@ -30,8 +30,10 @@ processes and socket paths. Its protocol/cleanup tests are adjacent.
 This is **not** the complete workload runner or an asynchronous backend. No
 worker, io_uring, experimental VMM selector, force-sync flag, new feature,
 notification optimization, snapshot format change, or jail allowance was
-introduced. The vCPU/device/API/snapshot/jail/seccomp and guest-agent runtime
-sources are unchanged from `b07f73b26b8ae876928d9c515b94bba1e9945870`.
+introduced in the original diagnostic commit. Those untouched L0 executions
+use runtime sources from `b07f73b26b8ae876928d9c515b94bba1e9945870`.
+The separately authorized correctness prerequisite below changes only jail
+permissions and trace-proven Unix API syscall compatibility, not a backend.
 
 ## Frozen source and assets
 
@@ -65,7 +67,7 @@ retained as a provisioning input, not a provisioned package/build fixture.
 Filesystem/mount details, tool versions, source diff and full commands are in
 the manifest. Zig caches and scratch are private and project-local.
 
-## Actual blockers and alternative probes
+## Untouched L0 blockers and alternative probes
 
 1. **Enforced-jail API fails before boot.** Jail entry and the kill filter
    succeed. The first `PUT /machine-config` resets its HTTP connection. Private
@@ -177,6 +179,57 @@ The wrapper was executed with `timeout 90s python3
 .perf/blk-io/post-provisioning/recheck.py` inside the common exclusive lock.
 Recorded owned processes exited; only these probes' named device nodes and
 socket paths were cleaned.
+
+## Separate correctness prerequisite — authorized at 16:18 UTC
+
+The parent required a minimal separate repair rather than stopping at the
+initial failures. Jail device directories are now explicitly root:root **0755**;
+new device nodes are explicitly configured UID:GID **0600**, through no-follow
+opened FDs before privilege drop. Artifact umask remains **077**, and host
+device ownership/mode is not changed. No directory or device is world-writable.
+
+The first receive-only repair actually passes the ownership/access regression,
+but a fresh kill-filter trace proves **`sendmsg`46 → SIGSYS** when emitting the
+first HTTP204 response. Only demonstrated Unix stream **recvmsg47/sendmsg46**
+are added; AF_UNIX socket, clone and mprotect filters remain intact. A new
+generated-filter regression checks those argument restrictions and keeps
+eventfd/io_uring denied. Real HTTP tests check the dropped UID/GID, NoNewPrivs1,
+Seccomp2, installed non-audit filter, and six successful PUT/GET transactions.
+These tests are added to the KVM CI job.
+
+Executed validation of this repaired configuration:
+
+| Coverage | Actual result |
+|---|---|
+| Debug/Safe VMM units | **32/32 each**, including confinement regression |
+| Debug/Safe existing real KVM integration | **7/7 each**, actual guest restore |
+| Debug/Safe Python framing + real jail/API regressions | **9/9 each**, no skips |
+
+The initial new fixture exceeded AF_UNIX's path limit; its failed runner
+execution is retained, then the project-local evidence names were shortened.
+It is not represented as a kernel/filter failure or a passing test. The
+receive-only stage is likewise a diagnostic failure, not final acceptance.
+
+Repaired safe binary SHA-256:
+`a134ea4b95b0002444c13fac3cee4507c0a5b1d9be3fdfac77108cfc0daeb8a0`.
+Untouched L0 `05e8308c…` and all old inputs/logs remain preserved, not overwritten.
+No performance benefit is attributed to the prerequisite.
+
+Fresh traced API/CLI **full guest** smokes advance beyond KVM/device/kernel setup
+but reveal additional compatibility denials: API `sched_getaffinity` **204**
+while starting its run-loop thread, CLI `epoll_pwait` **281** after its first
+actual KVM exit. Both are killed by the unchanged remaining filter. Real
+configuration HTTP acceptance is therefore not full guest/performance
+acceptance. This minimal prerequisite is complete, but the repaired synchronous
+workload baseline is **not yet qualified**; no numeric gates or worker exist.
+
+Artifacts: `prerequisite/` contains exact builds/tests, stage binaries and
+retained wrapper; `jail-tests/` contains real process status, permission/access
+evidence, six checked responses and the sendmsg denial trace. Earlier long-path
+runner diagnostics are under `prerequisite-tests/`. The distinct
+`repaired-sync/` tree contains the repaired binary, fresh full-boot traces and
+`prerequisite-smoke.json`; its input symlinks point only to the preserved
+project-local fixture/tools. All VM/test/build phases held the common lock.
 
 ## Executed validation
 

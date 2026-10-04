@@ -256,6 +256,13 @@ jobs:
               raise SystemExit(f"Incomplete integration coverage: {passed}/{total} passed; expected at least {expected}")
           print(f"Verified {passed} integration tests executed with KVM and the pinned kernel")
           PY
+      - name: Verify private-umask jail ownership and enforced API traffic
+        run: |
+          set -euo pipefail
+          umask 077
+          timeout --kill-after=10s 2m \
+            python3 -m unittest discover -s tools/perf -p test_jail_prerequisites.py -v \
+            2>&1 | tee .ci-logs/jail-prerequisites.log
       - name: Trace failed KVM device access
         if: failure()
         working-directory: vmm

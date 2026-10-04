@@ -101,6 +101,8 @@ const simple_syscalls = [_]u32{
     42, // connect (vsock UDS)
     44, // sendto
     45, // recvfrom
+    46, // sendmsg (Zig Unix API stream writer)
+    47, // recvmsg (Zig Unix API stream reader)
     49, // bind
     50, // listen
     288, // accept4
