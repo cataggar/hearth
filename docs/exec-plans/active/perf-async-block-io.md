@@ -1,12 +1,47 @@
 # Execution Plan: Profile and Evaluate Async VirtIO Block I/O
 
-**Status**: Blocked — corrected synchronous G0 rechecks fail; G1 qualification unavailable, backend not selected
+**Status**: Default-disabled worker implemented; fresh qualification resumed after owner-approved host cleanup; no default/merge eligibility
 **Last updated**: 2026-10-04
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
 **Actual results**: [baseline capability execution](../../product-specs/perf-async-block-io-results.md)
 
 ## Execution checkpoint — 2026-10-04
+
+### Fresh qualification continuation — 22:13 UTC
+
+The user authorized the parent to stop only fifteen revalidated old orphan
+busy-loop shells. This agent signaled none of those processes. Historical
+15.9–16 busy-core controls and earlier diagnostic comparisons must not be used
+as current qualification evidence. The parent queued a post-cleanup idle
+control; this worktree will independently retain fresh controls under the
+common fleet lock before baseline/A/A and candidate measurements.
+
+Preserve all original and noisy epochs. Recheck actual storage capacity after
+the observed ENOSPC; reuse only owned verified inputs, clean only named owned
+rebuildable/redundant artifacts, and verify new helpers/VM children are gone.
+Use canonical prerequisite-only `7dfee42` for the repaired synchronous baseline,
+unchanged static compiler/dependencies/kernel/agent and legacy notifications.
+Freeze fresh workload-specific `B`, `N` and absolute gates before new candidate
+results. Prior prototype observations cannot supply these values. Rerun
+timer-free/restore capabilities honestly; remaining mandatory failures are
+still blockers even if host CPU is quiet. No default or merge follows cleanup.
+
+Fresh canonical read-QD8 and flush profiles now complete with error0/all three
+owned TIDs/zero sample loss; exact full-window values and limitations are in
+the results. One bounded locked ten-pair unprofiled flush A/A series is running.
+Do not use profiled points as numeric`B/N` or divide warmup-inclusive CPU by
+measured-only fio operations.
+
+The canonical jail-only baseline lacks the pending-PIO migration repair in
+the current worker build. Before a new worker comparison, separately profile
+and A/A-freeze the **current identical ELF forced-sync** baseline (A′).
+Reuse the same exact canonical fixture bytes. Compare A′/worker using that
+one current ELF with alternating paired order, verifying the actual effective
+backend and all three/four owned TIDs; fallback is not a worker sample.
+Original canonical A remains an external calibration, not an opportunity to
+attribute coupled run-loop/snapshot corrections to async I/O. Neither partial
+flush qualification nor favorable points waive missing mandatory cells.
 
 The project-local integration kernel option and capability/diagnostic tooling
 are implemented and executed. Debug/safe unit suites each execute 31 tests;

@@ -12,6 +12,95 @@
 
 **Plan:** [active execution plan](../exec-plans/active/perf-async-block-io.md)
 
+## Fresh epoch after owner-approved orphan cleanup
+
+At22:13 the user authorized the parent to stop fifteen specifically revalidated
+old orphan busy-loop shells. This agent signaled none of them. Earlier saturated
+controls and exploratory worker points remain historical; they do not describe
+the current host or provide fresh gates.
+
+An independently executed new locked five-second no-owned-VM control measures
+**8.2busyCPU-s/5.000076232s =1.639975 busy cores**, with0.01iowaitCPU-s and
+zero steal. That is reduced load, not proof of a reserved quiet host. Fresh
+sysfs records CPU8siblings`8-9` and clientCPU1siblings`0-1`; this epoch uses
+those actual disjoint placements, not earlier asserted topology.
+
+Three fresh canonical `7dfee42` Safe enforced API/CLI/API boots immediately
+execute successfully (response1.067358/0.729085/1.072184ms respectively).
+All three requests after five seconds idle still **time out at two seconds**.
+These are actual new legacy readiness failures, not recycled saturation or
+the repaired recvmsg/node problem. All recorded owned VMMs are gone and their
+private device nodes removed; no host helper busy-loop was created.
+
+Storage before that phase has22,421,225,472free bytes. The earlier actual
+ENOSPC and narrowly named owned-intermediate cleanup remain distinct.
+Private new recipe/raw control/rosters/cleanup:
+`.perf/blk-io/quiet-1/{fresh-control.py,executed-control.log,control-before.json,fresh-summary.json}`.
+Fresh repaired-sync full-window profiles/A-A are being executed before any new
+candidate observations; numeric`B/N` remain unfrozen, and no gain/default/merge
+is inferred. Mandatory control/lifecycle/matrix/total-cost requirements remain.
+
+### Fresh full-window baseline profiles
+
+Canonical prerequisite-only source`7dfee42`/Safe ELF
+`6b6dad24ca2c6f17d372b0c35934f1ea44aee7ee27154c2c18cf977d305bee85`
+uses the unchanged kernel, agent, fio3.40/libaio closure, fully written1GiB,
+8GiB ext4 image,512MiB, legacy MMIO/IRQ and one vCPU. Constant`/job.fio`
+is placed in the initrd; all dataset/output I/O is VirtIO-backed. The first
+offline debugfs job insertion is retained as a failed zero-I/O recipe
+(guest job unavailable after filesystem recovery), not accepted as a profile.
+Neither new accepted run needs a host reply or heartbeat to complete fio.
+
+Both accepted runs use10s ramp/60s measured fio plus process-scoped80s stat
+and199Hz/8192-byte DWARF record. All three actual listed owned VMM TIDs,
+including the kernel-created VM task, are attached. Scoped root collectors
+and decoders retain exact argv/cache/scratch and raw reports.
+
+| One **profiled** baseline point | 4KiB random read, libaio QD8 | 4KiB write + fdatasync, sync QD1 |
+|---|---:|---:|
+| fio error | 0 | 0 |
+| Measured writes/reads | 962,715 | 302,560 |
+| IOPS | 16,044.982584 | 5,042.498583 |
+| Bytes/s | 65,720,794 | 20,654,074 |
+| Guest fio write/read p50/p95/p99 (ns) | 456,704 /708,608 /815,104 | 60,160 /89,600 /115,200 |
+| Guest fsync p50/p95/p99 (ns) | n/a | 124,416 /173,056 /234,496 |
+| Owned task-clock,80s collector (s) | 70.223265763 | 51.030919961 |
+| Context switches | 519 | 352,738 |
+| KVM entries/exits | 8,092,933 each | 5,119,868 each |
+| Host pread /pwrite /fdatasync calls | 1,128,086 /24 /4 | 1 /352,177 /352,138 |
+| Raw CPU-clock samples /lost | 13,974 /0 | 10,081 /0 |
+
+Actual QD8 accounting is100% at8. Fio's sync+fdatasync JSON reports roughly
+200% in its depth1 field and`sync.total_ios=0`, while its fsync latency
+distribution has302,559 observations and the owned host tracepoints count
+352,138fdatasync calls over the longer warmup-inclusive window. These fields
+are preserved, not normalized into invented probabilities or zero-flush claims.
+The synchronous engine serializes writes and explicit flushes; write and fsync
+quantiles are separate and cannot be summed into a joint request quantile.
+
+Flush stacks show inclusive fdatasync6.88% and pwrite2.01%; read stacks show
+pread about2.03%, with substantial KVM ioctl/exit work. The active flush owner
+records51.230724976runtime seconds,27.188598ms runqueue wait and352,347slices
+over the72.417786496s observation/drain window; the other two owned tasks
+record zero runtime there. This is meaningful blocking-work characterization,
+not an isolated syscall wall-duration/off-CPU attribution or a promised gain.
+Deferred kernel writeback CPU is still not fully attributable.
+
+**n=1 per profiled case, no variance or candidate comparison.** Stat includes
+warmup while fio operations exclude it: do not divide the table's task-clock
+by measured fio operations or claim aligned total CPU/completion. Profiler
+overhead and host-cache effects are not removed. Guest direct I/O does not
+bypass the buffered host backing FD.
+
+Raw recipes/manifests/JSON/stat/stacks/control/rosters/cleanup:
+`.perf/blk-io/quiet-1/e2/{randread-qd8,flush}/profile-1/`.
+Both accepted profile VMs/collectors are gone. A separate single bounded locked
+series of ten **unprofiled** paired fresh flush A/A runs is queued; its
+registration defines`B=mean(all20)` and the95% paired relative noise bound
+before results. Numeric gates are not yet frozen. Successful redundant A/A
+disk copies alone are deleted after exact-name/output-hash inventories;
+canonical inputs, all outputs and failed/profile inputs remain.
+
 ## What was implemented
 
 The original diagnostic integration suite accepts `-Dintegration-kernel=<path>` relative to

@@ -249,6 +249,14 @@ join before vCPU/guest-memory teardown on every normal/error/restore path.
 
 ## Measurement and decision contract
 
+**Fresh epoch, 22:13 UTC:** the user approved parent-only cleanup of fifteen
+specifically revalidated old orphan busy-loop shells. Old saturated controls
+remain historical, not current qualification data. Fresh locked host controls,
+repaired-sync capabilities/profiles and A/A must establish new numeric gates
+before any new candidate comparison. Actual ENOSPC also requires a capacity
+recheck. Defaults/merge eligibility do not change from host cleanup alone;
+mandatory liveness, lifecycle, workload and attribution requirements remain.
+
 Run host-side `perf stat`, `perf record` with call stacks and `perf report` on
 the baseline **before selecting a prototype**, and repeat on each candidate.
 Attribute syscall durations, I/O service/queue time, scheduler off-CPU wait and
