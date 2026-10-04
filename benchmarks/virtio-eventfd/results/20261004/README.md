@@ -23,7 +23,14 @@ eight reported cores with SMT2. Runs use one vCPU, 512 MiB guest RAM, UID/GID
 1000, unchanged synchronous block/userspace backends and guest features.
 All builds/tests/VMs/profiles/fixture preparation hold the fleet's exclusive
 `/d/hearth/.perf/fleet/host.lock`, use bounded commands and `umask 077`.
-No global device, driver, cache, NIC or security settings are changed.
+This workstream made no global device, driver, cache, NIC or security changes.
+All measurements in this report **precede the parent's final common host
+provisioning reported at 16:25 UTC**, including vhost module/device access
+provisioning. They remain partial W0 diagnostics, not a frozen fully controlled
+comparison. Future L0/C00/2×2 measurements must start after provisioning and
+actual nonroot capability verification, retain fresh tool/library/device-state
+metadata, and freeze gates before candidates. The immutable L0 binary/fixture
+identity is preserved; no pre-provisioning timing is promoted into a gate.
 The fleet lock serializes participating experiments, **not unrelated host
 workloads**. “True idle” below means a no-traffic VM, not a fully idle host.
 Whole-host `/proc/stat`/steal-time control snapshots were not collected in this
