@@ -8,6 +8,106 @@
 
 **Plan**: [Native Zig experiment](../exec-plans/active/perf-zig-native.md)
 
+## Post-orphan-cleanup restart
+
+The parent subsequently stopped only user-approved, revalidated pre-fleet orphan
+busy-loop shells. Old host-saturation and timing observations are historical;
+cleanup is not itself a quiet-window result or performance qualification.
+Resume with canonical `ced7ed7` supplementary-group clearing and `e1d3be0`
+collector confinement, identical across reference/candidate arms. The guest
+verifier must reject inherited supplementary groups. Renew identities,
+correctness and unchanged A/A before considering gains; retain the numerical
+gates unchanged and do not pool old/new samples.
+
+Fresh measurements must freeze current CPU sibling topology rather than old
+numbering assumptions, monitor whole-host controls and artifact capacity, and
+track/reap only owned fixture/helper children. No runtime prototype from peers
+or source-default change is authorized by removing unrelated contention.
+
+The restart copies `jail.zig`/the deterministic inherited-Group0 regression
+exactly from `ced7ed7`, and the collector plus nine focused tests exactly from
+`e1d3be0`. Fresh explicit LLVM/LLD and native/native Debug/safe cells execute
+**32 unit + all 7 KVM** tests and **3 common-jail regressions each**, without
+skips/cached execution. Unset Debug/safe also execute 32+7 after the build-only
+unit step is added. All inspected owned VMM task credentials report empty
+Groups, UID/GID1000, CapEff0, NoNewPrivs1 and Seccomp2; the verifier rejects
+Group0 even if other isolation fields are correct.
+
+The first fresh locked five-second no-VM control observes **1.9279 busy cores
+of16 (12.05%)**, no steal and 0.02 seconds iowait. It is not a demonstrated quiet
+window. Current topology is CPU pairs0-1,2-3,…14-15; CPU8/client1 do not share
+SMT, contrary to an older numbering assumption. The owned `kvm-nx-lpage-re`
+descriptor is observed with the VMM's Tgid and Kthread0, not inferred to be an
+untracked process or necessarily userspace execution. Asynchronous disk/network
+kernel CPU remains separately unquantified.
+
+Fresh binary sizes still reject adoption: Debug LLVM7,670,088/native24,155,761
+(+214.93%); safe LLVM6,855,240/native24,110,761 (+251.71%). These are correctness-build artifacts,
+not ten-pair speed measurements. Own focused recording/guard/archive tests now
+pass19/19; the common protocol/cache suite passes9/9. Invalid unittest discovery
+(zero tests) and an incorrect non-root perf prefix are retained as harness
+failures, not compiler/counter unsupported outcomes.
+
+### Fresh measurement milestones and exclusions
+
+Debug unchanged A/A completes ten counterbalanced pairs (20 observations per
+condition), including genuinely artifact-cold configurer/translation/helper
+work with only immutable package sources prefetched:
+
+| Condition | Median | Mean | SD | CV |
+|-----------|-------:|-----:|---:|---:|
+| Cold | 114.0748s | 114.7441s | 2.9390s | 2.5613% |
+| Warm no-op | 26.2708ms | 28.3056ms | 7.6866ms | 27.1557% |
+| Codegen-affecting rebuild | 0.982117s | 0.981596s | 0.035112s | 3.5770% |
+
+Paired B/A wall-delta median/SD are respectively−0.0875%/3.2260%,
+−2.1182%/17.3696%, and−1.6403%/4.7131%. These are unchanged-reference noise
+controls, **not** native speedups or prospectively relaxed gates. The first
+cold126.228s observation remains included. Genuine ENOSPC halted after five
+pairs; remaining five use exact-manifest, complete-pair/cache-SHA/source-identity
+verified resume. Both recorder epochs and the interruption are retained, with
+no automatic pooling qualification. Warm20ms RSS sampling sometimes misses the
+entire short command; zeros do not establish its peak memory. The exact cloned
+512→513MiB source patch changes emitted `.text`, unlike touch/comment edits;
+original/clone source restoration is checked.
+
+Actual inherited root software/KVM stat captures now flush after signalling
+only the owned Flint process and waiting for perf. Earlier v3 guest-correct
+rows with empty stat CSVs are explicitly excluded from counter coverage.
+Unprofiled latency and49Hz/4KiB DWARF record/report are separate manifests;
+successful nonempty files/report exit alone does not demonstrate all-task or
+symbol coverage. Short restore-only windows contain one sample/no identifiable
+Flint entry. A practical separate augmentation (new-process restore followed
+by1000 verified guest executions) obtains identifiable Flint stacks in all
+four Debug/safe×LLVM/native cells:26/25/19/28 samples, zero reported lost
+samples. This longer interval is **not** isolated restore cost or repeated
+profile-overhead confidence.
+
+The installed perf prints task-clock with a blank unit field. A retained
+250ms-process-CPU control reports raw270,332,649 against0.250004s process CPU;
+the human report independently records270,835,528 and0.271635s user+system.
+This verifies nanosecond scaling for this installation before normalization.
+Host/guest hardware PMU remains unavailable; these are genuine software/KVM
+counters, not invented cycles/instructions or agent-exclusive CPU.
+
+Fresh GNU/native-CPU safe LLVM/native each execute32+7, but common enforced-jail
+tests remain2/3 because guest boot exits SIGSYS; fresh GNU native binary is
+15,260,974B, LLVM6,001,096B. Debug no-heartbeat controls initially connect6/6,
+then all6/6 post-five-second execs time out within the two-second deadline.
+They are baseline failures, not successful production idle or latency samples.
+Full runtime minima and safe/explicit build comparisons remain underway; TAP,
+SDK CONNECT, independent agent performance/native AArch64 and complete
+asynchronous kernel CPU remain unqualified.
+
+Private post-cleanup records use `evidence/postcleanup-*`; measurements,
+correctness, codegen proof and exact-owned snapshot/cache archival manifests
+are indexed under `evidence/postcleanup-summary/`. Snapshot compression verifies
+all original bytes before deleting only owned redundant originals. Completed
+own support/cache directories may likewise be byte/link-verified into private
+archives outside measured regions; active measurement caches, canonical
+fixtures and other tasks' resources are excluded. Shared storage failure and
+4GiB build/3GiB runtime guards are not silently weakened.
+
 This is an experiment specification, not a benchmark result
 or decision to change defaults. The compiler migration in
 [#5](https://github.com/cataggar/hearth/pull/5) is complete.
@@ -135,14 +235,41 @@ packages. Integration runs retain their unconditional side effects.
 The agent's `test-build` step compiles the POSIX test artifact without executing
 it, allowing artifact-consistent AArch64 support discovery on an x86_64 host.
 It does not satisfy matching-native-hardware execution or runtime acceptance.
+The VMM's `test-build` similarly compiles unit tests; combine it with
+`integration-test-build` for build-only accounting, never the executing test
+steps.
 `-Dperf-test-kernel=.perf-zig-native/bzImage` selects a kernel relative to
 `vmm/`; absolute paths and `..` components are rejected. The build resolves
 the override before integration fixtures change the child's working directory.
 Without the override the historical integration-kernel default is retained.
 Installed binary paths and install layout are unchanged.
 
-The initial runner implements `run` and `summarize`, not the full proposed
-W3/W4 build/runtime interfaces. It uses exact argument arrays, private
+The runner implements `run`, `batch`, `summarize`, manifest-driven `build` and
+diagnostic `runtime`; full W4 qualification remains pending. `build` counterbalances
+ten-or-more paired repetitions, begins each cell with empty local/global
+artifact caches and shared prefetched immutable package sources, then measures
+warm no-op and an exact source-fragment replacement. It restores each clone
+even on build failure, never patches the actual worktree, forbids executing
+test steps, retains per-condition binaries/ELF reports and records whole-host
+CPU controls separately from attributable command CPU. Its cache-warm patched
+rebuild launches a fresh compiler process, not an asserted experimental
+in-process incremental compiler mode. Completed caches can be retained in
+hash-verified gzip tar archives, including symlink/hardlink identity, outside
+timed regions; no source inputs or another task's artifacts are removed.
+
+`runtime` counterbalances fresh jailed boots/new-process restores, numbered
+PTY ACK sessions, exec, block write/fsync/read, guest-initiated vsock ping,
+no-client-traffic idle and1/2/4/8 concurrency. It verifies restored bytes and
+actual guest execution, every inspected task's credentials, operation content
+and teardown. Unprofiled and inherited private `perf stat`/49Hz4KiB DWARF
+record/report runs are separate immutable manifests. Whole-host `/proc/stat`
+controls are not attributed workload CPU; empirical p99 is not asserted
+independent-tail confidence. Snapshot/disk archives are byte-verified outside
+timed regions. Supported TAP/network, complete asynchronous kernel CPU, guest
+agent-exclusive CPU and noise/tail qualification remain separate gates, not
+implied by the diagnostic command's exit status.
+
+Both interfaces use exact argument arrays, private
 worktree-relative caches/logs and the fleet lock, and refuses to overwrite
 evidence. `wait4` accounts for the command and its reaped descendants; sampled
 live-tree RSS is not `/usr/bin/time` maximum RSS or cgroup `memory.peak`.
@@ -281,7 +408,8 @@ reports supplementary **Groups0** despite UID/GID1000 and CapEff0. A subsequent
 peer-reported common correction,
 `ced7ed72b5b2f80286e37ba8c9d5eada0cb90236`, checks `setgroups(0, NULL)` before
 the UID/GID drop. It was published after this phase and has **not** been
-integrated or executed by #6. The existing counts establish that older
+integrated or executed by #6 **at that phase**; see the separately retained
+post-cleanup restart above. The existing counts establish that older
 configuration's protocol/snapshot compatibility, not cleared-group production
 isolation. Parent integration must reuse the canonical correction on both arms
 and renew identity/correctness evidence; no silent baseline substitution is made.

@@ -15,6 +15,62 @@ results are not pooled with untouched-runtime results or credited as speedups.
 No production-default change or adoption is claimed. The merged #5 compiler
 migration is a prerequisite already completed, not work to repeat.
 
+### Post-orphan-cleanup restart
+
+The parent stopped only the explicitly approved/revalidated old orphan
+busy-loop shells. Previous saturation/noisy samples are not current controls.
+Resume canonical `ced7ed7` group clearing and `e1d3be0` collector confinement
+first, then refresh source/toolchain/target/topology identities, forced native
+correctness and unchanged A/A. A fresh quiet window must be demonstrated, not
+assumed. Keep the frozen gates, original artifacts and measurement boundaries;
+monitor/reap only owned children and current storage before bounded phases.
+
+Canonical ced/e1 selected files now match byte-for-byte. Explicit CI
+LLVM/LLD/native/native Debug/safe refreshed cells pass forced32+7 and common3
+per cell; unset defaults pass32+7. Own recorder/guard/archive suite passes19,
+common protocol/cache suite9. Initial fresh locked host control is12.05% busy
+(1.9279/16cores), not assumed quiet. Fresh size artifacts still fail the
+unchanged10% gate. Old noisy/Group0 counts remain a separate epoch.
+
+Manifest-driven paired `build` is implemented: dependency-source-only seeds,
+independent cold caches, warm no-op and exact source-fragment rebuild, pristine
+restoration on failure, fixed affinity/parallelism, raw artifacts and verified
+archive retention. New `runtime` records actual jailed boots/restores,
+numbered PTY ACKs, exec/disk/vsock, idle and1/2/4/8 concurrency, plus inherited
+private stat/stack collectors; coverage pilots and full sample execution remain
+in progress. Neither tool's completion implies adoption or complete
+asynchronous kernel CPU accounting.
+
+Fresh Debug unchanged A/A now completes ten paired repetitions of all three
+conditions: cold median114.0748s/CV2.5613%, warm26.2708ms/CV27.1557%,
+codegen-changing rebuild0.982117s/CV3.5770% (20 observations each). The
+512→513MiB cloned-source patch changes emitted `.text`; pristine source is
+restored. Warm live-tree RSS sampling sometimes observes no process and cannot
+qualify peak memory. A real ENOSPC interruption after five pairs is preserved;
+verified same-manifest resume contributes the remaining five, not an automatic
+noise/acceptance decision. Safe A/A and explicit comparisons remain underway.
+
+Corrected inherited stat captures contain real software/KVM counters. Initial
+v3 group termination prevented stat flushing: empty captures are **not** valid
+coverage despite successful guest commands. v4 signals the owned Flint process,
+then waits for the collector to flush. Short restore-only49Hz windows have one
+sample and no identifiable Flint entry; successful report generation is not
+complete stack coverage. A separately retained new-process-restore plus1000
+verified guest-exec augmentation produces identifiable Flint stacks in all four
+cells,19–28 samples and zero reported loss. It is not isolated restore cost or
+repeated profiler-overhead confidence. A paired250ms-process-CPU calibration
+establishes this installed perf's blank-unit task-clock values are raw
+nanoseconds (270,332,649 against0.250004s guest-free process CPU); no milliseconds
+normalization is guessed.
+
+Both fresh GNU/native-CPU safe backends again execute32+7, but enforced-jail
+guest boot fails SIGSYS and each common suite passes2/3. Fresh Debug
+no-heartbeat trials initially connect6/6, then all6/6 time out on post-five-second
+exec within the fixed two-second host deadline. These baseline gaps are not
+production idle/performance passes. Only completed own snapshots/caches are
+compacted after exact-byte/link verification; the shared storage incident and
+capacity guards remain documented, with no other task's resources removed.
+
 ## Evidence and fixed scope
 
 The spec records inspected definitions at Hearth
@@ -240,8 +296,8 @@ artifacts/decision are recorded; do not mark implementation complete now.
 
 The artifact options, forced tests, project-relative kernel override and
 `run`/`batch`/`summarize`/`probe` recorder are implemented. Exact executed argv,
-status and identities are in private evidence. The `build`/`runtime` subcommands
-below remain **unimplemented design examples**, not executed commands. All
+status and identities are in private evidence. The `build`/`runtime` subcommands are implemented diagnostic interfaces;
+complete qualification is not implied by executing them. All
 operations must use `umask 077` and the exclusive fleet lock; direct identity,
 prefetch, build and perf examples also require that lock.
 
@@ -296,9 +352,9 @@ or `native/lld`; every cell has its own `CACHE`.
 No custom install prefix is used in these integration commands. A standalone
 `zig build` command with the same target/options is the measured executable
 build; test compilation/execution are distinct observations. The implemented recorder enforces timeout, exit-code failure and persistent logs.
-It does not enforce test counts/skips or implement the full build experiment;
-the executed correctness logs were explicitly checked for 31 + 7 passes and
-absence of skips/cached runs.
+It does not itself enforce test counts/skips; correctness logs are explicitly
+checked for the relevant epoch's31 or32 +7 passes and absence of skips/cached
+runs. The paired build interface times only compile steps.
 
 ### Separate agent safe probes
 
@@ -316,24 +372,20 @@ matching native host; x86_64 cross-building AArch64 is build-only evidence.
 
 ### Runner and host perf capture
 
-Unimplemented full-measurement runner contract; do not execute or claim it:
+Implemented manifest-driven interfaces (counts, conditions and variant order
+come from the frozen manifest, not additional CLI switches):
 
 ```bash
 python3 scripts/perf-zig-native.py build \
-  --manifest "$OUT/manifest.json" --repeats 10 \
-  --conditions cold,warm,incremental --output "$OUT/build"
+  --manifest "$OUT/build-manifest.json" --output "$OUT/build"
 python3 scripts/perf-zig-native.py runtime \
-  --manifest "$OUT/manifest.json" --variant llvm-lld \
-  --cases boot,snapshot,restore,exec,pty,files,block,vsock,network,concurrency,idle \
-  --output "$OUT/runtime/llvm-lld"
-python3 scripts/perf-zig-native.py runtime \
-  --manifest "$OUT/manifest.json" --variant native-native \
-  --cases boot,snapshot,restore,exec,pty,files,block,vsock,network,concurrency,idle \
-  --output "$OUT/runtime/native-native"
+  --manifest "$OUT/runtime-manifest.json" --output "$OUT/runtime"
 ```
 
-The manifest supplies spec sample counts, repetitions, warmups and seed/order;
-blocked cases are surfaced, not silently omitted. Extend beyond the old
+The manifest supplies sample counts, repetitions and counterbalanced order.
+Runtime supports boot/restore, exec, PTY, disk, vsock, concurrency and idle;
+unsupported TAP/network requires a separate explicit diagnostic recipe rather
+than an invented successful row. Extend beyond the old
 `migration-smoke.py` recipe: it lacks timed restore, concurrency/idle/PTY tails
 and full process coverage.
 
@@ -547,7 +599,9 @@ does not mark the remaining checkboxes complete.
 - Those retained controls still use `5ee81b1` and report supplementary Groups0.
   The later peer-reported canonical correction
   `ced7ed72b5b2f80286e37ba8c9d5eada0cb90236` clears groups before the UID/GID
-  drop; #6 has not integrated or executed it. Parent integration must apply
+  drop; #6 had not integrated or executed it in that historical phase. The
+  separately retained post-cleanup restart above refreshes this prerequisite.
+  Parent integration must apply
   the same canonical correction to both arms and refresh identities/tests.
   Old counts remain protocol/snapshot evidence, not cleared-group production
   isolation; collector confinement `e1d3be0` is also not retroactive acceptance.

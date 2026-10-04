@@ -6,6 +6,7 @@ import base64
 from contextlib import suppress
 import hashlib
 import http.client
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -96,9 +97,10 @@ def execute(connection, command, expected_code=0, timeout=5):
 
 
 class Vm:
-    def __init__(self, binary, folder, kernel, initrd, disk, cpu, restore=False, jailed=False):
+    def __init__(self, binary, folder, kernel, initrd, disk, cpu, restore=False, jailed=False, collector=None):
         self.folder = folder
         self.jailed = jailed
+        self.collector = collector
         self.process = None
         self.control = None
         self.log = None
@@ -133,6 +135,15 @@ class Vm:
                 argv += ["--restore", "--vmstate-path", "state.snap", "--mem-path", "memory.snap",
                          "--disk", "disk.ext4", "--vsock-cid", "100",
                          "--vsock-uds", "/v" if jailed else str(self.vsock_path)]
+            if collector:
+                if not jailed:
+                    raise ValueError("privileged collector requires the enforced non-root jail")
+                specification = importlib.util.spec_from_file_location(
+                    "native_perf_prerequisite", ROOT / "tools/perf/blk-io.py",
+                )
+                support = importlib.util.module_from_spec(specification)
+                specification.loader.exec_module(support)
+                argv = support.privileged_perf([*collector, "--", *argv[3:]])
             self.started = time.perf_counter()
             self.process = subprocess.Popen(
                 argv, cwd=self.workdir, stdout=self.log, stderr=self.log, start_new_session=jailed,
@@ -195,6 +206,7 @@ class Vm:
                 }}
                 if (list(map(int, values["Uid"].split())) != [os.getuid()] * 4
                         or list(map(int, values["Gid"].split())) != [os.getgid()] * 4
+                        or values["Groups"].split()
                         or int(values["CapEff"].strip(), 16) != 0
                         or values["NoNewPrivs"].strip() != "1"
                         or values["Seccomp"].strip() != "2"):
@@ -202,6 +214,24 @@ class Vm:
                 self.jail_status["task_ids"] = sorted(
                     int(task.name) for task in (entry / "task").iterdir()
                 )
+                self.jail_status["task_status"] = []
+                for tid in self.jail_status["task_ids"]:
+                    task = dict(line.split(":", 1) for line in
+                                (entry / "task" / str(tid) / "status").read_text().splitlines()
+                                if ":" in line)
+                    self.jail_status["task_status"].append({
+                        key: task.get(key, "").strip() for key in
+                        ("Name", "Tgid", "Pid", "PPid", "Kthread", "Uid", "Gid",
+                         "Groups", "CapEff", "NoNewPrivs", "Seccomp")
+                    })
+                    if task.get("Kthread", "").strip() == "0" and (
+                            list(map(int, task["Uid"].split())) != [os.getuid()] * 4
+                            or list(map(int, task["Gid"].split())) != [os.getgid()] * 4
+                            or task["Groups"].split()
+                            or int(task["CapEff"].strip(), 16) != 0
+                            or task["NoNewPrivs"].strip() != "1"
+                            or task["Seccomp"].strip() != "2"):
+                        raise RuntimeError("owned VMM userspace thread has incorrect jail credentials")
                 return
             except (OSError, ValueError, IndexError):
                 continue
@@ -209,8 +239,10 @@ class Vm:
 
     def signal(self, value):
         if self.jailed:
+            target = (self.jail_status["pid"] if self.collector and hasattr(self, "jail_status")
+                      else -self.process.pid)
             subprocess.run(["sudo", "-n", "kill", f"-{value}", "--",
-                            str(-self.process.pid)], check=True, timeout=5)
+                            str(target)], check=True, timeout=5)
         else:
             self.process.send_signal(getattr(signal, f"SIG{value}"))
 
