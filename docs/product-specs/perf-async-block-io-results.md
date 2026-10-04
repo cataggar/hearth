@@ -13,6 +13,15 @@ prerequisite `f2f9ab4`; its historical paths and integration/harness claims refe
 to that branch. Issue-2's actual controls and remaining gates are recorded in
 [its own execution evidence](../perf-results/vhost-net-20261004.md).
 
+The additional separately authorized shared credential prerequisite
+`ced7ed72b5b2f80286e37ba8c9d5eada0cb90236` clears supplementary groups before
+setgid/setuid, fails closed and adds no runtime syscall allowance. Its deterministic
+inherited-root-group regression is reused unchanged. Issue-1's reported fixed-target
+32-unit/7-KVM/12-Python populations per Debug/Safe and four jailed API/CLI disk
+controls are upstream evidence, not new issue-2 tests. Conflict resolution retains
+this record's earlier provenance rather than importing unrelated intermediate G0
+diagnostics; issue-2's new actual execution belongs in its own results.
+
 **Spec:** [perf-async-block-io](perf-async-block-io.md)
 
 **Plan:** [active execution plan](../exec-plans/active/perf-async-block-io.md)

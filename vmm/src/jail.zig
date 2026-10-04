@@ -75,6 +75,8 @@ pub fn setup(config: Config) !void {
     }
 
     // Drop privileges — last step requiring root
+    // Supplementary groups survive setgid/setuid.
+    try check(linux.syscall2(.setgroups, 0, 0), "setgroups");
     try check(linux.setgid(config.gid), "setgid");
     try check(linux.setuid(config.uid), "setuid");
 

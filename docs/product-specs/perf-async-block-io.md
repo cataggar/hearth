@@ -6,6 +6,15 @@
 **Execution plan**: [perf-async-block-io](../exec-plans/active/perf-async-block-io.md)
 **Execution evidence**: [baseline capability results](perf-async-block-io-results.md)
 
+### Common credential-hygiene prerequisite
+
+The jail must clear inherited supplementary groups before setgid/setuid and
+fail closed on error, without adding setgroups to the runtime allowlist.
+The exact shared `ced7ed72b5b2f80286e37ba8c9d5eada0cb90236` correction and
+deterministic inherited-root-group regression are reused for issue-2.
+Earlier issue-1 binary/profile populations remain distinct and are not credited
+as optimization gains; see issue-2's own result record for its actual acceptance.
+
 The untouched L0 execution verified project-local kernel/test support and retained
 actual startup perf/stack diagnostics, but the unchanged enforced-jail API is
 killed on `recvmsg` and the CLI cannot open jail device nodes created under

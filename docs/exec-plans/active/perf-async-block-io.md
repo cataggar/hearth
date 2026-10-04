@@ -5,6 +5,13 @@
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
 
+The separately authorized shared credential prerequisite
+`ced7ed72b5b2f80286e37ba8c9d5eada0cb90236` clears inherited supplementary groups
+before primary identity drop, fails closed and does not broaden runtime seccomp.
+Its exact code/regression are reused for issue-2; earlier source-branch evidence
+and issue-2's new execution populations remain separately attributed.
+No async worker or intermediate unrelated G0 runtime is imported.
+
 ## Outcome and controls
 
 ### Separate correctness prerequisite authorized at 16:18 UTC
