@@ -62,9 +62,18 @@ connect/warmup/active phases are retained; no latency or CPU/unit is invented
 for zero completions. Successful-only quantiles must never hide timeouts.
 `idle` is a separate 60 s diagnostic.
 
-Profiles use root host-wide software `perf stat` and `perf record -a -e
-cpu-clock -F 199 -g --call-graph dwarf`, plus actual `perf report --stdio`,
-stacks and KVM recording when the capability probe succeeds. All CPU placement,
+Profiles use root host-wide software `perf stat` and `perf record -a
+--no-buildid-cache -e cpu-clock -F 49 -g --call-graph dwarf,4096`, plus actual
+`perf report --stdio`, stacks and direct KVM entry/exit trace recording when the
+capability probe succeeds. The initial retained captures used 199 Hz/8 KiB
+DWARF and the `perf kvm stat record` frontend; post-provisioning idle captures
+hit overload/timeouts/frontend aborts. Their errors remain evidence, not passed
+profiles. The current lower-volume configuration is a separately identified
+diagnostic, not an interchangeable comparison arm. Build-ID cache updates and
+supervisor/child core dumps are disabled locally; no global setting is changed.
+KVM reports use `perf kvm -i FILE stat report --stdio`; `-i` is a global
+option. This profiler writes report text to stderr, so preserve both streams.
+All CPU placement,
 process/TID inventories, `/proc/stat`, softirq/softnet and network counters are
 retained. Visible-host busy CPU is user+nice+system+irq+softirq divided by
 `SC_CLK_TCK`; guest time is already in user/nice. System-wide task-clock is not

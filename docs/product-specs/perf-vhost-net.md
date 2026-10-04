@@ -30,6 +30,15 @@ mandatory contracts remain unproven. The execution plan stays active/blocked
 rather than claiming implementation completion or recommending a performance
 merge. There is no new selector, SDK mode, jail relaxation or runtime change.
 
+Post-provisioning retries separately freeze tools/libraries/device ACLs and
+confirm actual non-root KVM creation plus vhost feature access without FD loss.
+Four further requested network windows fail with zero active completions.
+Lower-volume whole-host stack/direct-KVM idle recordings and no-VM controls
+succeed, but background saturation remains about 16 cores. Earlier partial
+environment samples are diagnostics, not a controlled comparison; profiler
+overload/frontend failures are preserved. Readiness does not resolve relevance,
+qualified A/A noise or kernel lifecycle/confinement proof.
+
 ## Objective and applicability
 
 Determine whether Linux vhost-net reduces **total host CPU cost** or improves

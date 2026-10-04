@@ -48,6 +48,21 @@ while the mandatory execution remains missing. A relevant consumer is required
 to reopen backend implementation/adoption, not to accept a negative evaluation;
 the parent coordinator may separately qualify the retained S0 rejection.
 
+After common provisioning was fully verified, a 16:27 UTC manifest freezes
+tools, linked libraries, source/image hashes and device ACLs. UID-1000 actual
+KVM creation and vhost GET_FEATURES close without an FD-count change. Two
+additional TAP boots attempt four network windows; all four fail (three warmup,
+one active) with zero validated active responses. Earlier samples remain
+pre-boundary failure diagnostics, not a post-provisioning controlled baseline.
+Post-provisioning profiler overload/timeouts and KVM frontend aborts are
+retained. A separately identified lower-volume DWARF/direct-KVM retry completes
+VM idle and matched no-VM captures; software reports lose zero samples, but
+the no-VM software control still consumes 959.75 CPU s/60 s (~15.996 cores).
+Corrected global `perf kvm -i ... stat report --stdio` syntax produces fourteen
+offline reports without erasing original errors. Six fixture tests still pass.
+No A/A deciding noise, product relevance, kernel-worker/cursor/confinement proof
+or performance delta is established by these retries.
+
 ## Source-backed starting point
 
 At `b07f73b26b8ae876928d9c515b94bba1e9945870`, Flint has a two-queue

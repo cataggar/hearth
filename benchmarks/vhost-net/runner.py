@@ -6,6 +6,7 @@ import fcntl
 import hashlib
 import json
 import os
+import resource
 import signal
 import socket
 import struct
@@ -156,8 +157,8 @@ def probe(directory):
         ("software-root", ["perf", "stat", "-a", "-e", "task-clock,context-switches,cpu-migrations,page-faults", "--", "sleep", "1"], False),
         ("hardware", ["perf", "stat", "-a", "-e", "cycles,instructions", "--", "sleep", "1"], False),
         ("kvm-tracepoints", ["perf", "stat", "-a", "-e", "kvm:kvm_entry,kvm:kvm_exit", "--", "sleep", "1"], False),
-        ("kvm-stat-alternative", ["perf", "kvm", "stat", "record", "-a", "-o", str(directory / "kvm-probe.data"), "--", "sleep", "1"], False),
-        ("software-record", ["perf", "record", "-a", "-e", "cpu-clock", "-F", "199", "-g", "--call-graph", "dwarf", "-o", str(directory / "probe.perf.data"), "--", "sleep", "1"], False),
+        ("kvm-stat-alternative", ["perf", "record", "-a", "--no-buildid-cache", "-e", "kvm:kvm_entry,kvm:kvm_exit", "-o", str(directory / "kvm-probe.data"), "--", "sleep", "1"], False),
+        ("software-record", ["perf", "record", "-a", "--no-buildid-cache", "-e", "cpu-clock", "-F", "49", "-g", "--call-graph", "dwarf,4096", "-o", str(directory / "probe.perf.data"), "--", "sleep", "1"], False),
         ("software-report", ["perf", "report", "--stdio", "-i", str(directory / "probe.perf.data"), "--sort", "comm,dso,symbol"], False),
     ):
         command(argv, directory, name, user=user)
@@ -195,7 +196,8 @@ def workload(directory, mode, name, seconds, warmup, profile=None):
         ]
     elif profile == "record":
         argv = [
-            "perf", "record", "-a", "-e", "cpu-clock", "-F", "199", "-g", "--call-graph", "dwarf",
+            "perf", "record", "-a", "--no-buildid-cache", "-e", "cpu-clock", "-F", "49",
+            "-g", "--call-graph", "dwarf,4096",
             "-o", str(directory / f"{name}.perf.data"), "--", *peer,
         ]
     else:
@@ -214,12 +216,14 @@ def workload(directory, mode, name, seconds, warmup, profile=None):
         probe_path = directory.parent / "probes/kvm-tracepoints.command.json"
         if probe_path.exists() and json.loads(probe_path.read_text())["exit_status"] == 0:
             command(
-                ["perf", "kvm", "stat", "record", "-a", "-o", str(directory / f"{name}.kvm.data"),
+                ["perf", "record", "-a", "--no-buildid-cache", "-e", "kvm:kvm_entry,kvm:kvm_exit",
+                 "-o", str(directory / f"{name}.kvm.data"),
                  "--", *peer[:-1], str(directory / f"{name}.kvm-workload.json")],
                 directory, f"{name}.kvm-record", timeout=seconds + warmup + 30,
             )
             command(
-                ["perf", "kvm", "stat", "report", "-i", str(directory / f"{name}.kvm.data")],
+                ["perf", "kvm", "-i", str(directory / f"{name}.kvm.data"),
+                 "stat", "report", "--stdio"],
                 directory, f"{name}.kvm-report",
             )
     return status
@@ -376,6 +380,7 @@ def main():
                         default=["rpc", "h2g", "g2h", "wake"])
     args = parser.parse_args()
     os.umask(0o077)
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     def terminate(_number, _frame):
         raise SystemExit("fixture supervisor terminated; unwinding owned children")
     signal.signal(signal.SIGTERM, terminate)
