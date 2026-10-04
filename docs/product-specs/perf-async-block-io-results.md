@@ -598,6 +598,54 @@ distinct `perf-cache-check/` and final
 `perf-cache-check-2/` with exact post-sudo argv, checked guest outputs,
 thread roster, force-read reports/script and `acceptance.json`.
 
+## Common supplementary-group correctness follow-up
+
+The newly captured5ee roster retained bootstrap group0 after configured
+UID/GID drop. Jail setup now performs checked `setgroups(0, NULL)` before
+setgid/setuid and filter installation. Failure aborts admission. No syscall
+allowlist, host device, guest feature, compiler/dependency, worker or
+notification setting is changed.
+
+The real API regression deliberately launches the child through
+`sudo -n setpriv --groups=0 -- <flint ...>` before jail setup. Against retained
+5ee safe ELF, the three real regressions execute **2pass/1expected failure**:
+the dropped process still reports Groups0. New fixed-target Debug/Safe each
+execute **32/32 unit,7/7 real KVM integration,12/12 Python cases** successfully;
+no skips. Four additional actual jailed boot+disk controls (Debug/Safe×API/CLI)
+pass guest marker write/sync/hash and independent backing readback. All their
+listed tasks have configured UID/GID1000, empty supplementary groups,
+CapEff0, NoNewPrivs1, Seccomp2. Directory0755root and device0600configured-user
+policy remains unchanged and artifacts retain077.
+
+The frozen build commands are
+`zig build {test,integration-test} -Dtarget=x86_64-linux -Doptimize={debug,safe}`,
+with project-local cache/scratch and
+`-Dintegration-kernel=../.perf/blk-io/fixture/bzImage` for KVM tests. Real Python
+tests use the matching named binary and verified kernel. Every executed phase
+takes the absolute shared fleet lock.
+
+One initial diagnostic omitted the frozen target and built dynamic native
+glibc Debug. Its enforced guest case dies on **madvise66/SIGSYS** after
+successful group clearing; a trace confirms syscall28. Its11/12 Python result
+is preserved, not acceptance or baseline evidence. The first trace attempt
+used nonexistent `/usr/bin/strace` and failed before admission; the subsequent
+owned extracted tracer captures the actual kill. Restoring the unchanged
+`x86_64-linux` target produces the intended static baseline and passes, with
+**no madvise permission added**. The misbuilt binary/commands remain separate.
+
+After all four controlled VMs close, a new five-second locked no-owned-VM
+control records **79.94busyCPU-s/5.000297wall-s,99.937492%busy** (~15.987cores).
+It establishes continued host saturation, not attribution to a particular
+unowned task. No background CPU is subtracted into a saving, and no unowned
+process is signalled. This prerequisite is not a performance result.
+
+Raw evidence: `group-clear/old-safe-negative.log`,
+`group-clear/validation.log`, `debug-guest-trace*.log`,
+`frozen-validation.log`, `api-cli-validation.log`, `host-control.json`,
+retained named ELFs and `control/{d,s}-{api,cli}/` with actual credential and
+disk proof; the owned enforced trace is retained under `jail-tests/`.
+Earlier5ee profiles and canonical assets remain distinct.
+
 ## Original diagnostic validation
 
 | Command / coverage | Actual result |

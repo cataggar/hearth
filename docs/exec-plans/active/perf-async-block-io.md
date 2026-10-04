@@ -153,6 +153,30 @@ Kthread0/Seccomp2; supplementary Groups0 remains in the runtime and any
 group-clearing common follow-up must be separately coordinated. See results
 for exact argv, cache/scratch0700, ownership transfer and historical limits.
 
+### Common credential-hygiene execution follow-up
+
+Implement the newly observed inherited-group gap narrowly in jail setup:
+clear supplementary groups before GID/UID drop with checked failure, no
+runtime filter additions. Add a deterministic real-child regression with
+inherited group0; run unchanged unit/KVM suites plus real API/CLI077 checks in
+Debug/Safe. Preserve5ee binaries/inputs, commit separately, share the common
+revision with the explicit peers and relabel new diagnostics accordingly.
+This prerequisite cannot resolve host saturation or justify worker selection.
+
+Execution: deterministic inherited-group regression fails on unchanged5ee
+safe binary (2/3 pass,1/3 expected failure). Corrected fixed-target builds pass
+32/32 units,7/7 real KVM integrations and12/12 Python cases **per debug/safe**;
+four actual API/CLI jail disk/credential controls pass with empty groups on
+all listed tasks. No runtime seccomp allowance changes.
+
+One initial native-target diagnostic omitted the frozen `-Dtarget=x86_64-linux`:
+dynamic glibc Debug boots SIGSYS on madvise66, unlike the retained static
+baseline. That quarantined attempt is not acceptance or a comparison;
+restoring the original target resolves it without widening the filter.
+Fresh no-owned-VM locked host control79.94busyCPU-s/5.0003wall-s
+(99.9375%busy) still precludes meaningful qualification. Artifacts under
+`group-clear/`; the common correction is not an async backend or gain.
+
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
 and a measured keep/reject decision. Execution has started in the isolated
 `copilot/perf-async-block-20261004` worktree. Completion of implementation remains

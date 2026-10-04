@@ -78,9 +78,26 @@ Collector tooling now explicitly scopes build-ID cache/scratch after sudo and
 disables debuginfod lookup; real jailed collection/force-read decoding and
 focused regressions pass. Historical root cache locations were not explicitly
 scoped, and no global cache is inspected or cleaned. Own thread credential
-roster retains supplementary Groups0; a shared group-clearing correction is
+captured5ee81b1 roster retains supplementary Groups0; a group-clearing correction is
 not silently incorporated into prior profiles. Tooling acceptance is not a
 backend decision or isolation/performance promotion.
+
+### Common credential-hygiene prerequisite
+
+The dropped jail process must not retain the bootstrap's supplementary
+groups. Clear them before setgid/setuid, fail closed on error, and do not add
+setgroups to the runtime seccomp allowlist. Test with a deliberately inherited
+root group under the real enforced filter; confirm configured UID/GID,
+empty supplementary groups and unchanged node/directory policy. Preserve the
+prior5ee81b1 binaries/profiles. Treat the additional correction as a new common
+synchronous revision, not an async gain or permission broadening.
+
+This correction now passes32 units,7 real KVM integrations and12 Python cases
+per Debug/Safe, plus4 actual jailed API/CLI disk-and-credential controls.
+The fixed `x86_64-linux` target and original guest features are retained.
+All observed new VMM tasks have empty supplementary groups; old5ee profiles
+remain distinct. A fresh no-owned-VM host control still measures99.9375%busy
+(79.94 busy CPU-s/5.0003wall-s). G0/G1 qualification remains blocked.
 
 ## Objective and scope
 
@@ -110,7 +127,7 @@ facts against the execution revision before benchmarking.
 | `vmm/src/api.zig`, `snapshot.zig`, MMIO snapshot methods | Pause acknowledgement currently covers only the vCPU. Snapshot format v2 stores CPU/IRQ/device/queue state and guest memory, not disk contents or host work. Restore reopens supplied backends. New workers would make “vCPU stopped” insufficient. |
 | `src/vm/snapshot.ts`, `src/sandbox/sandbox.ts` | These are the actual SDK snapshot paths (not the architecture map's `src/snapshot/`). Disk artifacts are separately copied/moved while paused. All I/O must be settled before the caller can copy that disk. |
 | `vmm/src/main.zig:VmComponents.deinit`, restore functions | Fresh-boot cleanup deinitializes devices before memory; restore's defer ordering currently frees memory before devices. Worker shutdown must precede memory unmapping on **every** path. |
-| `vmm/src/jail.zig`, `seccomp.zig` | Jail closes inherited FDs, pivots root, drops UID/GID and applies optional cgroup limits. Seccomp is installed before guest interaction and permits filtered thread clone, futex, tkill and existing I/O/epoll; it does not whitelist eventfd or io_uring syscalls. An unlisted syscall kills, so fallback cannot rely on catching its errno. |
+| `vmm/src/jail.zig`, `seccomp.zig` | Jail closes inherited FDs, pivots root, clears supplementary groups, drops UID/GID and applies optional cgroup limits. Seccomp is installed before guest interaction and permits filtered thread clone, futex, tkill and existing I/O/epoll; it does not whitelist eventfd or io_uring syscalls. An unlisted syscall kills, so fallback cannot rely on catching its errno. |
 
 Block advertises only VERSION_1 and FLUSH, one split queue, with file capacity in
 512-byte sectors. The API accepts one disk path and memory sizing; it reports
