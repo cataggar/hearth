@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect only this disposable jailed L0 child and its actual thread filters."""
+"""Inspect only this disposable jailed child and its actual thread filters."""
 
 import argparse
 import importlib.util
@@ -56,6 +56,7 @@ def main():
     parser.add_argument("--jail", required=True)
     parser.add_argument("--binary", default=".perf/eventfd/fixtures/legacy/flint")
     parser.add_argument("--label", default="L0")
+    parser.add_argument("--virtio-mode", choices=["L0", "C00", "C10", "C01", "C11"], help="Only pass to a binary implementing the controlled-mode CLI")
     parser.add_argument("--trace-syscalls", action="store_true")
     parser.add_argument("--api", action="store_true", help="Configure and start the jailed guest through the actual Unix HTTP API")
     parser.add_argument("--native-workload", choices=["echo", "backpressure"], help="Check the connected timer-free guest after one second of silence")
@@ -74,6 +75,8 @@ def main():
         str(artifact_path(args.binary)),
         "--jail", str(jail), "--jail-uid", str(os.getuid()), "--jail-gid", str(os.getgid()),
     ]
+    if args.virtio_mode:
+        workload.extend(["--virtio-mode", args.virtio_mode])
     boot_args = "console=ttyS0 nokaslr reboot=k panic=1 pci=off nomodules"
     if args.api:
         workload.extend(["--api-sock", "/api.sock"])

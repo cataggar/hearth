@@ -15,6 +15,9 @@ pub fn main() !void {
     if (opened < 0) return error.SocketFailed;
     const listener: i32 = @intCast(opened);
     defer _ = linux.close(listener);
+    var reuse: c_int = 1;
+    const option: isize = @bitCast(linux.setsockopt(listener, 1, 2, std.mem.asBytes(&reuse).ptr, @sizeOf(c_int)));
+    if (option < 0) return error.ReuseAddressFailed;
     const address: SockaddrIn = .{};
     const bound: isize = @bitCast(linux.bind(listener, @ptrCast(&address), @sizeOf(SockaddrIn)));
     if (bound < 0) return error.BindFailed;

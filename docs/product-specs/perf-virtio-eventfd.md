@@ -1,6 +1,6 @@
 # Product Spec: VirtIO ioeventfd/irqfd Performance Experiment
 
-**Status**: In progress — four controlled modes implemented; real timer-free integrity/quiescence and cross-mode v2 restores pass; performance qualification unfinished
+**Status**: Blocked qualification — four controlled modes implemented; timer-free integrity,80 active mixed fresh restores and cross-mode v2 restores pass; frozen performance gates unmet
 
 **Last updated**: 2026-10-04
 
@@ -39,8 +39,9 @@ slow-reader messages also stall with a separately labelled heartbeat.
 All four modes pass native-vsock/TAP/disk/agent/PTY, active-I/O acknowledged pause,
 snapshot/resume, paused shutdown and sixteen actual cross-mode new-process v2
 restores. Combined block/TAP/vsock outstanding-I/O snapshots also pass in all
-four modes. Required repeated stress, multi-sandbox and performance qualification
-remain outstanding; these repairs are not an eventfd acceleration. No
+four modes;80 repeated active mixed fresh-process restores,64-connection/reuse
+and twelve native1/4/8-VM cells also pass. Full mixed-sandbox/performance
+qualification remains outstanding; these repairs are not eventfd acceleration. No
 performance merge or default adoption is eligible.
 
 The common restore path retains snapshot v2 and the guest reconnect policy:

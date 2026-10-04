@@ -1,13 +1,296 @@
-# VirtIO eventfd W0 results — 2026-10-04
+# VirtIO eventfd W0–W3 results — 2026-10-04
 
 **Decision: HOLD / INCONCLUSIVE / NOT PERFORMANCE-MERGE ELIGIBLE.**
 
-Issue [#3](https://github.com/cataggar/hearth/issues/3) is **not complete**.
-This is a partial baseline investigation and separately validated isolation
-prerequisite, not a rejected accelerated prototype. No C00/C10/C01/C11,
-eventfd registrations, readiness owners, queue decoder correction, IRQ policy
-or numeric adoption gates have been implemented/ratified. Legacy remains the
-only delivery path. No before/after candidate values or finite speedup exist.
+Issue [#3](https://github.com/cataggar/hearth/issues/3) is **in progress, not complete**.
+The published W0 and its original failures remain frozen. Following the actual
+parent's continuation instruction, common-control C00 now has per-device
+blocking readiness owners, selected-queue validation/publication barriers,
+full-window vsock buffering and a whole-VM pause fence. Initial real enforced
+timer-free integrity, active-I/O snapshot/resume and v2 new-process restore
+checks pass. C10/C01/C11 are now implemented and pass actual four-mode integrity
+and lifecycle checks, including80 actual active mixed captures/fresh restores.
+Five C00 controls (85 cells) now freeze numeric gates
+before three candidate matrices (51 cells). The frozen whole-matrix noise
+qualification fails. Longer primary windows show exploratory CPU reductions,
+not qualified speedups; ioeventfd modes also have severe pause regressions.
+Legacy remains the default; PR #9 remains draft without auto-merge.
+
+## W2 four controlled modes — actual correctness, not adoption
+
+Final pinned static-musl binaries:
+
+| Optimization | SHA256 |
+|---|---|
+| ReleaseSafe | `5555ae64b42c81ec71e80201bd27dd807d71ccca563114194e02d91b03769f4f` |
+| Debug | `516892168b405f26fea9cdeda1362ae9ecc9157c377393b0f98de4d39dcb5a30` |
+
+`zig build test eventfd-test integration-test -Dtarget=x86_64-linux-musl
+-Doptimize=ReleaseSafe|Debug -Dintegration-kernel=../.perf/eventfd/fixtures/bzImage
+--summary all` actually passes **39 unit +12 dedicated +7 existing integration
+tests per optimization** (58 each, across build19 and the expanded suite).
+Dedicated counts are eleven real enforced
+KVM tests and one policy unit, no skips. Existing integration counts remain
+five actual KVM guests plus two CLI-error cases, with their historical heartbeat.
+The dedicated suite actually executes100 queue disable/reset/fence/reconfigure
+cycles, ten partial-owner-setup failures and ten genuine late failures after
+live kick/IRQ registration per mode, without FD leaks,
+in **both** optimization builds. Production binaries remain pinned to build19.
+
+Executed real Linux cases on the shared C00/C10/C01/C11 binary:
+
+* **8/8** native/agent cells: outstanding16×64KiB native producer through
+  pause/v2 snapshot/resume, pending1MiB response close/agent reconnect, PTY,
+  active14MiB raw block write/readback from an0xA5 initial disk, paused shutdown.
+* **16/16** fresh-process cross-mode v2 restores of active block snapshots.
+  Every source/target pair verifies prior `EVENTFD` bytes before rewriting,
+  unchanged agent reconnect, disk/exec/PTY, then clean exit0.
+* **4/4** timer-free private-TAP cells, **18 checked messages each**, including
+  post-two-second silence and slow-reader bulk. Userspace TAP only, no vhost.
+* **4/4** simultaneous block/TAP/native-vsock/agent cases with both16×64KiB
+  host producers actually outstanding and an active disk producer, loaded PTY,
+  acknowledged pause/snapshot/resume, all checksums/14MiB host disk bytes
+  verified, paused all-task CPU delta0, graceful shutdown0.
+
+C10/C11 exact DWORD DATAMATCH registrations retain malformed/unmatched MMIO
+validation and fresh queue/pause epochs. All modes use the same owner budgets,
+features and synchronous block/TAP backends. PIC edge and level policies are
+common; real tiny guests test halted IRQFD wake, publication order, both
+ACK/EOI orders and actual level deassertion. Snapshot-v2 is unchanged. Pause
+retires pending MMIO/PIO before coherent ring/memory/IRQchip capture. Owner
+failure and normal teardown join before device/memory cleanup.
+
+The enforced optional owner-naming attempt genuinely failed eight cells on
+PR_SET_NAME157/SIGSYS31. Naming was removed, **not permitted**; these failures
+are retained. Narrow eventfd2/SO_ERROR permissions, nonroot private devices,
+empty groups/capabilities and inherited enforced filters remain.
+
+An ephemeral BPF observer now measures **on-CPU** owned irqfd work, subtracting
+off-CPU scheduler intervals rather than treating queue wall latency as CPU.
+It has no pinned maps, raw foreign task output or global tracefs/security
+changes. The simultaneous correctness cases observe C01 **2,386 inject +
+6 shutdown jobs /0.003412401 CPU seconds** and C11 **3,178+6 /
+0.003491866 CPU seconds**, zero anomalies/incomplete work; C00/C10 correctly
+observe zero irqfd jobs. Those windows include correctness/lifecycle work
+and are **not** matched performance gains.
+
+Current host noise is changing: later controls show approximately5.8–7.8 busy
+cores, not the historical constant16-core floor. Repeated A/A noise was actually
+measured and fails the frozen gates below. Required stress and remaining full
+qualification are separately tracked; no finite L0→C00 speedup is claimed.
+
+Private exact receipts: `.perf/eventfd/w1/{build-19,modes-18,restore-18,tap-18}.log`,
+`.perf/eventfd/w2/{matrix-19d.log,m19c-C00,m19c-C10,m19c-C01,m19c-C11}`.
+No VM-memory or live snapshot image is eligible for publication.
+
+## W3/W4 frozen controls and exploratory candidates
+
+Five actual C00 runs `aa-02..aa-06` execute the same17 classes: direct QD1
+4KiB/1MiB disk reads/writes/FLUSH;64/1400/65536B TAP;
+64/4096/65536B guest-initiated vsock;64KiB slow reader; exec; PTY;
+simultaneous disk/TAP/vsock;60-second agent-connected idle;20 pause/resume
+transitions. The earlier `aa-01` is a pilot, not a formal control. The first
+queued sixth run never acquired the lock; its absence is retained and the
+actual final fifth control was executed separately, not counted as a skip.
+
+`frozen-gates.json` was written before candidate performance. Gates are10%
+primary CPU/op benefit with paired95% confidence,90% eligible mechanism
+reduction, at most3% throughput or5% CPU/latency/lifecycle regressions,
+noise CV at most10% CPU/latency and5% throughput, and at most0.1 one-core
+percentage point/sandbox additional idle CPU. **No gate was relaxed.**
+All16 non-idle classes exceed at least one noise cap. Primary short-window
+FLUSH CPU/op CV is22.48%, throughput CV12.67%, p95 CV5.93%.
+Each candidate subsequently passes one17-cell matrix, not the five paired
+blocks needed for a valid confidence/benefit decision.
+
+A practical longer-window alternative executes five≥10-second FLUSH windows
+per mode, including a fresh longer C00 before the longer candidates:
+
+| Mode | Mean known backend CPU/op (µs) | CPU/op CV | Mean run p95 (ms) | Exploratory CPU difference vs C00 |
+|---|---:|---:|---:|---:|
+| C00 |424.006|5.90%|0.422742|control|
+| C10 |343.588|15.89%|0.356488|−18.97%|
+| C01 |323.334|2.48%|0.330591|−23.74%|
+| C11 |321.165|4.93%|0.346325|−24.25%|
+
+These are **not accepted gains**: the whole-matrix gates remain unmet,
+C10 still fails longer CPU noise, there is no valid paired95% CI, and these
+are diagnostic windows rather than retroactively substituted control policy.
+Known CPU includes every live VMM task plus scoped owned irqfd work:
+C01 long windows add0.374758185 kernel CPU seconds; C11 add0.400711080.
+The BPF measurement excludes workqueue dispatch/scheduler code outside the
+tagged irqfd function interval; it is a precisely scoped kernel-work measurement,
+not proof of complete marginal kernel scheduling CPU. That attribution limit
+is another reason not to promote these means into a performance claim.
+Client CPU is separate; native Python FNV/client work can dominate bulk timing.
+The100ms accounting tail is included in CPU but excluded from throughput.
+
+Pause diagnostics are especially unfavorable to ioeventfd: C00 mean-run p95
+is0.297736ms, versus C10 **20.520480ms**, C01 **0.347402ms**, and C11
+**29.561662ms** in the single candidate matrices. These are noisy diagnostic
+contrasts, not confidence-qualified regressions, but the large C10/C11
+deassignment costs preclude recommending them. Closing without KVM deassignment
+or omitting the fence is **not** an acceptable performance workaround.
+
+Timed native disk writes/FLUSH include exact direct readback. Timed standalone
+reads check lengths, not each returned payload; later whole-disk guest/host
+SHA checks are outside timing. Earlier A/A runs predate that extra whole-disk
+check; no retrospective integrity field is invented. The agent's existing
+50ms interactive limitation and unsupported host-initiated CONNECT remain.
+
+Private receipts: `.perf/eventfd/w3/{baseline,frozen-gates.json}`,
+`.perf/eventfd/w4/{matrix-C10,matrix-C01,matrix-C11,long-C00,long-C10,
+long-C01,long-C11}`. Candidate mechanism profiles and further lifecycle/stress
+results are recorded separately, never used as unprofiled benefit samples.
+
+## Mechanism profiles and CLI/API lifecycle
+
+All four modes execute software stat, scoped DWARF record/report and
+KVM/ioctl/read/write/epoll/scheduler traces on an identical two-device
+disk/agent fixture (separate from the three-device unprofiled matrix).
+Initial full traces lose3 chunks in C00/C01,1 in C11; C10 loses none.
+Those receipts are diagnostic, **not qualifying attribution**. A practical
+repeat using a private2048-page perf ring has no reported loss in all four:
+
+| Mode | Hardware exits | Userspace MMIO returns | Eligible notify userspace returns | Eligible IRQ_LINE calls | Workload operations |
+|---|---:|---:|---:|---:|---:|
+| C00 |475521|154803|51515|103288|17152|
+| C10 |636567|142027|0|142028|23552|
+| C01 |590513|190245|63310|0|20992|
+| C11 |635536|143786|0|0|23808|
+
+IOEVENTFD removes eligible notify **userspace** returns; IRQFD removes eligible
+IRQ_LINE calls. Hardware exits still occur, and different operation counts
+make absolute hardware totals inappropriate speed comparisons. Read/write/
+epoll/scheduler event arrays remain in the aggregate attribution receipts.
+Zero mechanism counts alone do not satisfy the CPU/latency/regression gates.
+Software stat observes C00 task-clock10.013240194s/1,082,409 switches,
+C10 10.392538497s/747,416, C01 9.951165589s/966,890, C11
+9.978159496s/875,636 over separate approximately12-second windows.
+Kernel IRQFD work is separately measured; profiled operation rates differ.
+No migrations/page faults are reported. No hardware cycles/instructions
+even with root, and no optional non-nested comparison is available.
+
+Actual API snapshot-load needs **basenames**, then separate `InstanceStart`.
+The initial absolute-path rejection and four load-without-start timeouts remain
+failures. The corrected **4/4** actual API-load/start restores verify prior
+disk bytes, complete the restored14MiB producer, reconnect the unchanged agent,
+and pass PTY/shutdown.
+Direct CLI cold boots pass4/4. Older saved `reboot=k` CLI restores pass2/4
+termination checks (all four integrity checks succeed); the two actual15-second
+shutdown timeouts are retained. A separate reliable `reboot=t` fixture now
+passes **4/4** source active-block snapshots and **4/4** direct fresh-process
+CLI restores, each with actual `KVM_EXIT_SHUTDOWN`,14MiB host readback and exit0.
+No guest/VMM runtime workaround is introduced or old failure overwritten.
+
+Actual save-on-halt remains **unexercised**: ordinary in-kernel IRQchip HLT
+sleeps inside `KVM_RUN` rather than returning `KVM_EXIT_HLT`. A source branch
+is not acceptance. Old↔new legacy connection compatibility and complete
+mask/congestion/lifecycle qualification also remain explicit.
+
+Private receipts: `.perf/eventfd/w4/{C10-stat,C01-stat,C11-stat,
+trace2048-C00,trace2048-C10,trace2048-C01,trace2048-C11,
+cli-source-C00,cli-source-C10,cli-source-C01,cli-source-C11,
+cli-new-restore-C00,cli-new-restore-C10,cli-new-restore-C01,cli-new-restore-C11}`.
+Scoped decoded traces with scheduler fields remain private, losslessly
+compressed when needed; only aggregate attribution and own stack reports
+are publishable. No foreign next-task names or memory/disk images are uploaded.
+
+## Final mixed restore, connection and native scaling stress
+
+**80/80** real active mixed-device captures and fresh-process API restores
+pass:20 each C00/C10/C01/C11. Each source actually has a running raw disk
+producer and two outstanding16×64KiB slow-reader streams. Whole-VM pause
+observes all-task CPU0, saves coherent v2 rings/memory/IRQchip, resumes and
+checks every source message. A new jailed process loads that actual snapshot
+and disk; the unchanged agent reconnects, fixture-native apps are explicitly
+restarted, both transports pass eight64KiB checksum replies, the restored
+14MiB producer finishes with host readback, and paused shutdown exits0.
+Snapshot state/memory/disk SHA receipts persist before bulky success images
+are removed. Live host stream continuation is **not** promised.
+
+Practical failed alternatives remain separate: initial restarted-TCP bind/
+readiness failures, lock-expired nonexecuted requests, and ENOSPC build/trace
+attempts are not passing cases. Startup-only bounded retries did not solve
+the repeated TCP bind issue. A **lifecycle-only SO_REUSEADDR probe** did:
+both source/restored apps use it in these80 cases. Original performance/L0
+probe hashes and all measured matrices remain unchanged; this fixture change
+is not an eventfd speedup. The final scope is `.perf/eventfd/w4/r20reuse-*`.
+
+**4/4**16/64-total-connection fairness cases pass, including63 native+one
+unchanged-agent connection and32 closes/reconnects/slot reuse.
+**12/12** pure-native1/4/8-VM active+60-second idle cases actually pass,
+using all VMM tasks on CPU8, clients CPU1, one fixed core total:
+
+| Mode |1 VM idle %/sandbox|4 VM idle %/sandbox|8 VM idle %/sandbox|
+|---|---:|---:|---:|
+| C00 |0.333333|0.370833|0.583243|
+| C10 |0.399999|0.391666|0.291666|
+| C01 |0.350000|0.266666|0.258333|
+| C11 |0.316666|0.262499|0.325000|
+
+These are native-only diagnostics, not mixed-device scaling qualification.
+Their task-tick CPU excludes kernel IRQFD work outside VMM tasks; do not pool
+them with the BPF-accounted matrix or call them complete marginal CPU gains.
+Three original lock-expired cells were really executed as new samples;
+a wrong mixed fixture was explicitly rejected before traffic and retained.
+
+The shared600GB filesystem filled during evaluation. Only this experiment's
+raw snapshots/traces were reclaimed: sparse zero extents preserve **every
+byte/SHA**, and decoded private traces are losslessly gzip-compressed with
+readback hash verification. No foreign artifact/resource was removed, no
+global cache/permission changed. `.perf/eventfd/w4/space-preservation.json`
+records28 such verified preservation operations. Interrupted README write
+was repaired; no truncated documentation is committed.
+
+**Final acceptance remains blocked**, not reactor implementation: frozen
+whole-matrix noise, missing paired95% full-candidate inference and complete
+kernel scheduling attribution, mixed4/8-VM qualification, unexercised actual
+save-on-halt/old↔new legacy compatibility and remaining mask/congestion gates.
+Keep all modes experimental and L0 default. No performance merge/auto-merge.
+
+## W1 historical initial C00 correctness, not performance adoption
+
+Safe musl control build `487dce3da0911bb5f80ee9d7ae7c0b4efaaf70abac93f2ab7520b7016d7e66d1`
+passed **38/38 unit tests**, including real enforced eventfd flag/init and
+Unix `SO_ERROR` argument restrictions, ring wrap/overrun, mailbox sleep-boundary
+wakes, TAP retry and complete vsock credit/backpressure integrity.
+The initial earlier control build also passed real no-heartbeat 4 KiB echo,
+eight 64 KiB slow-reader replies, ten TCP/TAP requests including a post-two-second
+silence wake, and an actual jailed API boot/echo. All observed VMM tasks retain
+UID/GID1000, empty supplementary groups, zero effective capabilities, enforced
+Seccomp2 and NoNewPrivs1.
+
+Actual `control.py` executions on the later build passed:
+
+* Native **16 × 64 KiB** payload/checksum replies across an outstanding-I/O
+  pause, snapshot and same-process resume; snapshot version **2**, memory
+  **536,870,912 bytes**, observed paused all-task CPU delta **0.0 seconds** over
+  a 200 ms window, and API shutdown joined owners with exit **0**. The stronger
+  explicit producer-outstanding barrier is being rerun after this initial case.
+* No-heartbeat agent ping, synchronous raw `/dev/vda` write/sync/read,
+  PTY integrity, paused snapshot and after-resume repetitions; the independently
+  read host backing marker is `EVENTFD`, and API shutdown exits **0**.
+* A **new process** actually restores that v2 guest/disk snapshot, delivers the
+  standard vsock transport-reset event, receives the unchanged agent's
+  guest-initiated reconnect, verifies the old disk marker before overwriting
+  it, and passes ping/disk/PTY again; shutdown exits **0**.
+
+These are separate correctness cases, not a qualified performance matrix.
+The agent's existing **50 ms** interactive polling limitation is unchanged.
+The first disk fixture attempt genuinely failed with exit127 because `dd` and
+`sync` symlinks are absent; explicit `/bin/busybox` applets then passed. Native
+host-glibc unit invocation also failed on syscall28 during thread setup; the
+pinned static musl target passes without admitting unnecessary `madvise`.
+The actual connection-check build initially died with SIGSYS on syscall55;
+only traced `getsockopt(SOL_SOCKET, SO_ERROR)` is now admitted. Original failure
+artifacts are retained under private `.perf/eventfd/w1/`.
+
+That initial TCP control observed **81.98 busy CPU seconds / 5.134344 wall
+seconds (~15.967 busy cores)**. External saturation has not been solved or
+attributed to this VM. It does not justify stopping C00 implementation, but
+does prevent a performance-merge recommendation without valid repeated
+controls and complete backend/kernel overhead attribution.
 
 Worktree: `/d/hearth/.perf/worktrees/virtio-eventfd`.
 Branch: `copilot/perf-virtio-eventfd-20261004`.

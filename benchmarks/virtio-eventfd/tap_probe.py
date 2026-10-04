@@ -156,6 +156,8 @@ def supervise(args):
                 "console=ttyS0 nokaslr reboot=k panic=1 pci=off nomodules",
                 "--tap", "hef3tap0",
             ]
+            if args.virtio_mode:
+                argv.extend(["--virtio-mode", args.virtio_mode])
         manifest["binary_sha256"] = digest(binary)
         manifest["argv"] = argv
         source = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, check=True, timeout=5)
@@ -247,6 +249,7 @@ def main():
     parser.add_argument("--cpu", type=int, default=8)
     parser.add_argument("--client-cpu", type=int, default=1)
     parser.add_argument("--label", default="isolation-control")
+    parser.add_argument("--virtio-mode", choices=["L0", "C00", "C10", "C01", "C11"])
     parser.add_argument("--binary", default=".perf/eventfd/fixtures/isolation-control/flint")
     parser.add_argument("--native", default="vmm/zig-out/bin/eventfd-tcp-probe")
     parser.add_argument("--fixture", default=".perf/eventfd/fixtures/tap-no-heartbeat")

@@ -329,7 +329,7 @@ def await_marker(child, serial_path, marker, timeout):
     raise TimeoutError(f"guest did not emit {marker!r}")
 
 
-def perf_collect(pid, out, profile, seconds, sudo, trace_events):
+def perf_collect(pid, out, profile, seconds, sudo, trace_events, buffer_pages=None):
     tids = ",".join(str(row["tid"]) for row in thread_roster(pid))
     if profile == "stat":
         argv = [
@@ -352,6 +352,11 @@ def perf_collect(pid, out, profile, seconds, sudo, trace_events):
         ]
         insertion = argv.index("--")
         argv[insertion:insertion] = [item for event in trace_events for item in ("-e", event)]
+    if buffer_pages is not None:
+        if profile == "stat" or not 1 <= buffer_pages <= 4096:
+            raise ValueError("buffer pages require a bounded recording profile")
+        insertion = argv.index("--")
+        argv[insertion:insertion] = ["-m", str(buffer_pages)]
     if sudo:
         argv = [
             "sudo", "-n", "timeout", "--kill-after=5", str(seconds + 10),

@@ -17,6 +17,7 @@ def analyze(lines, devices):
     pending, irq_times = {}, []
     unpaired_exits = 0
     irq_calls = Counter()
+    pending_notify, userspace_notify = {}, Counter()
     for line in lines:
         match = LINE.search(line)
         if not match:
@@ -24,19 +25,28 @@ def analyze(lines, devices):
         tid, timestamp, event, detail = match.groups()
         timestamp = float(timestamp)
         events[event] += 1
-        if event == "kvm:kvm_exit":
+        if event == "kvm:kvm_entry":
+            # A handled MMIO resumes in-kernel; do not carry its classification
+            # into a later, unrelated userspace return.
+            pending_notify.pop(tid, None)
+        elif event == "kvm:kvm_exit":
             reason = re.search(r"reason (\S+)", detail)
             if reason:
                 kernel_reasons[reason[1]] += 1
         elif event == "kvm:kvm_userspace_exit":
             reason = re.search(r"reason (\S+)", detail)
             user_reasons[reason[1] if reason else detail] += 1
+            notify = pending_notify.pop(tid, None)
+            if notify is not None and reason and "MMIO" in reason[1]:
+                userspace_notify[notify] += 1
         elif event == "kvm:kvm_mmio":
             write = re.search(r"mmio write len (\d+) gpa (0x[\da-f]+) val (0x[\da-f]+)", detail)
             if write and int(write[1]) == 4:
                 for device in devices:
                     if int(write[2], 16) == device["mmio_base"] + 0x50:
-                        kicks[f'{device["kind"]}:queue{int(write[3], 16)}'] += 1
+                        key = f'{device["kind"]}:queue{int(write[3], 16)}'
+                        kicks[key] += 1
+                        pending_notify[tid] = key
         elif event == "syscalls:sys_enter_ioctl":
             request = re.search(r"cmd: (0x[\da-f]+)", detail)
             if request:
@@ -66,6 +76,7 @@ def analyze(lines, devices):
         "kernel_exit_reasons": dict(kernel_reasons),
         "userspace_exit_reasons": dict(user_reasons),
         "observed_four_byte_notify_writes": dict(kicks),
+        "attributed_notify_userspace_returns": dict(userspace_notify),
         "irq_line_edges": dict(irq_edges),
         "completed_irq_line_ioctl_calls": dict(irq_calls),
         "eligible_irq_line_ioctl_profiled_us": {

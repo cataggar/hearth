@@ -4,6 +4,22 @@ from analyze_trace import analyze
 
 
 class AttributionTests(unittest.TestCase):
+    def test_only_notify_followed_by_same_vcpu_userspace_return_is_eligible(self):
+        data = [
+            "flint 123 [008] 1.000000: kvm:kvm_mmio: mmio write len 4 gpa 0xd0000050 val 0x1",
+            "flint 123 [008] 1.000010: kvm:kvm_userspace_exit: reason KVM_EXIT_MMIO (6)",
+            "flint 123 [008] 1.000020: kvm:kvm_entry: vcpu 0",
+            "flint 123 [008] 2.000000: kvm:kvm_mmio: mmio write len 4 gpa 0xd0000050 val 0x1",
+            "flint 123 [008] 2.000010: kvm:kvm_entry: vcpu 0",
+            "flint 123 [008] 2.000020: kvm:kvm_userspace_exit: reason KVM_EXIT_MMIO (6)",
+            "flint 123 [008] 3.000000: kvm:kvm_mmio: mmio write len 4 gpa 0xd0000050 val 0x1",
+            "flint 456 [008] 3.000010: kvm:kvm_userspace_exit: reason KVM_EXIT_MMIO (6)",
+            "flint 123 [008] 3.000020: kvm:kvm_entry: vcpu 0",
+        ]
+        result = analyze(data, [{"kind": "vsock", "mmio_base": 0xD0000000, "gsi": 5}])
+        self.assertEqual(result["observed_four_byte_notify_writes"], {"vsock:queue1": 3})
+        self.assertEqual(result["attributed_notify_userspace_returns"], {"vsock:queue1": 1})
+
     def test_kernel_handled_exits_and_serial_irqs_are_not_virtio_savings(self):
         def line(timestamp, event, detail):
             return f"flint 123 [008] {timestamp:.6f}: {event}: {detail}"

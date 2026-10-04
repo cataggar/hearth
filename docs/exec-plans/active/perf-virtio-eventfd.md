@@ -1,6 +1,6 @@
 # Execution Plan: Profile VirtIO ioeventfd/irqfd
 
-**Status**: In progress — W1/W2 controlled servicing implementation
+**Status**: Blocked qualification — controlled implementation/stress executed; frozen performance gates unmet
 
 **Date**: 2026-10-04
 
@@ -84,8 +84,11 @@ and four simultaneous block/TAP/vsock active snapshots pass. Each mode executes
 owner failure FD-leak checks per optimization.
 Longer primary diagnostic CPU means improve19–24%, but frozen whole-matrix noise,
 incomplete paired inference and C10/C11 severe pause costs prevent acceptance.
-Further active fresh-process restore stress, multi-sandbox/connection coverage
-and CLI lifecycle verification are executing. The plan stays active,
+All80 active mixed fresh-process restore cycles, four64-connection/reuse cases,
+twelve native1/4/8-VM cells and the reliable CLI restore fixture actually pass.
+Full paired performance/kernel scheduling attribution, mixed-device scaling,
+old↔new legacy, masks/congestion and actual save-on-halt remain nonacceptance.
+The plan stays active,
 not completed. Existing benchmark commands below that describe
 future selectors/matrix runners remain proposals; only the W0 tool README
 documents implemented options.
