@@ -1,0 +1,181 @@
+src/eventfd_tests.zigeventfd-test
++- run test w
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+failed command: ./.zig-cache/o/a109c0f1100c2a5ebd8102b18d911a91/test --cache-dir=./.zig-cache --seed=0xdd62ffe1 --listen=-
+
+Build Summary: 27/27 steps succeeded; 14/14 tests passed
+eventfd-test success
++- run test 14 pass (14 total) 16s MaxRSS:11M
+   +- compile test safe x86_64-linux-musl success 18s MaxRSS:561M
+      +- translate-c abi cached
+         +- compile exe translate-c debug native cached 5ms MaxRSS:41M
+            +- options cached
+            +- options cached
+            +- options cached
+            +- run exe generate-def (aarch64.zig) cached
+            |  +- compile exe generate-def debug native cached 5ms MaxRSS:41M
+            +- run exe generate-def (amdgcn.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (arm.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (bpf.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (common.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (hexagon.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (loongarch.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (mips.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (neon.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (nvptx.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (powerpc.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (riscv.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (s390x.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (ve.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (wasm.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (x86_64.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (x86.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (xcore.zig) cached
+               +- compile exe generate-def debug native (reused)
+
+eventfd-test
++- run test w
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+[virtio_owner] (err): device GSI32 owner failed: error.UnsupportedVirtioGsi
+failed command: ./.zig-cache/o/d3c62228a4e4d060559ba6b509f7b496/test --cache-dir=./.zig-cache --seed=0x1e687950 --listen=-
+
+Build Summary: 27/27 steps succeeded; 14/14 tests passed
+eventfd-test success
++- run test 14 pass (14 total) 16s MaxRSS:11M
+   +- compile test debug x86_64-linux-musl success 1s MaxRSS:194M
+      +- translate-c abi cached
+         +- compile exe translate-c debug native cached 5ms MaxRSS:41M
+            +- options cached
+            +- options cached
+            +- options cached
+            +- run exe generate-def (aarch64.zig) cached
+            |  +- compile exe generate-def debug native cached 5ms MaxRSS:41M
+            +- run exe generate-def (amdgcn.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (arm.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (bpf.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (common.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (hexagon.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (loongarch.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (mips.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (neon.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (nvptx.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (powerpc.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (riscv.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (s390x.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (ve.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (wasm.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (x86_64.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (x86.zig) cached
+            |  +- compile exe generate-def debug native (reused)
+            +- run exe generate-def (xcore.zig) cached
+               +- compile exe generate-def debug native (reused)
+
+2026-10-04T22:41:18Z

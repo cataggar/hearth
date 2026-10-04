@@ -33,7 +33,7 @@ show severe pause deassignment costs. Adoption gates and full stress/performance
 coverage remain incomplete; no default promotion is justified.
 
 **Actual results and durable evidence**:
-[2026-10-04 W0 report](../../benchmarks/virtio-eventfd/results/20261004/README.md).
+[2026-10-04 controlled experiment report](../../benchmarks/virtio-eventfd/results/20261004/README.md).
 Untouched L0 timer-free native traffic stalls after silence; eight 64 KiB
 slow-reader messages also stall with a separately labelled heartbeat.
 All four modes pass native-vsock/TAP/disk/agent/PTY, active-I/O acknowledged pause,
@@ -390,6 +390,16 @@ IRQFD RESAMPLE when accelerated. ACK-before-EOI explicitly deassigns, drains
 and recreates the irqfd source; zero writes or closing an fd are not deassertion.
 Tiny real KVM guests verify used-before-IRQ, halted wake, both ACK/EOI orders,
 counter aggregation and exact DWORD DATAMATCH/unmatched MMIO.
+The follow-up dedicated suite passes14/14 tests in both Debug/ReleaseSafe:
+masked PIC edge/level sources leave the guest halted until unmask in both
+IRQ_LINE/IRQFD modes; masked level reset drains/deassigns the stale source,
+then only a fresh publication wakes the guest. These checks do not complete
+active IOAPIC-mask/congestion acceptance or justify performance adoption.
+
+The parent independently reported15.961/16 busy cores during a locked idle
+control, with no iowait/steal, at22:33 UTC. This is externally reported control
+evidence, not an owned baseline repetition. A quieter reserved window/host is
+still required; frozen gates remain unchanged and no default promotion occurs.
 
 Pause also retires pending userspace MMIO/PIO through an immediate-exit
 KVM_RUN reentry before owner fences and snapshot acknowledgement. A real

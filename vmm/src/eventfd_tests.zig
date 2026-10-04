@@ -330,13 +330,37 @@ const Run = struct {
 
 fn signalHandler(_: linux.SIG) callconv(.c) void {}
 
-fn irqScenario(level: bool, eoi_first: bool) !void {
+fn expectSleeping(tid: i32) !void {
+    var path: [96]u8 = undefined;
+    const name = try std.fmt.bufPrint(path[0 .. path.len - 1], "/proc/self/task/{}/status", .{tid});
+    path[name.len] = 0;
+    const opened: isize = @bitCast(linux.open(@ptrCast(&path), .{ .ACCMODE = .RDONLY, .CLOEXEC = true }, 0));
+    if (opened < 0) return error.ThreadStatusUnavailable;
+    const fd: i32 = @intCast(opened);
+    defer abi.close(fd);
+    var status: [2048]u8 = undefined;
+    const length: isize = @bitCast(linux.read(fd, &status, status.len));
+    if (length <= 0) return error.ThreadStatusUnavailable;
+    try std.testing.expect(std.mem.indexOf(u8, status[0..@intCast(length)], "State:\tS (") != null);
+}
+
+const IrqOptions = struct {
+    level: bool = false,
+    eoi_first: bool = false,
+    accelerated: bool = true,
+    masked: bool = false,
+    reset_pending: bool = false,
+};
+
+fn irqScenario(options: IrqOptions) !void {
+    const level = options.level;
+    const eoi_first = options.eoi_first;
     const code = [_]u8{
         0xb0, 0x11, 0xe6, 0x20, // PIC ICW1
-        0xb0, 0x20, 0xe6, 0x21, // PIC vector base
-        0xb0, 0x04, 0xe6, 0x21,
-        0xb0, 0x01, 0xe6, 0x21,
-        0xb0, 0xdf, 0xe6, 0x21, // unmask only GSI5
+        0xb0, 0x20,                               0xe6, 0x21, // PIC vector base
+        0xb0, 0x04,                               0xe6, 0x21,
+        0xb0, 0x01,                               0xe6, 0x21,
+        0xb0, if (options.masked) 0xff else 0xdf, 0xe6, 0x21,
         0xba, 0xd0, 0x04, 0xb0, if (level) 0x20 else 0, 0xee, // ELCR
         0xb0, 0x11, 0xe6, 0xe9, // ready barrier
         0xfb, 0xf4, 0xeb, 0xfd, // sti; hlt loop
@@ -361,7 +385,7 @@ fn irqScenario(level: bool, eoi_first: bool) !void {
     @memcpy(fixture.mem.mem[0x318..][0..finish.len], &finish);
     std.mem.writeInt(u16, fixture.mem.mem[0x25 * 4 ..][0..2], 0x300, .little);
     try std.testing.expectEqual(@as(u32, c.KVM_EXIT_IO), try fixture.vcpu.run());
-    var irq = try Accelerator.Irq.init(&fixture.vm, 5, true);
+    var irq = try Accelerator.Irq.init(&fixture.vm, 5, options.accelerated);
     defer irq.deinit() catch {};
     try irq.reconcile(true, 0);
     try std.testing.expectEqual(if (level) Accelerator.Trigger.level else .edge, irq.trigger);
@@ -382,30 +406,62 @@ fn irqScenario(level: bool, eoi_first: bool) !void {
     };
     // This host-only wait never injects guest IRQs; no PIT or heartbeat exists.
     _ = linux.nanosleep(&.{ .sec = 1, .nsec = 0 }, null);
-    var path: [96]u8 = undefined;
-    const name = try std.fmt.bufPrint(path[0 .. path.len - 1], "/proc/self/task/{}/status", .{run.tid.load(.acquire)});
-    path[name.len] = 0;
-    const opened: isize = @bitCast(linux.open(@ptrCast(&path), .{ .ACCMODE = .RDONLY, .CLOEXEC = true }, 0));
-    if (opened < 0) return error.ThreadStatusUnavailable;
-    const status_fd: i32 = @intCast(opened);
-    defer abi.close(status_fd);
-    var status: [2048]u8 = undefined;
-    const length: isize = @bitCast(linux.read(status_fd, &status, status.len));
-    if (length <= 0) return error.ThreadStatusUnavailable;
-    try std.testing.expect(std.mem.indexOf(u8, status[0..@intCast(length)], "State:\tS (") != null);
+    try expectSleeping(run.tid.load(.acquire));
     const index: *u16 = @ptrCast(@alignCast(fixture.mem.mem[0x702..].ptr));
     @atomicStore(u16, index, 1, .release);
     try irq.notify(1);
+    var expected_index: u16 = 1;
+    if (options.masked) {
+        var pending = false;
+        for (0..1000) |_| {
+            const pic = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_MASTER);
+            if (pic[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IRR_OFFSET] & 0x20 != 0) {
+                pending = true;
+                break;
+            }
+            _ = linux.nanosleep(&.{ .sec = 0, .nsec = 1_000_000 }, null);
+        }
+        try std.testing.expect(pending);
+        try expectSleeping(run.tid.load(.acquire));
+        try std.testing.expectEqual(@as(u16, 0), std.mem.readInt(u16, fixture.mem.mem[0x700..][0..2], .little));
+        if (options.reset_pending) {
+            const generation = irq.generation;
+            try irq.quiesce();
+            const pic = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_MASTER);
+            try std.testing.expectEqual(@as(u8, 0), pic[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IRR_OFFSET] & 0x20);
+            if (options.accelerated) {
+                try std.testing.expect(!irq.assigned);
+                try std.testing.expect(irq.generation != generation);
+                for ([_]i32{ irq.fd, irq.resample_fd }) |fd| {
+                    var counter: u64 = 0;
+                    const read: isize = @bitCast(linux.read(fd, std.mem.asBytes(&counter).ptr, 8));
+                    try std.testing.expectEqual(-@as(isize, @backingInt(linux.E.AGAIN)), read);
+                }
+            }
+            try irq.reconcile(true, 0);
+        }
+        var chip = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_MASTER);
+        chip[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IMR_OFFSET] &= ~@as(u8, 0x20);
+        try fixture.vm.setIrqChip(&chip);
+        if (options.reset_pending) {
+            _ = linux.nanosleep(&.{ .sec = 0, .nsec = 100_000_000 }, null);
+            try expectSleeping(run.tid.load(.acquire));
+            try std.testing.expectEqual(@as(u16, 0), std.mem.readInt(u16, fixture.mem.mem[0x700..][0..2], .little));
+            expected_index = 2;
+            @atomicStore(u16, index, expected_index, .release);
+            try irq.notify(1);
+        }
+    }
     thread.join();
     joined = true;
     try std.testing.expect(!run.failed);
     try std.testing.expectEqual(@as(u32, c.KVM_EXIT_MMIO), run.exit);
     try std.testing.expectEqual(@as(u64, 0x8064), fixture.vcpu.getMmioData().phys_addr);
-    try std.testing.expectEqual(@as(u16, 1), std.mem.readInt(u16, fixture.mem.mem[0x704..][0..2], .little));
-    if (level) try irq.resampled(true, 1);
+    try std.testing.expectEqual(expected_index, std.mem.readInt(u16, fixture.mem.mem[0x704..][0..2], .little));
+    if (level and options.accelerated) try irq.resampled(true, 1);
     try irq.reconcile(true, 0);
     try std.testing.expectEqual(@as(u32, c.KVM_EXIT_IO), try fixture.vcpu.run());
-    if (level) try irq.resampled(true, 0);
+    if (level and options.accelerated) try irq.resampled(true, 0);
     const pic = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_MASTER);
     const irr = pic[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IRR_OFFSET];
     try std.testing.expectEqual(@as(u8, 0), irr & 0x20);
@@ -416,7 +472,7 @@ fn irqScenario(level: bool, eoi_first: bool) !void {
 test "real KVM irqfd wakes timer-free HLT with used-before-IRQ and edge ACK" {
     try isolated(struct {
         fn run() !void {
-            try irqScenario(false, false);
+            try irqScenario(.{});
         }
     }.run);
 }
@@ -424,13 +480,35 @@ test "real KVM irqfd wakes timer-free HLT with used-before-IRQ and edge ACK" {
 test "real KVM level irqfd resamples and ACK-before-EOI really deasserts" {
     try isolated(struct {
         fn run() !void {
-            try irqScenario(true, false);
+            try irqScenario(.{ .level = true });
         }
 
         test "real KVM level EOI-before-ACK reasserts pending work without a stale storm" {
             try isolated(struct {
                 fn run() !void {
-                    try irqScenario(true, true);
+                    try irqScenario(.{ .level = true, .eoi_first = true });
+                }
+
+                test "real KVM masked edge and level IRQs wake only after unmask for line and irqfd" {
+                    try isolated(struct {
+                        fn run() !void {
+                            for ([_]bool{ false, true }) |accelerated| {
+                                for ([_]bool{ false, true }) |level| {
+                                    try irqScenario(.{ .accelerated = accelerated, .level = level, .masked = true });
+                                }
+                            }
+                        }
+                    }.run);
+                }
+
+                test "real KVM masked level reset drains stale IRQ epoch before fresh publication" {
+                    try isolated(struct {
+                        fn run() !void {
+                            for ([_]bool{ false, true }) |accelerated| {
+                                try irqScenario(.{ .accelerated = accelerated, .level = true, .masked = true, .reset_pending = true });
+                            }
+                        }
+                    }.run);
                 }
             }.run);
         }

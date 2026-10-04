@@ -16,6 +16,41 @@ qualification fails. Longer primary windows show exploratory CPU reductions,
 not qualified speedups; ioeventfd modes also have severe pause regressions.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Parent-requested mask/reset follow-up
+
+The parent independently reported a locked idle-window **15.961/16 busy-core**
+control at22:33 UTC, using user+nice+system+irq+softirq without guest double
+count, with0 iowait/steal. This is parent-provided evidence, **not** another owned
+A/A repetition. Final performance needs a quieter reserved window/host;
+frozen gates, default mode and the HOLD decision are unchanged.
+
+Safe implementation continued with two real enforced KVM regressions:
+
+* Masked PIC edge/level interrupts keep a timer-free guest halted, then deliver
+  exactly one published completion after unmask, for IRQ_LINE and IRQFD.
+* Masked level reset deasserts/quiesces the old source. IRQFD additionally
+  proves deassignment, epoch change and drained kick/resample counters. After
+  unmask the guest remains halted until a fresh used-index publication, then
+  observes that new index with one IRQ and no stale pending PIC request.
+
+The expanded dedicated suite passes **14/14 per ReleaseSafe and Debug**:
+thirteen real enforced KVM tests plus one policy unit, with six new actual
+mask/reset scenarios per optimization and no skips. Exact bounded locked
+command: `zig build eventfd-test -Dtarget=x86_64-linux-musl
+-Doptimize=ReleaseSafe|Debug --summary all`, after `zig fmt
+src/eventfd_tests.zig`, using the private existing Zig cache.
+[Raw owned validation](irq-mask-reset-validation.log) and
+[follow-up receipt](irq-mask-reset-followup.json) preserve actual outcomes.
+Production build19/measurement fixture hashes are unchanged; no new performance
+sample was collected. A subsequent combined-suite replay could not acquire the
+fleet lock in300 seconds (exit1); **no tests executed** in that request.
+The58-test historical combined runs below are not silently promoted to60-test
+new executions.
+
+This closes focused PIC mask/reset coverage, **not** active IOAPIC-mask,
+congestion, old↔new legacy, actual save-on-halt or mixed-device scaling
+acceptance. No unrelated task/process metadata or stacks were captured.
+
 ## W2 four controlled modes — actual correctness, not adoption
 
 Final pinned static-musl binaries:
@@ -74,8 +109,9 @@ changes. The simultaneous correctness cases observe C01 **2,386 inject +
 observe zero irqfd jobs. Those windows include correctness/lifecycle work
 and are **not** matched performance gains.
 
-Current host noise is changing: later controls show approximately5.8–7.8 busy
-cores, not the historical constant16-core floor. Repeated A/A noise was actually
+Earlier owned controls showed approximately5.8–7.8 busy
+cores; the later parent-reported15.961/16 control above prevents assuming a
+quiet window. Repeated A/A noise was actually
 measured and fails the frozen gates below. Required stress and remaining full
 qualification are separately tracked; no finite L0→C00 speedup is claimed.
 
@@ -678,7 +714,7 @@ inside the archive as `evidence-manifest.json`.
 The full private working evidence/immutable fixtures remain under
 `.perf/eventfd/results/` and `.perf/eventfd/fixtures/` in this worktree.
 
-Remaining blockers/work:
+Historical W0 remaining work (superseded by controlled execution above):
 
 1. Required native slow-reader/backpressure correctness/liveness does not
    pass on L0; no-heartbeat L0 also stalls. Shared controls must address these

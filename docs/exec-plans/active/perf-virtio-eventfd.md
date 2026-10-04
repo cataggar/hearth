@@ -4,6 +4,29 @@
 
 **Date**: 2026-10-04
 
+### Parent-requested focused correctness continuation,22:33 UTC
+
+The parent independently measured **15.961/16 visible busy cores** during a
+locked idle control, using user+nice+system+irq+softirq and excluding guest
+double count, with0 iowait/steal. This is parent-provided control evidence,
+not an owned experiment repetition or a gate change. Valid final performance
+qualification requires a quieter reserved window/host; keep frozen gates.
+
+Continue safe opt-in correctness despite that blocker: actual enforced KVM
+microguests must remain halted with masked edge/level IRQs, wake after unmask,
+and prove masked level reset/deassignment drains stale epochs before a fresh
+used-ring publication. Exercise both common IRQ_LINE and IRQFD semantics,
+without timers/heartbeat to wake the guest, unrelated process metadata or
+default promotion. Existing production binary/fixture/performance pins stay
+unchanged; these are focused test-only additions.
+
+Both optimizations actually pass the expanded14/14 dedicated tests (thirteen
+real enforced KVM tests plus one policy unit). The two new tests execute six
+actual PIC mask/reset scenarios per optimization, without skips/guest timers.
+The subsequent combined-suite replay never acquired the fleet lock within
+300 seconds (exit1); no tests executed in that request. Historical unit/
+integration results remain separately identified, not counted as a new run.
+
 **Issue**: [#3](https://github.com/cataggar/hearth/issues/3)
 
 **Spec**: [VirtIO eventfd experiment](../../product-specs/perf-virtio-eventfd.md)
@@ -76,9 +99,10 @@ busy cores). No quiet A/A baseline or numeric gates can be inferred from this.
 
 **Hold / not eligible for performance merge.** Per-device blocking owners,
 exact per-queue ioeventfd, trigger-aware irqfd/resampling and v2 quiescence now
-pass actual focused checks. Both static-musl Debug/Safe builds pass39 unit,
-12 dedicated (eleven real KVM cases plus one policy unit) and7 existing integration
-tests each. Four-mode native/agent/TAP checks,16 new-process cross-mode restores,
+pass actual focused checks. Both static-musl Debug/Safe builds previously passed
+39 unit,12 dedicated and7 existing integration tests each. The focused follow-up
+expands the dedicated suite to14/14 passing (thirteen real KVM tests plus one
+policy unit) per optimization. Four-mode native/agent/TAP checks,16 new-process cross-mode restores,
 and four simultaneous block/TAP/vsock active snapshots pass. Each mode executes
 100 reset/fence/reconfigure, ten partial-setup and ten genuine post-registration
 owner failure FD-leak checks per optimization.
@@ -87,11 +111,11 @@ incomplete paired inference and C10/C11 severe pause costs prevent acceptance.
 All80 active mixed fresh-process restore cycles, four64-connection/reuse cases,
 twelve native1/4/8-VM cells and the reliable CLI restore fixture actually pass.
 Full paired performance/kernel scheduling attribution, mixed-device scaling,
-old↔new legacy, masks/congestion and actual save-on-halt remain nonacceptance.
+old↔new legacy, active IOAPIC masks/congestion and actual save-on-halt remain nonacceptance.
 The plan stays active,
 not completed. Existing benchmark commands below that describe
-future selectors/matrix runners remain proposals; only the W0 tool README
-documents implemented options.
+future selectors/matrix runners remain proposals unless superseded by the
+current benchmark README, which documents implemented options and executions.
 
 Keep userspace TAP and synchronous block I/O throughout the attributed
 experiment. Coordinate reusable control/readiness plumbing with [#2

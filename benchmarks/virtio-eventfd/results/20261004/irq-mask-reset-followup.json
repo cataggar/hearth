@@ -1,0 +1,55 @@
+{
+  "issue": 3,
+  "kind": "focused_correctness_followup_not_performance",
+  "date": "2026-10-04",
+  "owned_validation_log": "irq-mask-reset-validation.log",
+  "owned_validation_log_sha256": "5c3e3fe0c0f189cc171b24558b528532f98ccf69563773fa3248b0196d38fe9a",
+  "command": "zig build eventfd-test -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe|Debug --summary all",
+  "command_note": "Executed separately for each optimization after zig fmt src/eventfd_tests.zig; | is documentation shorthand, not a shell pipeline.",
+  "exclusive_lock": "/d/hearth/.perf/fleet/host.lock",
+  "umask": "077",
+  "results": [
+    {"optimization": "ReleaseSafe", "tests_passed": 14, "tests_total": 14, "skips": 0},
+    {"optimization": "Debug", "tests_passed": 14, "tests_total": 14, "skips": 0}
+  ],
+  "dedicated_suite": {"real_enforced_kvm_tests": 13, "policy_unit_tests": 1},
+  "new_scenarios_per_optimization": {
+    "masked_pic_edge_level_line_irqfd": 4,
+    "masked_pic_level_reset_line_irqfd": 2
+  },
+  "guest_heartbeat_or_timer": false,
+  "production_binary_sha256": {
+    "ReleaseSafe": "5555ae64b42c81ec71e80201bd27dd807d71ccca563114194e02d91b03769f4f",
+    "Debug": "516892168b405f26fea9cdeda1362ae9ecc9157c377393b0f98de4d39dcb5a30"
+  },
+  "subsequent_combined_suite_attempt": {
+    "requested": "zig build test eventfd-test integration-test for ReleaseSafe and Debug",
+    "lock_wait_seconds": 300,
+    "exit_code": 1,
+    "acquired_lock": false,
+    "tests_executed": 0
+  },
+  "parent_reported_idle_control": {
+    "reported_at_utc": "2026-10-04T22:33:01.992Z",
+    "busy_cores": 15.961,
+    "visible_cores": 16,
+    "iowait": 0,
+    "steal": 0,
+    "busy_definition": "user+nice+system+irq+softirq; no guest double count",
+    "independently_reproduced_by_this_followup": false,
+    "owned_raw_measurement_provided": false
+  },
+  "performance_samples_collected": 0,
+  "frozen_gates_changed": false,
+  "default_changed": false,
+  "performance_adoption_eligible": false,
+  "remaining_acceptance": [
+    "quieter reserved window/host and valid full paired performance qualification",
+    "complete marginal kernel dispatcher/scheduler CPU",
+    "mixed-device four/eight-VM qualification",
+    "active IOAPIC-mask/congestion",
+    "old-to-new and new-to-old legacy compatibility",
+    "actual save-on-halt",
+    "host-glibc threaded setup remains unvalidated and denied on syscall28"
+  ]
+}
