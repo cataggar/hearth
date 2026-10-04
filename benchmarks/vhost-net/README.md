@@ -115,15 +115,46 @@ net mode alone permits blocking poll−1 for exactly1,2 or5 readiness descriptor
 sets, invalid counts/positive timeouts and retained eventfd/socket/clone/mprotect
 restrictions. A unit-only two-second watchdog bounds an accidentally allowed
 zero-FD test; the runtime still has no readiness timer or heartbeat.
-Current shared jailed credentials retain supplementary group0, so requested
-jailed net modes fail closed with `NetJailInheritedGroups` before VM/worker
-creation. `jail_probe.py --expect inherited-groups` records that diagnosed
-rejection, not a successful network case. Generic group clearing must come from
-the next authoritative shared correctness prerequisite.
+The prior shared5ee jailed credentials retained supplementary group0; the
+preserved `jail_probe.py --expect inherited-groups` cases record fail-closed
+rejection, not successful network. Exact authorized shared `ced7ed7` now clears
+groups before identity drop. `boot --jail` exercises the enforced VMM from a
+deliberate inherited-root-group bootstrap, configured private0600 nodes, empty
+dropped groups and an owned memory1GiB/pids16 cgroup. It verifies every observed
+VMM/dispatcher/vhost task and removes the empty cgroup after join. CPU quota is
+not enabled globally. Snapshot files live inside the private jail; restores
+use a fresh root and the same immutable backing with new MAP_PRIVATE mappings.
+Use distinct short IDs, for example:
+
+```sh
+bash benchmarks/vhost-net/run.sh boot --boot-id j-new --jail --net-backend vhost \
+  --repetitions 1 --seconds 1 --warmup 0 --modes rpc h2g g2h wake \
+  --traffic-snapshot --restore-backend userspace --concurrent
+```
+
+Do not use the old diagnosed-failure probe to claim current successful jailed
+traffic. Jailed malformed/capability injection uses fresh per-case resources;
+unjailed controls are not substitutes. Correctness RAM copies omit verified
+zero pages and require unchanged full-file hashes; this is not a new memory
+backend or a performance variant. Artifact-write failure cannot prevent empty
+cgroup/device cleanup. Consult the results for actually run
+populations; command support alone is not acceptance.
+
+`cow_isolation.py --jail --source <snapshot-jail>` tests two simultaneous enforced
+restores of that same backing. `capability_probe.py` injects permission/UAPI
+faults into only the already-created private vhost node, or FD limits12/14/15
+into a fresh jailed CLI. Run each under the bounded fleet lock and a fresh
+private namespace. Strict must diagnose the failure without fallback; `auto`
+may fall back only before activation and must pass real checked traffic.
+All observed tasks are checked for UID/GID1000, empty groups, zero capabilities,
+NNP1/Seccomp2, CPU8, owned cgroup and matching actual namespaces. Profiler cache/
+scratch paths stay inside the owned artifact directory; debuginfod is disabled.
 
 See [actual results](../../docs/perf-results/vhost-net-20261004.md),
 [spec](../../docs/product-specs/perf-vhost-net.md) and
 [active plan](../../docs/exec-plans/active/perf-vhost-net.md) for exact commands,
-counts, pins and mandatory remaining gates. Full enforced VMM jail, independent
-jailed restore isolation, arbitrary injected ioctl/allocator failures, UDP/external/scaling cells and quiet
+counts, pins and mandatory remaining gates. Basic enforced VMM traffic/lifecycle
+and simultaneous jailed restore isolation now execute; these are not complete
+production acceptance. CPU quota, arbitrary injected ioctl/allocator failures,
+long sustained IRQ/reset/tail populations, UDP/external/scaling cells and quiet
 A/A/performance qualification are not passed. No default or merge is justified.

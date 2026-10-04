@@ -74,7 +74,7 @@ case "${1:-}" in
   probe|boot|quiet|selftest|strict|resource)
     PHASE=$1
     shift
-    flock -x -w 600 "$LOCK" timeout 900 sudo -n unshare --mount --net -- \
+    flock -x -w 600 "$LOCK" timeout 900 sudo -n env PYTHONDONTWRITEBYTECODE=1 unshare --mount --net -- \
       python3 benchmarks/vhost-net/runner.py --artifact-dir "$OUT" --phase "$PHASE" "$@"
     ;;
   test)

@@ -1,6 +1,6 @@
 # Execution Plan: Evaluate Flint vhost-net
 
-**Status**: In progress — safe shadow-ring opt-in/common adapter; performance qualification blocked
+**Status**: Blocked — implemented experimental shadow-ring opt-in/common adapter; full acceptance and performance qualification incomplete
 **Last updated**: 2026-10-04
 **Issue**: [#2](https://github.com/cataggar/hearth/issues/2)
 **Spec**: [Capability-gated vhost-net Evaluation](../../product-specs/perf-vhost-net.md)
@@ -37,15 +37,35 @@ Shared compatibility `5ee81b1` is now reused as `66b9d1a`; generic enforced
 jail/API3/3 includes actual guest boot. Own35/35 units each and17 actual enforced
 child cases prove opt-in poll−1/count1,2,5, default blocking-poll denial and
 retained confinement. Two fresh exact-filter kernel owner/cgroup/join probes
-pass. Actual common jailed credentials still include supplementary group0,
-so requested jailed A′/B/auto now fail closed3/3 with NetJailInheritedGroups
-before VM/worker creation. Next authoritative shared group clearing remains
-required; old AccessDenied/SIGSYS evidence is retained. Own getuid102 guard
+pass. Prior5ee common jailed credentials included supplementary group0,
+so requested jailed A′/B/auto failed closed3/3 with NetJailInheritedGroups
+before VM/worker creation. Exact authorized shared group-clearing `ced7ed7` is
+now reused as `dff5567`; own focused enforced execution now passes, not complete
+production/performance acceptance. The harness starts with deliberate inherited group0, uses fresh
+private jail roots/new MAP_PRIVATE restore mappings and owned memory/pids
+cgroups, then verifies all observed VMM/dispatcher/vhost tasks and joins before
+removing resources. Old AccessDenied/SIGSYS/group evidence is retained. Own getuid102 guard
 denial is fixed without allowing a syscall, strict/auto root rejection passes2/2,
 and the preceding current-control unjailed A′/B traffic4/4 each remains distinct.
+Current enforced A′/B each pass4 normal modes, checked8MiB traffic pause/fences/
+resume, opposite-backend4-mode restore and132-transaction eight-client control.
+Fresh jailed malformed23/23, simultaneous CoW twice, reset3 each/stableFD10/17,
+two auto controls8 windows, strict2/2 and partial FD setup6/6 pass. The earlier
+matched B phase completed positive stages then hit real ENOSPC during its final
+negative inputs; that whole phase remains failed/partial, not repainted passing.
+Sparse correctness copies preserve full bytes/hash and failure logging cannot
+prevent empty resource cleanup. All actual commands/counts and unresolved long
+IRQ/race/fault/scaling/SDK/CPU-budget cells remain in the results.
 Existing parent CPU controllers
 are not globally enabled or changed. S3 deciding A/A and S7 qualification remain
-blocked by about16 unrelated busy cores. The original default and draft-only,
+unqualified: earlier controls showed about16 unrelated busy cores; later
+five-second idle/wake windows show variable0.55–2.13 aggregate busy cores,
+not a reserved quiet condition or established deciding noise. A′/B five-second
+idle/wake and actual task-namespace checks pass; repaired original A still fails
+two of four short windows. CPU quota and the full mandatory matrix remain
+unaccepted. The final separate3,827-file seal verifies841 owned PIDs/TIDs and70
+cgroups absent; all new aggregate windows span0.279334–4.322714 busy cores,
+not a qualified pooled performance population. The original default and draft-only,
 no-performance-merge disposition remain unchanged. Precise commands/counts,
 profile scope, artifacts and remaining gates are in the appended results.
 
@@ -687,7 +707,7 @@ preserved, followed by verified zero-only sparsification recovering
 4,293,562,368 allocated bytes. All 18 complete RAM hashes remain unchanged;
 canonical baseline allocation is untouched. See the results report and private
 `storage-{reflink,sparse}.{py,json,sha256}` epochs. This is artifact maintenance,
-not correctness/performance progress. Shared supplementary-group clearing,
+not correctness/performance progress. Own shared-group correction acceptance,
 full-jail isolation/lifecycle acceptance, current TAP relevance and quiet
 deciding performance qualification remain blocked; no checklist gate closes.
 

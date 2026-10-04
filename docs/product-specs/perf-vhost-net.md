@@ -1,6 +1,6 @@
 # Product Spec: Capability-gated vhost-net Evaluation
 
-**Status**: Safe opt-in shadow-ring investigation/implementation in progress; performance blocked
+**Status**: Experimental opt-in shadow prototype implemented; full acceptance and performance blocked
 **Last updated**: 2026-10-04
 **Issue**: [#2 — Perf-profile and evaluate a vhost-net backend for Flint](https://github.com/cataggar/hearth/issues/2)
 **Execution plan**: [perf-vhost-net](../exec-plans/active/perf-vhost-net.md)
@@ -46,16 +46,42 @@ acceptance. The opt-in poll−1/count1,2,5 overlay passes **17 actual enforced
 forked child cases**, retaining the default timeout0-only rule and existing
 socket/clone/mprotect confinement. Two fresh exact-filter kernel-owner probes
 pass empty-groups/UID/GID1000/CapEff0/NNP1/Seccomp2/cgroup/join inheritance.
-However, the actual common jailed API still has **supplementary group0** after
-UID/GID1000 drop. All requested jailed net modes now reject3/3 with
+The preceding `5ee81b1` common jailed API had **supplementary group0** after
+UID/GID1000 drop. Its requested jailed net modes rejected3/3 with
 `NetJailInheritedGroups` before filter/VM/backend creation rather than force an
-unsafe worker. The next authoritative shared group-clearing prerequisite is
-required; generic repairs are not duplicated. The introduced B getuid102 denial
+unsafe worker. The separately authorized group-clearing `ced7ed7` is now reused
+with provenance as `dff5567`; it checks setgroups before setgid/setuid and adds
+no runtime allowance. Fresh own enforced jail/traffic/lifecycle execution now passes focused controls;
+prior failures remain preserved and are not silently counted passing.
+Generic repairs are not duplicated. The introduced B getuid102 denial
 was fixed by capturing real/effective identity after privilege drop before
 seccomp; strict/auto root controls reject2/2. Historical SIGSYS281/204/102 and
 untouched
-root-owned0700/0600 AccessDenied evidence remains distinct. CPU quota delegation,
-fully jailed independent-restore isolation, arbitrary injected ioctl/allocator failures, UDP/loss,
+root-owned0700/0600 AccessDenied evidence remains distinct.
+
+The fixed-target35-unit Debug/Safe builds, three actual common-jail regressions
+and eight focused fixture/cleanup tests pass. Enforced A′/B each pass four normal
+checked modes, in-flight8MiB pause/double-RAM-fence/resume and opposite-backend
+format-v2 restore four modes with unchanged backing. Both eight-client controls
+check132 transactions/33,562,624bytes without error. The complete fresh jailed
+malformed matrix passes23/23; a preceding dense-copy run hit actual ENOSPC after
+21 cases and is retained as a failed partial phase. Two simultaneous-restore
+repetitions each preserve paused B and common backing while A's checked uploads
+change only A. Three driver resets in each backend retain FD populations10/17.
+Two private-node auto controls pass eight network windows; strict diagnoses2/2
+and partial FD setup failures6/6 unwind without fallback. Observed tasks inherit
+UID/GID1000, empty groups, CapEff0, NNP1/Seccomp2, CPU8 and owned memory1GiB/pids16
+cgroups; closed cgroups have no remaining worker/process. These are focused
+correctness populations, not complete production or performance acceptance.
+Five-second idle/wake controls also pass, with matching actual per-task
+net/mnt/user/pid namespaces; native guest clocks remain unchanged, so this is
+not a continuously halted or long-idle gate. Repaired original A still fails
+two of four short windows. The separate3,827-file seal verifies841 recorded
+owned PIDs/TIDs and70 cgroups absent. New aggregate busy observations span
+0.279334–4.322714 cores, versus earlier near16-core saturation: a changing
+unreserved load is not established A/A noise or a qualified CPU/unit benefit.
+
+CPU quota delegation, arbitrary injected ioctl/allocator failures, UDP/loss,
 4/8-VM and external Azure cells, long idle/tail/noise and installed SDK controls
 remain unaccepted. No prototype correctness diagnostic is a performance gate.
 
