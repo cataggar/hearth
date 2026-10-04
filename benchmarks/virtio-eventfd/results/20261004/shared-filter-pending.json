@@ -1,0 +1,46 @@
+{
+  "issue": 3,
+  "status": "unvalidated_draft_source_lock_acquisition_blocked",
+  "shared_prerequisite": "f2f9ab4c8e7a67097f2c3f52636327e9c41d5084",
+  "own_prerequisite_reuse": "2305b1176b76ffb87331c06f534b2997a71347bd",
+  "shared_compatibility_source": "5ee81b163b266f9c7643fb67c88cb59fe7aa2878",
+  "reused_blocks": [
+    "poll7 timeout0 only",
+    "epoll_pwait281 NULL signal-mask pointer, both32-bit halves"
+  ],
+  "own_additional_controls_preserved": [
+    "setgroups(0,NULL) before UID/GID drop, upstream f2 lacks call",
+    "experimental eventfd2 initial0/flags NONBLOCK|CLOEXEC only",
+    "experimental getsockopt SOL_SOCKET/SO_ERROR only"
+  ],
+  "new_enforced_rejection_scenarios_pending": [
+    "epoll_pwait low pointer half nonzero",
+    "epoll_pwait high pointer half nonzero",
+    "poll positive timeout",
+    "poll infinite timeout"
+  ],
+  "exclusive_lock": "/d/hearth/.perf/fleet/host.lock",
+  "umask": "077",
+  "acquisition_attempts": [
+    {"scope": "combined_suite_replay", "wait_seconds": 300, "exit_code": 1, "acquired": false},
+    {"scope": "full_rebuild_and_suites", "wait_seconds": 180, "exit_code": 1, "acquired": false},
+    {"scope": "full_rebuild_longer_retry", "wait_seconds": 900, "exit_code": 1, "acquired": false},
+    {"scope": "smaller_safe_only_window", "wait_seconds": 0, "exit_code": 1, "acquired": false}
+  ],
+  "redirected_build_log_created": false,
+  "compilers_executed": 0,
+  "tests_executed": 0,
+  "vms_executed": 0,
+  "new_binary_sha256": null,
+  "performance_samples_collected": 0,
+  "last_completed_followup_commit": "e2f3f69a251417525ba788d5876f46266f1ea513",
+  "last_completed_dedicated_suites": {"ReleaseSafe": "14/14", "Debug": "14/14"},
+  "historical_build19_is_exact_shared_5ee_filter": false,
+  "historical_pins_changed": false,
+  "frozen_gates_changed": false,
+  "default_changed": false,
+  "adoption_eligible": false,
+  "unowned_holder_inspected_or_terminated": false,
+  "request_still_running_or_holding_lock": false,
+  "required_next_action": "Parent coordinates an available bounded exclusive fleet window; format, build, enforced suites and actual no-heartbeat jailed guest regression must pass before acceptance."
+}

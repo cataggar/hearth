@@ -412,6 +412,21 @@ getsockopt(SOL_SOCKET,SO_ERROR) for the new control paths. An optional
 PR_SET_NAME157 attempt was correctly killed by the filter; the naming syscall
 was removed rather than admitted. Owner TIDs/fd identities are diagnostic logs.
 
+The shared #1 compatibility follow-up
+`5ee81b163b266f9c7643fb67c88cb59fe7aa2878` additionally narrows poll7 to
+timeout0 and epoll_pwait281 to a NULL signal-mask pointer (both halves).
+These restrictions cover actual existing vsock and blocking owner operations;
+no arbitrary blocking poll or signal-mask override is needed. Reconcile its
+exact blocks with experimental dispatch and validate before accepting a new
+binary. Historical production/measurement pins remain immutable, and none of
+the shared jail fixes are counted as eventfd acceleration.
+
+The follow-up narrowing is **pending/unvalidated**: four bounded acquisition
+requests (300s,180s,900s and nonblocking) ended before any compiler/test/VM
+started. It has no new production binary pin or performance sample. Retained
+build19/e2f3f69 correctness evidence is historical, not a replay of this source;
+a coordinated fleet window is required before acceptance.
+
 An ephemeral, unpinned, owned-TGID/exact-function BPF observer accounts actual
 on-CPU `irqfd_inject`/`irqfd_shutdown` work and subtracts scheduler off-CPU
 intervals. It emits only aggregate CPU/jobs, no foreign task names/stacks.

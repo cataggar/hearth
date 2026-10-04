@@ -19,7 +19,7 @@ const Vsock = @import("devices/virtio/vsock.zig");
 
 test "seccomp: enforced readiness and own-affinity query retain restrictions" {
     const linux = std.os.linux;
-    for (0..8) |scenario| {
+    for (0..12) |scenario| {
         const child: isize = @bitCast(linux.syscall0(.fork));
         if (child < 0) return error.ForkFailed;
         if (child == 0) {
@@ -95,8 +95,14 @@ test "seccomp: enforced readiness and own-affinity query retain restrictions" {
                 _ = linux.syscall5(.getsockopt, 0, 1, 3, @intFromPtr(&value), @intFromPtr(&length));
             } else if (scenario == 6) {
                 _ = linux.syscall2(.eventfd2, 1, VirtioOwner.EVENT_FLAGS);
-            } else {
+            } else if (scenario == 7) {
                 _ = linux.syscall2(.eventfd2, 0, VirtioOwner.EVENT_FLAGS | 1);
+            } else if (scenario == 8 or scenario == 9) {
+                const mask: usize = if (scenario == 8) 1 else @as(usize, 1) << 32;
+                _ = linux.syscall6(.epoll_pwait, 0, 0, 0, 0, mask, 8);
+            } else {
+                const timeout: usize = if (scenario == 10) 1 else @as(usize, 0xffff_ffff);
+                _ = linux.syscall3(.poll, 0, 0, timeout);
             }
             _ = linux.syscall1(.exit_group, 44);
             unreachable;
@@ -590,15 +596,15 @@ test "seccomp: filter starts with arch check and ends with allow" {
     try std.testing.expectEqual(@as(u16, 0x06), filter[filter.len - 1].code); // BPF_RET
     try std.testing.expectEqual(@as(u32, 0x7FFF0000), filter[filter.len - 1].k); // ALLOW
 
-    const N = filter.len - 38;
-    try std.testing.expectEqual(@as(u32, 0x80000000), filter[4 + N + 6].k); // KILL_PROCESS
+    const N = filter.len - 49;
+    try std.testing.expectEqual(@as(u32, 0x80000000), filter[4 + N + 8].k); // KILL_PROCESS
 }
 
 test "seccomp: log filter uses LOG as default action" {
     const filter = &seccomp_mod.log_filter;
-    const N = filter.len - 38;
+    const N = filter.len - 49;
     // Default action position uses LOG instead of KILL
-    try std.testing.expectEqual(@as(u32, 0x7FFC0000), filter[4 + N + 6].k); // RET_LOG
+    try std.testing.expectEqual(@as(u32, 0x7FFC0000), filter[4 + N + 8].k); // RET_LOG
 
 }
 
@@ -676,7 +682,7 @@ test "seccomp: all required syscalls are whitelisted" {
 
 test "seccomp: Unix API additions retain argument confinement" {
     const Eval = struct {
-        fn run(nr: u32, arg0: u32, arg2: u32) u32 {
+        fn evaluate(nr: u32, arg0: u32, arg2: u32, mask: u64) u32 {
             var accumulator: u32 = 0;
             var pc: usize = 0;
             while (pc < seccomp_mod.kill_filter.len) {
@@ -688,6 +694,8 @@ test "seccomp: Unix API additions retain argument confinement" {
                         16 => arg0,
                         24 => 0,
                         32 => arg2,
+                        48 => @truncate(mask),
+                        52 => @truncate(mask >> 32),
                         else => unreachable,
                     },
                     0x54 => accumulator &= insn.k,
@@ -698,6 +706,10 @@ test "seccomp: Unix API additions retain argument confinement" {
                 pc += 1;
             }
             return 0x80000000;
+        }
+
+        fn run(nr: u32, arg0: u32, arg2: u32) u32 {
+            return evaluate(nr, arg0, arg2, 0);
         }
     };
     const allow: u32 = 0x7FFF0000;
@@ -717,6 +729,13 @@ test "seccomp: Unix API additions retain argument confinement" {
     try std.testing.expectEqual(allow, Eval.run(204, 0, 0));
     try std.testing.expectEqual(kill, Eval.run(204, 1, 0));
     try std.testing.expectEqual(kill, Eval.run(203, 0, 0));
+    try std.testing.expectEqual(kill, Eval.run(56, 0x00020000, 0));
+    try std.testing.expectEqual(allow, Eval.evaluate(281, 0, 0, 0));
+    try std.testing.expectEqual(kill, Eval.evaluate(281, 0, 0, 1));
+    try std.testing.expectEqual(kill, Eval.evaluate(281, 0, 0, 1 << 32));
+    try std.testing.expectEqual(allow, Eval.run(7, 0, 0));
+    try std.testing.expectEqual(kill, Eval.run(7, 0, 1));
+    try std.testing.expectEqual(kill, Eval.run(7, 0, 0xFFFFFFFF));
 }
 
 test "snapshot: device min size check rejects undersized data" {

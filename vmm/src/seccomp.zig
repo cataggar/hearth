@@ -2,11 +2,15 @@
 // Whitelists the minimum syscalls needed to run a KVM VM with
 // virtio devices and an API socket. Everything else kills the process.
 //
-// Four syscalls have argument-level filtering:
+// Eight syscalls have argument-level filtering:
 //   clone  — only thread-creation flags (blocks CLONE_NEWUSER escape)
 //   socket — only AF_UNIX (blocks network exfiltration)
 //   mprotect — blocks PROT_EXEC (no shellcode execution)
 //   sched_getaffinity — current process only (thread startup)
+//   epoll_pwait — only a null signal mask, as emitted by linux.epoll_wait
+//   poll — only the existing nonblocking vsock check
+//   eventfd2 — zero initial count, nonblocking and close-on-exec
+//   getsockopt — only the Unix connection SO_ERROR query
 
 const std = @import("std");
 const linux = std.os.linux;
@@ -27,6 +31,7 @@ const DATA_OFF_ARCH: u32 = 4;
 const DATA_OFF_ARG0: u32 = 16; // after nr(4) + arch(4) + instruction_pointer(8)
 const DATA_OFF_ARG1: u32 = 24;
 const DATA_OFF_ARG2: u32 = 32;
+const DATA_OFF_ARG4: u32 = 48;
 
 // Classic BPF structs (not in Zig stdlib)
 const SockFilter = extern struct {
@@ -75,16 +80,17 @@ const SYS_CLONE: u32 = 56;
 const SYS_SCHED_GETAFFINITY: u32 = 204;
 const SYS_EVENTFD2: u32 = 290;
 const SYS_GETSOCKOPT: u32 = 55;
+const SYS_EPOLL_PWAIT: u32 = 281;
+const SYS_POLL: u32 = 7;
 
 // Simple whitelist — allowed unconditionally (no argument checks).
-// clone, socket, mprotect and sched_getaffinity have argument filters below.
+// Argument-filtered syscalls are excluded; their checks are below.
 const simple_syscalls = [_]u32{
     // Core I/O
     0, // read
     1, // write
     2, // open (Zig's linux.open() emits raw open syscall)
     3, // close
-    7, // poll (vsock socket readiness)
     8, // lseek
     16, // ioctl (KVM, FIONBIO, TUNSETIFF)
     17, // pread64 (virtio-blk)
@@ -142,7 +148,6 @@ const simple_syscalls = [_]u32{
     // Epoll (run loop device polling)
     232, // epoll_wait
     233, // epoll_ctl
-    281, // epoll_pwait (Zig's epoll_wait wrapper)
     291, // epoll_create1
 
     // Timers / sleep
@@ -156,21 +161,23 @@ const simple_syscalls = [_]u32{
 /// Build the BPF filter at comptime. Layout:
 ///   [0-3]      header: load arch, verify x86_64, load nr
 ///   [4..4+N-1] simple syscall checks (unconditional allow)
-///   [4+N..+5]  filtered syscall dispatch (jump to arg check blocks)
-///   [4+N+6]    default KILL
-///   [4+N+7..]  argument check blocks
+///   [4+N..+7]  filtered syscall dispatch (jump to arg check blocks)
+///   [4+N+8]    default KILL
+///   [4+N+9..]  argument check blocks
 ///   [last]      ALLOW
-fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simple.len + 38]SockFilter {
+fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simple.len + 49]SockFilter {
     const N = simple.len;
-    const ALLOW_POS = N + 37;
-    const CLONE_BLK = 4 + N + 7;
-    const SOCKET_BLK = 4 + N + 11;
-    const MPROT_BLK = 4 + N + 14;
-    const AFFINITY_BLK = 4 + N + 18;
-    const EVENTFD_BLK = 4 + N + 21;
-    const SOCKOPT_BLK = 4 + N + 27;
+    const ALLOW_POS = N + 48;
+    const CLONE_BLK = 4 + N + 9;
+    const SOCKET_BLK = 4 + N + 13;
+    const MPROT_BLK = 4 + N + 16;
+    const AFFINITY_BLK = 4 + N + 20;
+    const EVENTFD_BLK = 4 + N + 23;
+    const SOCKOPT_BLK = 4 + N + 29;
+    const EPOLL_BLK = 4 + N + 35;
+    const POLL_BLK = 4 + N + 41;
 
-    var f: [N + 38]SockFilter = undefined;
+    var f: [N + 49]SockFilter = undefined;
 
     // Header: verify arch, load syscall nr
     f[0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARCH);
@@ -190,9 +197,11 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
     f[4 + N + 3] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_SCHED_GETAFFINITY, @intCast(AFFINITY_BLK - (4 + N + 3) - 1), 0);
     f[4 + N + 4] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_EVENTFD2, @intCast(EVENTFD_BLK - (4 + N + 4) - 1), 0);
     f[4 + N + 5] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_GETSOCKOPT, @intCast(SOCKOPT_BLK - (4 + N + 5) - 1), 0);
+    f[4 + N + 6] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_EPOLL_PWAIT, @intCast(EPOLL_BLK - (4 + N + 6) - 1), 0);
+    f[4 + N + 7] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_POLL, @intCast(POLL_BLK - (4 + N + 7) - 1), 0);
 
     // Default: kill (or log)
-    f[4 + N + 6] = bpf_stmt(BPF_RET | BPF_K, default_action);
+    f[4 + N + 8] = bpf_stmt(BPF_RET | BPF_K, default_action);
 
     // Clone check: only allow thread-creation flags (block CLONE_NEWUSER etc.)
     f[CLONE_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
@@ -229,6 +238,18 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
     f[SOCKOPT_BLK + 4] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 4, @intCast(ALLOW_POS - (SOCKOPT_BLK + 4) - 1), 0);
     f[SOCKOPT_BLK + 5] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 
+    // Check both halves of the signal-mask pointer, not just its low word.
+    f[EPOLL_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG4);
+    f[EPOLL_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, 0);
+    f[EPOLL_BLK + 2] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+    f[EPOLL_BLK + 3] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG4 + 4);
+    f[EPOLL_BLK + 4] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (EPOLL_BLK + 4) - 1), 0);
+    f[EPOLL_BLK + 5] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+
+    f[POLL_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG2);
+    f[POLL_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (POLL_BLK + 1) - 1), 0);
+    f[POLL_BLK + 2] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+
     // ALLOW
     f[ALLOW_POS] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
 
@@ -262,6 +283,6 @@ pub fn install(audit: bool) !void {
     if (audit) {
         log.warn("seccomp in AUDIT mode — violations logged, not killed", .{});
     } else {
-        log.info("seccomp filter installed ({} syscall classes admitted)", .{simple_syscalls.len + 6});
+        log.info("seccomp filter installed ({} syscall classes admitted)", .{simple_syscalls.len + 8});
     }
 }

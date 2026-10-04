@@ -53,6 +53,36 @@ acceptance. No unrelated task/process metadata or stacks were captured.
 
 ## W2 four controlled modes — actual correctness, not adoption
 
+### Shared filter reconciliation pending
+
+The authoritative shared jail repair is #1's `f2f9ab4` + `5ee81b1`.
+Build19 reused the first and independently implemented PID0-affinity/ignored
+clone compatibility, but its ordinary poll7/epoll_pwait281 allowances were
+unconditional. It was **not the exact second shared filter**. All historical
+C00/C10/C01/C11 arms used that same filter, yet remain unqualified; do not
+retrospectively label them exact-`5ee81b1` repaired-baseline measurements.
+
+The exact shared timeout0 poll and NULL-mask epoll blocks (both pointer halves)
+are now reconciled with the required experimental eventfd2/SO_ERROR dispatch.
+Root0755 internal directories/target UID:GID0600 nodes remain the exact shared
+permission contract under077, not UID-owned0700 replacement directories.
+Supplementary-group clearing is an additional explicit #3 prerequisite:
+`jail.zig` calls `setgroups(0,NULL)` before the UID/GID drop, retained from
+the original isolation control. Upstream `f2f9ab4` does not contain that call.
+Its actual empty-group enforced rosters remain #3 evidence; consolidation
+into the authoritative shared revision was requested directly from #1.
+It is not silently described as identical to #1's unmodified group policy.
+The new filter is **unvalidated draft source**. Four attempts exited1 before
+any build log was created: a combined replay waiting300s, full rebuild waiting
+180s, longer rebuild waiting900s, and a smaller nonblocking Safe-only phase.
+Thus **zero compilers, tests or VMs executed**, no new binary/hash exists,
+and no request remains queued/holding the lock. These are lock-refusal
+receipts, not skipped/passing tests. Parent must coordinate an available bounded
+fleet window; no bypass, unowned-holder inspection/termination, gate relaxation
+or default promotion is permitted. [Pending receipt](shared-filter-pending.json)
+captures provenance, source changes and actual missing execution.
+Old production/performance/L0 pins stay immutable, gates unchanged.
+
 Final pinned static-musl binaries:
 
 | Optimization | SHA256 |

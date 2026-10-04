@@ -27,6 +27,34 @@ The subsequent combined-suite replay never acquired the fleet lock within
 300 seconds (exit1); no tests executed in that request. Historical unit/
 integration results remain separately identified, not counted as a new run.
 
+### Shared least-privilege compatibility reconciliation
+
+Reuse #1's exact follow-up `5ee81b163b266f9c7643fb67c88cb59fe7aa2878`
+NULL-mask epoll-pwait (both pointer halves) and timeout-zero poll BPF blocks
+and confinement cases. Existing PID0 affinity/ignored-clone-bit controls
+already match; retain experimental argument-filtered eventfd2/SO_ERROR.
+Exclude sibling async/backend/docs and nonhermetic imported fixtures.
+This narrows an earlier ordinary-call allowance, not readiness ownership or
+the matched modes. Rebuild and run enforced regression/guest checks under
+fleet lock; preserve build19 and all prior performance/L0 pins unchanged.
+New binaries require new hashes; old measurements are not reclassified as
+current-binary qualification. Performance/default adoption stays blocked.
+Keep the explicit existing `setgroups(0,NULL)` before credential drop; upstream
+`f2f9ab4` lacks it. Its separate provenance and real empty-group roster checks
+are disclosed, and #1 was asked to consolidate this additional isolation
+prerequisite rather than weakening #3 to match an uncleared group policy.
+
+**Actual follow-up outcome: validation blocked, not passing.** The new filter
+could not acquire the shared fleet lock: full-suite wait300s, rebuilt full
+phase wait180s, longer retry wait900s, and a smaller nonblocking Safe-only
+phase all exited1 before the redirected build logs were created. No compiler,
+test or VM executed in these requests; no new ELF/hash exists. All own requests
+ended without holding a lock. Parent coordination of an available bounded
+lock window is required before this reconciled source is accepted. Do not
+bypass the lock, inspect/kill unowned holders, relax gates or count these as
+skipped/passing tests. Earlier e2f3f69 fourteen-test suites remain independently
+valid historical executions.
+
 **Issue**: [#3](https://github.com/cataggar/hearth/issues/3)
 
 **Spec**: [VirtIO eventfd experiment](../../product-specs/perf-virtio-eventfd.md)
