@@ -241,6 +241,15 @@ pub fn main(init: std.process.Init) !void {
         });
     }
 
+    // Capture after privilege drop; the enforced filter forbids identity changes.
+    if (net_options.enabled) {
+        const uid = std.os.linux.getuid();
+        const effective_uid = std.os.linux.geteuid();
+        net_options.owner_uid = if (uid == 0 or effective_uid == 0) 0 else @intCast(effective_uid);
+        if (net_options.mode != .userspace and net_options.owner_uid.? == 0)
+            return error.VhostRequiresPrivilegeDrop;
+    }
+
     // Seccomp filter — installed after jail (jail needs mount/mknod/setuid)
     // but before any guest interaction
     if (cli.jail != null or cli.@"seccomp-audit") {

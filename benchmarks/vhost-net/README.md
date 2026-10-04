@@ -100,8 +100,15 @@ direct-ring mode deliberately preserves the rejected behavior.
 an owner-mode kernel worker in a unique memory/pids-limited cgroup, observes
 NNP1/Seccomp2/CapEff0/affinity/inheritance and waits for synchronous close/join.
 It removes only that owned empty cgroup. It never enables global controllers;
-CPU quota delegation was absent. `jail_probe.py` separately reproduces the
-still-unrepaired common `/dev`/KVM ownership failure rather than bypassing it.
+CPU quota delegation was absent. `jail_probe.py` retains original ownership
+failure diagnostics and now checks the exact shared prerequisite without
+relaxing enforcement: `--expect sigsys --trace` captures an explicitly waited
+owned child's signal (a zero profiler exit is not acceptance). `--trace-all`
+is still owned-child-only. Strict/auto root-rejection controls use
+`--no-jail --uid 0 --expect privilege-drop` in a private namespace. They reject
+before VM creation, not demonstrate a working root backend.
+Real/effective owner identity is captured after privilege drop before seccomp;
+unset/root fails closed without adding a getuid syscall allowance.
 
 See [actual results](../../docs/perf-results/vhost-net-20261004.md),
 [spec](../../docs/product-specs/perf-vhost-net.md) and

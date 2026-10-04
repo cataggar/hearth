@@ -27,9 +27,18 @@ that mutating A with343,932,928 checked bytes leaves paused B's entire RAM and
 the shared backing unchanged; A's RAM differs, both repetitions pass and all
 owned VMs/supervisors join. This is unjailed CoW isolation, not jail acceptance.
 These are focused S6 diagnostics, not complete production-jail acceptance or S7.
-The authoritative separate common C00 jail prerequisite is still unavailable;
-the current jail reproduction remains KVM AccessDenied under umask077. The new
-vhost node itself is private0600/UID-GID1000. Existing parent CPU controllers
+The authoritative minimal common prerequisite `f2f9ab4` is now reused as
+`bc9bfc2`, with its exact pure regression-helper dependency and issue-1 evidence
+provenance. Own current debug/safe units35/35 each, fixture6/6 and two enforced
+jail/API prerequisite cases pass. Original/A′/B actually open private owner0600
+KVM/TUN nodes, then all die SIGSYS; owned original/A′ traces identify281/204.
+The requested vhost node also uses the common no-follow-FD helper,0600/UID-GID1000.
+Next shared thread/poll compatibility and supplementary-group clearing remain
+required before full-jail acceptance; old KVM AccessDenied evidence is retained.
+Own getuid102 guard denial is fixed by capturing real/effective UID before
+seccomp after privilege drop, without adding a syscall. Current B now fails204,
+strict/auto root rejection passes2/2, and current unjailed A′/B traffic4/4 each.
+Existing parent CPU controllers
 are not globally enabled or changed. S3 deciding A/A and S7 qualification remain
 blocked by about16 unrelated busy cores. The original default and draft-only,
 no-performance-merge disposition remain unchanged. Precise commands/counts,

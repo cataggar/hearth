@@ -33,11 +33,21 @@ Two simultaneous unjailed KVM restores of one backing file now also verify
 that a paused guest's entire RAM is unchanged while the other receives checked
 bulk traffic, with unchanged common backing and different mutated guest RAM.
 
-**Full production-jail acceptance is still blocked:** the requested authoritative
-separate common C00 commit has not been supplied. A current untouched-common-jail
-reproduction still fails opening KVM because umask077 leaves root-owned `/dev`
-0700/KVM0600. Only the requested vhost node and narrowly conditional eventfd2
-policy are added here; generic repairs are not duplicated. CPU quota delegation,
+**Full production-jail acceptance is still blocked:** the separately authorized
+common prerequisite `f2f9ab4` is now reused as `bc9bfc2`, not duplicated or credited
+as a speedup. Its exact pure harness dependency and issue-1 provenance record
+are imported with it. Own debug/safe units35/35 each, fixture6/6 and two real
+enforced-jail prerequisite cases pass, including six checked API exchanges.
+The conditional vhost node uses the same no-follow-FD owner/mode helper.
+Original, A′ and B now actually open private UID/GID1000 KVM/TUN nodes under077,
+but all still die with SIGSYS before traffic; owned original/A′ traces identify
+epoll_pwait281/sched_getaffinity204. Thread/poll compatibility and supplementary
+group clearing need the next shared correctness control. The introduced B
+getuid102 denial is fixed by capturing real/effective identity after privilege
+drop before seccomp, never expanding its whitelist; current B now reaches the
+same thread-affinity204 denial and strict/auto root controls reject2/2.
+Historical untouched
+root-owned0700/0600 AccessDenied evidence remains distinct. CPU quota delegation,
 fully jailed independent-restore isolation, arbitrary injected ioctl/allocator failures, UDP/loss,
 4/8-VM and external Azure cells, long idle/tail/noise and installed SDK controls
 remain unaccepted. No prototype correctness diagnostic is a performance gate.

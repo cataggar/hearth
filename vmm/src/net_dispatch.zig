@@ -11,7 +11,11 @@ const Vcpu = @import("kvm/vcpu.zig");
 const Self = @This();
 const log = std.log.scoped(.net_dispatch);
 pub const Mode = enum { userspace, vhost, auto };
-pub const Options = struct { enabled: bool = false, mode: Mode = .userspace };
+pub const Options = struct {
+    enabled: bool = false,
+    mode: Mode = .userspace,
+    owner_uid: ?u32 = null,
+};
 
 mem: *Memory,
 dev: *Mmio,
@@ -32,7 +36,7 @@ generation: u64 = 0,
 
 pub fn init(options: Options, mem: *Memory, dev: *Mmio, vm: *const Vm, vcpu: *Vcpu) !Self {
     if (dev.device_id != virtio.DEVICE_ID_NET) return error.NetBackendRequiresTap;
-    if (options.mode != .userspace and linux.getuid() == 0)
+    if (options.mode != .userspace and (options.owner_uid orelse 0) == 0)
         return error.VhostRequiresPrivilegeDrop;
     const wake = try Vhost.eventfd();
     errdefer _ = linux.close(wake);

@@ -71,8 +71,7 @@ pub fn setup(config: Config) !void {
         try createDeviceNode("dev/net/tun", DEV_NET_TUN, config);
     }
     if (config.need_vhost_net) {
-        try check(linux.mknod("dev/vhost-net", S_IFCHR | 0o600, DEV_VHOST_NET), "mknod(/dev/vhost-net)");
-        try check(linux.fchownat(linux.AT.FDCWD, "dev/vhost-net", config.uid, config.gid, 0), "chown(/dev/vhost-net)");
+        try createDeviceNode("dev/vhost-net", DEV_VHOST_NET, config);
     }
 
     // Drop privileges — last step requiring root
