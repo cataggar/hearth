@@ -270,11 +270,114 @@ Distinct stages are `repaired-sync/`, `repaired-sync-compat/` and
 `repaired-sync-usable/`; final raw evidence includes `compat-smoke.json`,
 per-mode traces/launches/exits, and `prerequisite/usable-*.log`.
 Untouched L0 remains unchanged. Prerequisite correctness is now established;
-the fio/package/build fixture, complete G0/G1 workload matrix, post-provisioning
+the package/build fixture, complete G0/G1 workload matrix, post-provisioning
 A/A and total-host noise controls still require execution. No performance
 benefit, frozen gate, prototype selection or promotion is inferred from repair.
 
-## Executed validation
+## Actual repaired-sync guest fio and loaded profiles — 17:26–17:33 UTC
+
+These executions use repaired synchronous source
+`5ee81b163b266f9c7643fb67c88cb59fe7aa2878`, safe binary `0f7b0d55…`,
+the same kernel and unchanged static agent. All VMs remain jailed and dropped
+to UID/GID1000, with legacy MMIO/IRQ behavior. The original untouched L0 tree
+is not overwritten or included in a comparison with this usable configuration.
+
+### Verified guest engine, dataset and achieved depth
+
+Host `fio --enghelp` and `ldd /usr/bin/fio` were insufficient: the first actual
+guest run could print fio3.40 but could not load libaio. The installed
+`fio-engine-libaio-3.40-3.azl4.x86_64` RPM supplies a **dlopened**
+`/usr/lib64/fio/fio-libaio.so`, with an additional `libaio.so.1` dependency.
+The corrected private fixture copies that exact installed plugin and dynamic
+closure; no compiler, dependency manifest, guest feature or installed package
+version changes.
+
+An initial plugin-enabled trial completed fio commands but destroyed the VM
+before its JSON was reliably persisted. The owned backing-image copy and
+journal-recovery attempt did not recover depth JSON. It is preserved as a
+failed evidence-capture trial, **not achieved-depth acceptance**. The corrected
+run syncs and reads/parses each JSON through the actual agent before destruction,
+checks every job's `error=0`, and uses distinct run/prefilled image names.
+
+The fully checked guest run at **17:26:35–17:27:00 UTC** establishes:
+
+| Actual guest operation | Checked result |
+|---|---|
+| Full refill-buffered file write with final fsync | **1,073,741,824 bytes written**, error0; not sparse sizing |
+| Direct libaio random read, requested QD8 | Achieved depth band8 **99.964865%**, error0 |
+| Direct libaio random read, requested QD32 | Achieved depth band32 **99.853698%**, error0 |
+
+The verified prefilled image is
+`fio-sync-libaio/fixture/disk.prefilled-guest-fio-verified.ext4`; raw guest JSON,
+engine help, commands and executed wrapper are in
+`fio-sync-libaio/guest-fio-verified/`. Original incomplete-plugin and
+unpersisted-JSON trials remain separate. This resolves guest fio/higher-depth
+and fully written dataset capability, not the entire G0 workload fixture.
+The pinned offline package/build disk-root closure remains unprovisioned.
+
+### Short warm-cache diagnostic A/A and actual host profiles
+
+One exclusive-lock series makes fresh reflink image copies and uses CPU8,
+one vCPU, 512MiB, and the declared existing10ms heartbeat. Six unprofiled
+**10-second** direct libaio QD8 random-read trials form three short diagnostic
+A/A pairs; separate repeated runs collect stat and stacked software profiles.
+
+IOPS are **11738.826117 / 11112.388761 / 11107.789221 / 11041.695830 /
+10341.665833 / 10348.565143**. Mean **10948.49**, sample SD **531.73**
+(**4.857% CV**); pairwise relative deltas are **−5.336% / −0.595% / +0.067%**.
+These are synchronous-only samples and drift/noise, not an optimization gain
+or confidence-qualified A/A bound.
+
+The separately matched five-second whole-host control measures **99.799875%
+busy CPU** despite holding the fleet lock. External runnable work remains;
+ownership is not established and no unowned PID, affinity, cache or security
+setting was changed. This is new #1 post-repair evidence, distinct from the
+historical99.938% window and peer-reported controls.
+
+The stat collector explicitly attaches to all **three listed VMM TIDs**, not
+just the vCPU, for approximately12 seconds:
+
+| Actual counter | Observed total |
+|---|---|
+| task-clock | **10.254681329 CPU seconds**, 0.854 CPUs utilized |
+| context switches / page faults | **5153 / 0** |
+| KVM entry / exit | **795699 / 795699** |
+| pread64 / pwrite64 / fdatasync | **103005 / 22 / 4** |
+| Separately stat-profiled fio IOPS | **10299.370063** |
+
+The separate199Hz cpu-clock/DWARF record contains **2036 raw sample records,
+zero lost samples**; native `perf script` decodes730 event headers, while the
+record/report also contains guest/hypervisor-mode samples without guest symbol
+maps. Real native kernel/user stacks include KVM run/ioctl and buffered
+`pread64`/`filemap_read` paths. The record-profiled fio IOPS are **10580.641936**.
+Raw sample count is obtained from `perf report -D`, not rounded “2K” output.
+Hardware cycles/instructions remain unsupported.
+
+These are **not G1 acceptance**: no10s warmup/60s measured windows, only three
+short pairs, incomplete workload/cache/writeback matrix, no independently
+verified runtime thread-role/creation census, and no complete attributable
+asynchronous kernel I/O/writeback CPU. No lower vCPU cost or total CPU saving
+is claimed; no candidate or numeric performance/resource gates exist.
+
+### Own no-heartbeat control liveness check
+
+Fresh repaired jailed API boots without the heartbeat accept three immediate
+startup exec requests (**3/3**, approximately1.88–1.94ms). That is not idle
+progress: three further fresh boots wait **five seconds** before submitting
+the same exec. **All3/3 time out at the two-second socket deadline**. No
+heartbeat, polling workaround or peer notification optimization is added.
+
+These are actual #1 controls, not assumed peer outcomes. Logs and launch/
+exit manifests are under `g0-loaded-profile/idle-no-heartbeat-*` and
+`idle-wait-no-heartbeat-*`; `idle-wait-control-summary.json` and the retained
+executed wrapper describe the exact bounds. Required idle/interactive baseline
+liveness is therefore genuinely blocked. An async block worker cannot be
+qualified from heartbeat-masked control success or an unsupported mandatory
+baseline row. This failure and the uncontrolled saturated-host condition
+prevent G0/G1 qualification/backend selection; they do not prove a worker's
+performance merits.
+
+## Original diagnostic validation
 
 | Command / coverage | Actual result |
 |---|---|
@@ -315,9 +418,10 @@ not counted as successful profiles. Retrying the same startup probe at
 reports of jail/setup/kill-filter execution. Sixty-two startup samples cannot
 identify a disk bottleneck; they are not a substitute for G1's loaded profiles.
 
-**Before/after throughput, IOPS, request/interactive tails, total attributable
+**Before/after comparisons of throughput, IOPS, request/interactive tails, total attributable
 CPU, idle VM cost, lifecycle distributions and confidence intervals: not
-measured. No candidate exists.** No numeric workload gate or A/A noise bound was
+measured. No candidate exists.** The newer repaired synchronous-only diagnostic
+numbers above do not establish a comparison. No numeric workload gate or A/A noise bound was
 frozen from these startup counters. Proposed thresholds remain provisional.
 
 ## Required matrix and decision
@@ -334,7 +438,7 @@ frozen from these startup counters. Proposed thresholds remain provisional.
 | Async faults/mutation/backpressure/wake/generation/drain/isolation | **0; no backend selected** |
 | Non-nested comparison | Unavailable; no extrapolation |
 
-**Keep synchronous pending a repaired, independently qualified baseline.** This
+**Keep synchronous pending an independently qualified repaired baseline.** This
 does not demonstrate that a worker is slow or unwarranted. G0/G1 are incomplete,
 so selecting/implementing a backend or freezing performance margins now would
 violate the profile-first experiment. G2–G5 remain unexecuted; the plan stays
@@ -343,8 +447,10 @@ merge recommendation is made.
 
 Next work: use the declared repaired synchronous configuration identically on
 both sides; reserve/control a host suitable for total CPU
-attribution; provision the pinned fio/higher-QD and offline package/build
-fixtures; execute the full synchronous matrix/A/A profiles and freeze gates.
+attribution; establish real no-heartbeat idle control progress without treating
+#3's optional notification optimization as a prerequisite; provision the pinned
+offline package/build fixture; execute the full synchronous matrix/A/A profiles
+and freeze gates. Guest fio/higher-QD and the written dataset are now verified.
 Only then choose a bounded worker, implement the specified coupled ownership,
 wake and lifecycle surfaces, and run all remaining acceptance/comparison gates.
 
@@ -369,6 +475,15 @@ Raw evidence remains private in the isolated worktree:
   probes; retained wrapper, traces, modes, source/binary identity and exits.
 - `smoke-unjailed-capability/`: actual guest kernel/mount/memory output,
   successful disk marker/flush counters and hash, owned exit record; no profiles.
+- `prerequisite/`, `jail-tests/`, `repaired-sync*`: separate repair-stage
+  binaries/traces, actual32/7/10 Debug/Safe counts, enforced guest/disk checks.
+- `fio-sync/`, `fio-sync-libaio/`: exact dynamic/plugin closure and distinct
+  failed/successful guest fio captures, checked1GiB prefill/depth JSON.
+- `g0-loaded-profile/`: repaired source/binary/fixture copies, six short
+  unprofiled trials, raw stat/perf/script/report events, host control,
+  no-heartbeat startup/idle controls, retained executed scripts and summaries.
+  `final-cleanup-evidence.json` checks **83 recorded owned PIDs absent** and
+  no remaining owned device nodes/socket paths.
 
 All compilation, test execution, installation/extraction, fixture generation
 and VM/perf probe series take the **common absolute** exclusive fleet lock.

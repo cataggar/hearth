@@ -51,6 +51,19 @@ The next traced stage proves the existing vsock loop needs nonblocking `poll`
 declares that bit unused/ignored; recognizing it does not permit another
 active clone capability. All namespace/process-escape flags stay denied.
 
+### Repaired synchronous execution status
+
+The identical repaired configuration `5ee81b1` now verifies real guest fio3.40
+libaio loading, fully written1GiB, and achieved QD8/QD32. Short warm-read
+diagnostic repeats plus actual all-listed-TID software stat/stack records
+exist, but are not the complete G1 matrix or frozen numeric gates.
+Current own controls find99.799875%whole-host busy under the shared lock;
+no-heartbeat agent exec times out3/3 after five seconds idle. Original jail
+repairs are complete; mandatory baseline idle progress and controlled total
+CPU attribution remain blocked. The detailed results preserve both successful
+capabilities and failed trials. No async worker/default or performance merge
+is justified, and the full plan remains active/incomplete.
+
 ## Objective and scope
 
 Determine whether moving backing-file operations off Flint's vCPU loop improves

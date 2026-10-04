@@ -77,6 +77,30 @@ per mode including real enforced guest boot, and two traced jailed disk/agent
 smokes. Details and intermediate failures are in the results. G0/G1 workload
 and noise qualification remain outstanding; no worker was selected.
 
+### Repaired synchronous G0 execution — 17:26–17:33 UTC
+
+Source `5ee81b1` and safe SHA256 `0f7b0d55…` now execute real guest fio3.40,
+including its actually dlopened libaio plugin/closure. The checked guest run
+writes the full1GiB and verifies achieved QD8/QD32 bands99.964865%/99.853698%
+with error0 and JSON read before destruction. Initial missing-plugin and
+unpersisted-JSON trials remain failures, separate from that accepted capability.
+
+Six short10s warm-read diagnostics report10948.49±531.73IOPS (sample SD,
+4.857%CV); separate actual stat/stack collections attach to three listed VMM
+TIDs and retain2036raw samples/zero lost. This is not the required10s warmup,
+60s window or ten paired repeats; kernel/writeback attribution and full
+workload/thread-role census remain incomplete. No numeric gate is frozen.
+
+Fresh locked host control is99.799875%busy, with unowned load untouched.
+Own repaired no-heartbeat API exec succeeds3/3 immediately after startup but
+times out3/3 after five seconds idle, at the two-second response deadline.
+These are genuine current baseline/noise blockers, not the now-fixed original
+jail denials. Keep synchronous; no backend chosen or performance merge.
+The offline package/build, loaded PTY, concurrent and lifecycle matrix still
+requires execution after baseline liveness/controlled-host prerequisites.
+Raw commands, actual counts, limitations and distinct artifacts are linked
+in the results. This active plan is **not complete**.
+
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
 and a measured keep/reject decision. Execution has started in the isolated
 `copilot/perf-async-block-20261004` worktree. Completion of implementation remains
