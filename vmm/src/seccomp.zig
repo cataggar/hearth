@@ -250,8 +250,25 @@ fn withNetEvents(comptime base: anytype) [base.len + 11]SockFilter {
     return filter;
 }
 
-pub const net_kill_filter = withNetEvents(kill_filter);
-const net_log_filter = withNetEvents(log_filter);
+fn withNetPoll(comptime base: anytype) [base.len + 13]SockFilter {
+    var filter: [base.len + 13]SockFilter = undefined;
+    @memcpy(filter[0..4], base[0..4]);
+    filter[4] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_POLL, 0, 8);
+    filter[5] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG2);
+    filter[6] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0xffffffff, 0, 6);
+    filter[7] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0 + 8);
+    // Wake only, wake/TAP, or wake plus both queue CALL/ERR eventfds.
+    filter[8] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 1, 3, 0);
+    filter[9] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 2, 2, 0);
+    filter[10] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 5, 1, 0);
+    filter[11] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+    filter[12] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
+    @memcpy(filter[13..], &base);
+    return filter;
+}
+
+pub const net_kill_filter = withNetPoll(withNetEvents(kill_filter));
+const net_log_filter = withNetPoll(withNetEvents(log_filter));
 
 /// Install the seccomp BPF filter. After this, unlisted syscalls kill
 /// the process (or log in audit mode for development).
@@ -288,8 +305,14 @@ pub fn installForNet(audit: bool, enabled: bool) !void {
     }
 }
 
-test "explicit net filter allows only required eventfd2 and retains confinement" {
-    const cases = [_]struct { enabled: bool, action: u8, killed: bool }{
+test "explicit net filter confines eventfd2 and blocked readiness poll" {
+    const cases = [_]struct {
+        enabled: bool,
+        action: u8,
+        killed: bool,
+        count: u32 = 1,
+        timeout: i32 = -1,
+    }{
         .{ .enabled = false, .action = 0, .killed = true },
         .{ .enabled = true, .action = 0, .killed = false },
         .{ .enabled = true, .action = 1, .killed = true },
@@ -297,11 +320,29 @@ test "explicit net filter allows only required eventfd2 and retains confinement"
         .{ .enabled = true, .action = 3, .killed = true },
         .{ .enabled = true, .action = 4, .killed = true },
         .{ .enabled = true, .action = 5, .killed = true },
+        .{ .enabled = false, .action = 6, .killed = true },
+        .{ .enabled = true, .action = 6, .killed = false },
+        .{ .enabled = true, .action = 6, .killed = false, .count = 2 },
+        .{ .enabled = true, .action = 6, .killed = false, .count = 5 },
+        .{ .enabled = true, .action = 6, .killed = true, .count = 0 },
+        .{ .enabled = true, .action = 6, .killed = true, .count = 3 },
+        .{ .enabled = true, .action = 6, .killed = true, .count = 6 },
+        .{ .enabled = true, .action = 6, .killed = true, .timeout = 1 },
+        .{ .enabled = true, .action = 6, .killed = false, .timeout = 0 },
+        .{ .enabled = false, .action = 6, .killed = false, .timeout = 0 },
     };
     for (cases) |case| {
         const child: isize = @bitCast(linux.fork());
         if (child < 0) return error.TestForkFailed;
         if (child == 0) {
+            var ready: linux.fd_t = -1;
+            if (case.action == 6) {
+                const rc: isize = @bitCast(linux.eventfd(1, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK));
+                if (rc < 0) linux.exit(92);
+                ready = @intCast(rc);
+                // Bound an accidentally allowed zero-descriptor infinite wait.
+                _ = linux.syscall1(.alarm, 2);
+            }
             installForNet(false, case.enabled) catch linux.exit(90);
             switch (case.action) {
                 0 => {
@@ -314,6 +355,13 @@ test "explicit net filter allows only required eventfd2 and retains confinement"
                 3 => _ = linux.mprotect(@ptrFromInt(4096), 4096, .{ .EXEC = true }),
                 4 => _ = linux.eventfd(1, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK),
                 5 => _ = linux.syscall5(.clone, linux.CLONE.NEWUSER, 0, 0, 0, 0),
+                6 => {
+                    var pollfds: [6]linux.pollfd = undefined;
+                    for (&pollfds) |*fd| fd.* = .{ .fd = ready, .events = linux.POLL.IN, .revents = 0 };
+                    const rc: isize = @bitCast(linux.poll(&pollfds, case.count, case.timeout));
+                    if (rc != case.count) linux.exit(93);
+                    _ = linux.close(ready);
+                },
                 else => unreachable,
             }
             linux.exit(0);

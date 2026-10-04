@@ -33,11 +33,16 @@ provenance. Own current debug/safe units35/35 each, fixture6/6 and two enforced
 jail/API prerequisite cases pass. Original/A′/B actually open private owner0600
 KVM/TUN nodes, then all die SIGSYS; owned original/A′ traces identify281/204.
 The requested vhost node also uses the common no-follow-FD helper,0600/UID-GID1000.
-Next shared thread/poll compatibility and supplementary-group clearing remain
-required before full-jail acceptance; old KVM AccessDenied evidence is retained.
-Own getuid102 guard denial is fixed by capturing real/effective UID before
-seccomp after privilege drop, without adding a syscall. Current B now fails204,
-strict/auto root rejection passes2/2, and current unjailed A′/B traffic4/4 each.
+Shared compatibility `5ee81b1` is now reused as `66b9d1a`; generic enforced
+jail/API3/3 includes actual guest boot. Own35/35 units each and17 actual enforced
+child cases prove opt-in poll−1/count1,2,5, default blocking-poll denial and
+retained confinement. Two fresh exact-filter kernel owner/cgroup/join probes
+pass. Actual common jailed credentials still include supplementary group0,
+so requested jailed A′/B/auto now fail closed3/3 with NetJailInheritedGroups
+before VM/worker creation. Next authoritative shared group clearing remains
+required; old AccessDenied/SIGSYS evidence is retained. Own getuid102 guard
+denial is fixed without allowing a syscall, strict/auto root rejection passes2/2,
+and the preceding current-control unjailed A′/B traffic4/4 each remains distinct.
 Existing parent CPU controllers
 are not globally enabled or changed. S3 deciding A/A and S7 qualification remain
 blocked by about16 unrelated busy cores. The original default and draft-only,
@@ -187,7 +192,7 @@ These are proposed edits only; not files to change during planning.
 | `vmm/src/main.zig` | Proposed `--net-backend userspace\|vhost\|auto` selector, common net dispatcher/IRQ bridge, pause acknowledgement including workers, clean resume and memory-after-backend teardown ordering in both restore variants. Track FDs/devices by generation. |
 | `vmm/src/api.zig` | Preboot backend option/diagnostics and postboot lifecycle error propagation. Declare permissions before jail setup; reject undeclared privileged backend requests. |
 | `vmm/src/memory.zig`, `snapshot.zig` | Memory-table inputs and lifetime, stopped-worker assertion at snapshot, safe cursor persistence and restored-memory activation. Keep MAP_PRIVATE and existing v2 format if possible. |
-| `vmm/src/jail.zig`, `seccomp.zig` | Add only requested vhost node, restricted UID ownership/mode and `eventfd2`. Existing ioctl allowance is broad: do not describe it as an existing per-request allowlist or widen it further. Preserve all current argument-filtered restrictions. |
+| `vmm/src/jail.zig`, `seccomp.zig` | Add only requested vhost node, restricted UID ownership/mode, exact `eventfd2` and opt-in poll−1 for exactly1/2/5 readiness descriptors. Default legacy poll remains timeout0 only. Existing ioctl allowance is broad: do not describe it as an existing per-request allowlist or widen it further. Preserve all current argument-filtered restrictions. |
 | `vmm/src/kvm/vm.zig`, `kvm/abi.h` | Only if separately testing/reusing #3's KVM eventfd capabilities. Not needed to hide MMIO exits in the first vhost comparison. |
 | `vmm/src/tests.zig`, `integration_tests.zig`, `vmm/build.zig` | Focused net validation/failure/lifecycle coverage and an explicit project-relative kernel override for reproducible network integration fixtures. Retain existing tests. |
 | **New** `benchmarks/vhost-net/` | Future `run.sh`, `tcp-rr.py`, manifest/report helpers and fixture recipe. Explicitly selects/evidences backend and notification modes; retains raw samples/profiles outside committed source under `.perf/vhost-net/`. This harness does not currently exist. |

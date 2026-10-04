@@ -18,7 +18,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--backend", choices=("original", "userspace", "vhost", "auto"), default="vhost")
-    parser.add_argument("--expect", choices=("access-denied", "sigsys", "privilege-drop"), default="access-denied")
+    parser.add_argument("--expect", choices=("access-denied", "sigsys", "privilege-drop", "inherited-groups"), default="access-denied")
     parser.add_argument("--uid", type=int, choices=(0, 1000), default=1000)
     parser.add_argument("--no-jail", action="store_true")
     parser.add_argument("--trace", action="store_true")
@@ -95,6 +95,8 @@ def main():
             "VhostRequiresPrivilegeDrop" in stderr or
             (not args.no_jail and args.uid == 0 and "jail must drop root" in stderr)
         )
+    elif args.expect == "inherited-groups":
+        result["expected_failure_observed"] = actual_status == 1 and "NetJailInheritedGroups" in stderr
     else:
         result["expected_failure_observed"] = result["sigsys"]
     runner.owned_file(directory / "jail-result.json", json.dumps(result, indent=2) + "\n")

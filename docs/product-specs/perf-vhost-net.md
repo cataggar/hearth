@@ -40,13 +40,20 @@ are imported with it. Own debug/safe units35/35 each, fixture6/6 and two real
 enforced-jail prerequisite cases pass, including six checked API exchanges.
 The conditional vhost node uses the same no-follow-FD owner/mode helper.
 Original, A′ and B now actually open private UID/GID1000 KVM/TUN nodes under077,
-but all still die with SIGSYS before traffic; owned original/A′ traces identify
-epoll_pwait281/sched_getaffinity204. Thread/poll compatibility and supplementary
-group clearing need the next shared correctness control. The introduced B
-getuid102 denial is fixed by capturing real/effective identity after privilege
-drop before seccomp, never expanding its whitelist; current B now reaches the
-same thread-affinity204 denial and strict/auto root controls reject2/2.
-Historical untouched
+and the shared compatibility follow-up `5ee81b1` is reused as `66b9d1a`.
+Current generic enforced jail/API **3/3** includes actual guest boot, not network
+acceptance. The opt-in poll−1/count1,2,5 overlay passes **17 actual enforced
+forked child cases**, retaining the default timeout0-only rule and existing
+socket/clone/mprotect confinement. Two fresh exact-filter kernel-owner probes
+pass empty-groups/UID/GID1000/CapEff0/NNP1/Seccomp2/cgroup/join inheritance.
+However, the actual common jailed API still has **supplementary group0** after
+UID/GID1000 drop. All requested jailed net modes now reject3/3 with
+`NetJailInheritedGroups` before filter/VM/backend creation rather than force an
+unsafe worker. The next authoritative shared group-clearing prerequisite is
+required; generic repairs are not duplicated. The introduced B getuid102 denial
+was fixed by capturing real/effective identity after privilege drop before
+seccomp; strict/auto root controls reject2/2. Historical SIGSYS281/204/102 and
+untouched
 root-owned0700/0600 AccessDenied evidence remains distinct. CPU quota delegation,
 fully jailed independent-restore isolation, arbitrary injected ioctl/allocator failures, UDP/loss,
 4/8-VM and external Azure cells, long idle/tail/noise and installed SDK controls
@@ -270,7 +277,17 @@ ioeventfd/irqfd comparisons are separate matched arms, not bundled vhost gains.
   No writes or interrupts from an old device generation may reach a new one.
   Fix restore cleanup ordering as part of future backend integration.
 - Use only explicitly requested vhost/TUN devices inside the jail, approved
-  node ownership/mode and required syscalls (notably `eventfd2`). Retain root
+  node ownership/mode and required syscalls (notably `eventfd2`). The shared
+  correctness control permits only legacy timeout-zero poll; the opt-in net
+  overlay additionally permits poll timeout−1 with exactly1,2 or5 descriptors,
+  matching wake-only, wake/TAP or wake/two-CALL/two-ERR readiness. Other counts
+  or positive timeouts must remain denied, and the default filter must not gain
+  blocking poll. Prove these with actual enforced child cases and jailed traffic.
+  Requested jailed net modes must verify zero inherited supplementary groups
+  after the shared privilege drop and before filter/backend initialization,
+  failing closed if the shared clearing prerequisite is absent. Do not silently
+  repair generic jail credentials in an optimization commit.
+  Retain root
   drop, AF_UNIX-only sockets, clone/mprotect restrictions and cgroup limits.
   Do not pass privileged FDs around `close_range` or run the VMM as root to
   avoid confinement work. Verify kernel-worker accounting/resource isolation.

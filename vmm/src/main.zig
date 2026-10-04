@@ -248,6 +248,11 @@ pub fn main(init: std.process.Init) !void {
         net_options.owner_uid = if (uid == 0 or effective_uid == 0) 0 else @intCast(effective_uid);
         if (net_options.mode != .userspace and net_options.owner_uid.? == 0)
             return error.VhostRequiresPrivilegeDrop;
+        if (cli.jail != null) {
+            const groups: isize = @bitCast(std.os.linux.syscall2(.getgroups, 0, 0));
+            if (groups < 0) return error.NetJailGroupVerificationFailed;
+            if (groups != 0) return error.NetJailInheritedGroups;
+        }
     }
 
     // Seccomp filter — installed after jail (jail needs mount/mknod/setuid)

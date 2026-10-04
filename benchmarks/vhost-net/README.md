@@ -109,6 +109,17 @@ is still owned-child-only. Strict/auto root-rejection controls use
 before VM creation, not demonstrate a working root backend.
 Real/effective owner identity is captured after privilege drop before seccomp;
 unset/root fails closed without adding a getuid syscall allowance.
+The exact shared thread/epoll/legacy-poll follow-up is also reused. Requested
+net mode alone permits blocking poll−1 for exactly1,2 or5 readiness descriptors;
+17 real enforced child cases check default blocking-poll denial, exact allowed
+sets, invalid counts/positive timeouts and retained eventfd/socket/clone/mprotect
+restrictions. A unit-only two-second watchdog bounds an accidentally allowed
+zero-FD test; the runtime still has no readiness timer or heartbeat.
+Current shared jailed credentials retain supplementary group0, so requested
+jailed net modes fail closed with `NetJailInheritedGroups` before VM/worker
+creation. `jail_probe.py --expect inherited-groups` records that diagnosed
+rejection, not a successful network case. Generic group clearing must come from
+the next authoritative shared correctness prerequisite.
 
 See [actual results](../../docs/perf-results/vhost-net-20261004.md),
 [spec](../../docs/product-specs/perf-vhost-net.md) and
