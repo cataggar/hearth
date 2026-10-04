@@ -80,6 +80,13 @@ Every run retains expanded launch/perf/report commands, per-operation arrays,
 responses/failures, all-thread CPU ticks and before/after thread/affinity
 rosters. A changed roster invalidates CPU accounting. CPU tick resolution is
 recorded: short samples that round to zero are not evidence of free I/O.
+Future runs also retain raw aggregate `/proc/stat` controls around the measured
+window and their separate interval. Conversion uses the first eight counters
+only, avoiding guest-time double counting, and reports steal separately.
+Host nonidle includes steal; it is a noise control, **not** backend CPU.
+No unrelated PID/comm/stack data is inspected. A reset counter invalidates the
+control. The runner's own hash is recorded and participates in grouping, so
+old runs without controls cannot silently pool with new collector conditions.
 Profiled and unprofiled repetitions must remain separate. The runner terminates
 only its own VMM/profiler processes and removes only its owned listener.
 Artifacts are private under `.perf/eventfd/`; preserve failed runs too.

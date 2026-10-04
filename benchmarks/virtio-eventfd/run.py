@@ -161,6 +161,27 @@ def cpu_delta(before, after):
     return ticks / os.sysconf("SC_CLK_TCK")
 
 
+def host_cpu_delta(before, after, seconds):
+    def counters(text):
+        line = next(line for line in text.splitlines() if line.startswith("cpu "))
+        return [int(value) for value in line.split()[1:9]]
+
+    old, new = counters(before), counters(after)
+    delta = [end - start for start, end in zip(old, new)]
+    if len(delta) != 8 or any(value < 0 for value in delta):
+        raise ValueError("host CPU counters reset or have an unsupported layout")
+    ticks = os.sysconf("SC_CLK_TCK")
+    total = sum(delta) / ticks
+    idle = (delta[3] + delta[4]) / ticks
+    return {
+        "nonidle_including_steal_cpu_seconds": total - idle,
+        "idle_or_iowait_cpu_seconds": idle,
+        "steal_cpu_seconds": delta[7] / ticks,
+        "nonidle_one_core_equivalent_percent": 100 * (total - idle) / seconds,
+        "scope": "aggregate host noise control, not owned backend CPU attribution",
+    }
+
+
 def recv_exact(connection, count):
     result = bytearray()
     while len(result) < count:
@@ -384,6 +405,7 @@ def run(args):
         "argv": argv, "cwd": str(ROOT), "started_unix": time.time(),
         "source_baseline": "b07f73b26b8ae876928d9c515b94bba1e9945870",
         "binary_sha256": digest(binary), "fixture": metadata,
+        "runner_sha256": digest(Path(__file__)),
         "host_kernel": os.uname().release, "vcpus": 1, "guest_ram_mib": 512,
         "cpus": sorted(affinity), "profile": args.profile,
         "client_cpus": sorted(os.sched_getaffinity(0)),
@@ -436,6 +458,8 @@ def run(args):
                 time.sleep(0.15)
             before = thread_roster(child.pid)
             save_json(out / "threads-before.json", before)
+            host_started = time.monotonic()
+            host_before = Path("/proc/stat").read_text()
             client_before = resource.getrusage(resource.RUSAGE_SELF)
             started = time.monotonic()
             if args.workload == "idle":
@@ -473,6 +497,12 @@ def run(args):
             measured_seconds = time.monotonic() - started
             after = thread_roster(child.pid)
             save_json(out / "threads-after.json", after)
+            host_after = Path("/proc/stat").read_text()
+            host_seconds = time.monotonic() - host_started
+            (out / "host-proc-stat-before.txt").write_text(host_before)
+            (out / "host-proc-stat-after.txt").write_text(host_after)
+            result["host_cpu_control"] = host_cpu_delta(host_before, host_after, host_seconds)
+            result["host_cpu_control"]["window_seconds"] = host_seconds
             result["measured_seconds"] = measured_seconds
             result["all_thread_cpu_seconds"] = cpu_delta(before, after)
             client_after = resource.getrusage(resource.RUSAGE_SELF)
@@ -575,7 +605,7 @@ def summarize(args):
         conditions = {
             field: manifest.get(field) for field in (
                 "variant", "workload", "profile", "guest_command", "expected_stdout",
-                "binary_sha256", "compiler_sha256", "host_kernel", "source_baseline",
+                "binary_sha256", "compiler_sha256", "runner_sha256", "host_kernel", "source_baseline",
                 "cpus", "client_cpus", "vcpus", "guest_ram_mib", "payload_bytes",
                 "requests", "seconds", "latency_timeout_seconds", "cache_policy",
                 "warmup", "perf_privilege",

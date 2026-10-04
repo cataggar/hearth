@@ -15,6 +15,40 @@ Base: docs-only `b06ec0a6c19b4977bfb602c2daa1d94acf3eacf7`;
 initial runtime sources match `b07f73b26b8ae876928d9c515b94bba1e9945870`.
 Async block #1, vhost-net #2 and native-Zig #6 patches are excluded.
 
+## Post-provisioning prerequisite recheck
+
+A separate unchanged-L0 check executed at **16:34 UTC**, after the parent
+verified common provisioning. Actual UID1000 KVM/IRQchip/eventfd-capability
+preflight passes; current Node/npm/ip/fio/iperf3 and narrow KVM/vhost ACL
+receipts are preserved. No optimized backend or new runtime is used.
+
+* `post-noheart`: one timer-free 4 KiB request fails, zero completed round
+  trips; sequence0 receives **0/4** header bytes at the one-second bound.
+* `post-backpressure`: one 64 KiB×8 slow-reader burst fails, zero whole bursts;
+  sequence3 again receives **36,808/65,544** response bytes, with the same
+  partial hash as prior diagnostic failures.
+* Aggregate `/proc/stat` is retained before, between and after these complete
+  runs (including startup/warmup, **not just operation windows**). At
+  CLK_TCK100 the nonidle/total tick deltas are **5,692/5,694** and
+  **8,125/8,127** (approximately **99.965%/99.975% aggregate nonidle**).
+  These prove substantial host contention, not backend CPU or causal
+  attribution. Raw snapshots have no unrelated PID/comm/stack information.
+
+The failures survive provisioning, but saturated-host bounded checks are not
+quiet-host/A/A performance evidence. No numerical benefit/noise gate is frozen.
+[Post-provision raw evidence](post-provision-blockers.tar.gz) and its checksum
+are separate from the original W0 archive.
+
+The runner now automatically records operation-window aggregate host snapshots,
+a separate host-control interval, nonidle/steal controls (without guest-time
+double counting), and its own hash. These changes pass **16 tooling tests**;
+the two post-provision runs above predate that automatic collector and use
+the explicitly documented outer snapshots. No historical field is fabricated.
+Parent has assigned #1 an isolated prerequisite correctness commit covering
+enforced API `recvmsg` and jail ownership; #3 is requesting/reusing its exact
+SHA, excluding #1's async backend, rather than claiming its CLI-only jail
+proof establishes API/lifecycle acceptance.
+
 ## Environment and controls
 
 Actual host `vm31e`: Microsoft/Azure `Standard_D16ds_v5`, nested KVM,
@@ -24,7 +58,7 @@ eight reported cores with SMT2. Runs use one vCPU, 512 MiB guest RAM, UID/GID
 All builds/tests/VMs/profiles/fixture preparation hold the fleet's exclusive
 `/d/hearth/.perf/fleet/host.lock`, use bounded commands and `umask 077`.
 This workstream made no global device, driver, cache, NIC or security changes.
-All measurements in this report **precede the parent's final common host
+The original W0 timing series **precedes the parent's final common host
 provisioning reported at 16:25 UTC**, including vhost module/device access
 provisioning. They remain partial W0 diagnostics, not a frozen fully controlled
 comparison. Future L0/C00/2×2 measurements must start after provisioning and
@@ -33,8 +67,8 @@ metadata, and freeze gates before candidates. The immutable L0 binary/fixture
 identity is preserved; no pre-provisioning timing is promoted into a gate.
 The fleet lock serializes participating experiments, **not unrelated host
 workloads**. “True idle” below means a no-traffic VM, not a fully idle host.
-Whole-host `/proc/stat`/steal-time control snapshots were not collected in this
-series; external contention is therefore unquantified. Only owned VMM-group
+Whole-host `/proc/stat`/steal-time control snapshots were not collected in that
+original series; its external contention is therefore unquantified. Only owned VMM-group
 CPU and separately recorded client CPU are attributed. Future repeated A/A
 windows must retain host controls as well, without inspecting or changing
 unowned workloads. None of these diagnostics establishes whole-window kernel

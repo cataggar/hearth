@@ -17,6 +17,22 @@ SPEC.loader.exec_module(RUNNER)
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_host_controls_do_not_double_count_guest_cpu(self):
+        before = "cpu  0 0 0 0 0 0 0 0 0 0\n"
+        after = "cpu  100 0 20 30 10 0 0 5 80 0\n"
+        result = RUNNER.host_cpu_delta(before, after, 2)
+        ticks = RUNNER.os.sysconf("SC_CLK_TCK")
+        self.assertAlmostEqual(result["nonidle_including_steal_cpu_seconds"], 125 / ticks)
+        self.assertAlmostEqual(result["idle_or_iowait_cpu_seconds"], 40 / ticks)
+        self.assertAlmostEqual(result["steal_cpu_seconds"], 5 / ticks)
+        self.assertAlmostEqual(result["nonidle_one_core_equivalent_percent"], 100 * 125 / ticks / 2)
+
+    def test_reset_host_counters_invalidate_controls(self):
+        with self.assertRaisesRegex(ValueError, "counters reset"):
+            RUNNER.host_cpu_delta(
+                "cpu  100 0 0 0 0 0 0 0\n", "cpu  99 0 0 0 0 0 0 0\n", 1,
+            )
+
     def test_newc_alignment_and_contents(self):
         for name, data in (("init", b"#!/bin/sh\n"), ("a", b""), ("bin/sh", b"busybox")):
             archive = RUNNER.newc_entry(name, data, 0o100755, 1)
