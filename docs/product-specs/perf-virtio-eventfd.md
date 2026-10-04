@@ -1,6 +1,6 @@
 # Product Spec: VirtIO ioeventfd/irqfd Performance Experiment
 
-**Status**: Blocked after partial W0; acceleration remains unimplemented/disabled
+**Status**: In progress — four controlled modes implemented; real timer-free integrity/quiescence and cross-mode v2 restores pass; performance qualification unfinished
 
 **Last updated**: 2026-10-04
 
@@ -21,14 +21,33 @@ prototype with reproducible profiles, correctness findings, and a keep/reject
 decision satisfies the investigation. W0 environment verification and untouched
 baseline collection have produced real liveness/backpressure failures and
 software profiles. This is **not** a completed/rejected prototype. No owner topology, IRQ policy, accelerated
-mode, numeric gate, or default promotion has been selected.
+mode, numeric gate, or default promotion had been selected in the published W0.
+The parent's continuation instruction now authorizes W1: per-device blocking
+owners are implemented in C00, with real no-heartbeat integrity/lifecycle
+evidence. The independent accelerator modes now pass focused real KVM and Linux
+integrity/lifecycle checks. Five C00 controls (85 cells) froze numeric gates
+before candidate measurements; every non-idle class exceeds a noise cap.
+Longer primary diagnostics suggest19–24% known-CPU reductions, but lack
+qualified paired inference and complete scheduling attribution. C10/C11 also
+show severe pause deassignment costs. Adoption gates and full stress/performance
+coverage remain incomplete; no default promotion is justified.
 
 **Actual results and durable evidence**:
 [2026-10-04 W0 report](../../benchmarks/virtio-eventfd/results/20261004/README.md).
-Timer-free native traffic stalls after silence; eight 64 KiB slow-reader
-messages also stall with a separately labelled heartbeat. C00/C10/C01/C11,
-their correctness/lifecycle tests and the required full performance matrix
-remain outstanding. No performance merge or default adoption is eligible.
+Untouched L0 timer-free native traffic stalls after silence; eight 64 KiB
+slow-reader messages also stall with a separately labelled heartbeat.
+All four modes pass native-vsock/TAP/disk/agent/PTY, active-I/O acknowledged pause,
+snapshot/resume, paused shutdown and sixteen actual cross-mode new-process v2
+restores. Combined block/TAP/vsock outstanding-I/O snapshots also pass in all
+four modes. Required repeated stress, multi-sandbox and performance qualification
+remain outstanding; these repairs are not an eventfd acceleration. No
+performance merge or default adoption is eligible.
+
+The common restore path retains snapshot v2 and the guest reconnect policy:
+it publishes the standard `VIRTIO_VSOCK_EVENT_TRANSPORT_RESET` through the
+already-existing event queue. This wakes the unchanged agent from obsolete
+connections instead of expecting serialized host fds or a serial heartbeat.
+Host generation counters and restore admission flags are not serialized.
 
 The work follows [architecture](../../ARCHITECTURE.md) and
 [core beliefs](../design-docs/core-beliefs.md): preserve hardware isolation,
@@ -341,3 +360,50 @@ Decisions requiring evidence:
    enlarging the SDK? What per-device fallback is understandable and testable?
 6. Are available host software events/tracepoints precise enough for attribution,
    and what baseline-derived numeric gates/sample size can be frozen?
+
+### W1 common owner decision
+
+The timer-free L0 vsock and post-silence TAP failures, and the source's exclusive
+post-KVM_RUN polling, justify independent blocking readiness. Use per-device
+owners for C00 and every accelerated mode: block remains synchronous within
+its owner and cannot stall network/vsock servicing. All transport/ring/backend
+mutation is serialized through that owner; the vCPU issues synchronous MMIO
+control requests. Bounded batches revisit control before more data work.
+Pause stops vCPU admission, acknowledges every backend owner and disables
+readiness before logical rings/memory/IRQchip are captured. Resume reconciles
+pending work before running the guest. New host wake fds are not snapshot state.
+This chooses correctness plumbing, not a performance winner or default.
+
+### W2 implemented delivery and lifecycle policy
+
+The default remains L0; `--virtio-mode C00|C10|C01|C11` selects one strict
+experimental mode, never a silently downgraded sample. All use the same
+per-device owner, bounded budgets, ring validation/publication, synchronous
+block backend and userspace TAP. Owner control uses an eventfd/futex mailbox;
+idle readiness blocks in epoll without a timer. Dynamic vsock IN/OUT interests
+respect credits and real partial writes, with generation-safe fd lifetimes.
+
+Actual guest PIC/IOAPIC trigger/mask state determines a common IRQ policy.
+Edge routes pulse; level routes remain asserted until logical ACK and use
+IRQFD RESAMPLE when accelerated. ACK-before-EOI explicitly deassigns, drains
+and recreates the irqfd source; zero writes or closing an fd are not deassertion.
+Tiny real KVM guests verify used-before-IRQ, halted wake, both ACK/EOI orders,
+counter aggregation and exact DWORD DATAMATCH/unmatched MMIO.
+
+Pause also retires pending userspace MMIO/PIO through an immediate-exit
+KVM_RUN reentry before owner fences and snapshot acknowledgement. A real
+microguest verifies the emulated result/RIP while no subsequent guest
+instruction executes. Host fds, counters and epochs remain absent from v2.
+Normal shutdown joins owners and reports backend failure before cleanup.
+
+Enforced isolation admits only eventfd2(init0, NONBLOCK|CLOEXEC) and
+getsockopt(SOL_SOCKET,SO_ERROR) for the new control paths. An optional
+PR_SET_NAME157 attempt was correctly killed by the filter; the naming syscall
+was removed rather than admitted. Owner TIDs/fd identities are diagnostic logs.
+
+An ephemeral, unpinned, owned-TGID/exact-function BPF observer accounts actual
+on-CPU `irqfd_inject`/`irqfd_shutdown` work and subtracts scheduler off-CPU
+intervals. It emits only aggregate CPU/jobs, no foreign task names/stacks.
+Combined integrity runs observe 2,386/3,178 injection jobs for C01/C11,
+zero anomalies or incomplete work; C00/C10 correctly observe zero irqfd work.
+These are attribution self-tests, not qualified performance gains.

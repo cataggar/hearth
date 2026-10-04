@@ -10,10 +10,16 @@ const snapshot = @import("snapshot.zig");
 const seccomp_mod = @import("seccomp.zig");
 const abi = @import("kvm/abi.zig");
 const Vcpu = @import("kvm/vcpu.zig");
+const VirtioOwner = @import("devices/virtio/owner.zig");
+const VirtioMmio = @import("devices/virtio/mmio.zig");
+const virtio = @import("devices/virtio.zig");
+const sync = @import("sync.zig");
+const Net = @import("devices/virtio/net.zig");
+const Vsock = @import("devices/virtio/vsock.zig");
 
 test "seccomp: enforced readiness and own-affinity query retain restrictions" {
     const linux = std.os.linux;
-    for (0..5) |scenario| {
+    for (0..8) |scenario| {
         const child: isize = @bitCast(linux.syscall0(.fork));
         if (child < 0) return error.ForkFailed;
         if (child == 0) {
@@ -37,6 +43,27 @@ test "seccomp: enforced readiness and own-affinity query retain restrictions" {
                     unreachable;
                 };
                 thread.join();
+                const counter = VirtioOwner.eventfd() catch {
+                    _ = linux.syscall1(.exit_group, 47);
+                    unreachable;
+                };
+                VirtioOwner.wake(counter) catch unreachable;
+                VirtioOwner.wake(counter) catch unreachable;
+                VirtioOwner.drain(counter) catch unreachable;
+                _ = linux.close(counter);
+                const unix: isize = @bitCast(linux.socket(linux.AF.UNIX, linux.SOCK.STREAM | linux.SOCK.CLOEXEC, 0));
+                if (unix < 0) {
+                    _ = linux.syscall1(.exit_group, 48);
+                    unreachable;
+                }
+                var socket_error: i32 = 0;
+                var length: u32 = 4;
+                const queried: isize = @bitCast(linux.syscall5(.getsockopt, @intCast(unix), 1, 4, @intFromPtr(&socket_error), @intFromPtr(&length)));
+                _ = linux.close(@intCast(unix));
+                if (queried != 0 or socket_error != 0 or length != 4) {
+                    _ = linux.syscall1(.exit_group, 49);
+                    unreachable;
+                }
                 var pollfds: [0]linux.pollfd = .{};
                 const polled: isize = @bitCast(linux.poll(&pollfds, 0, 0));
                 if (polled != 0) {
@@ -60,8 +87,16 @@ test "seccomp: enforced readiness and own-affinity query retain restrictions" {
             } else if (scenario == 3) {
                 var cpus: [128]u8 = @splat(0);
                 _ = linux.syscall3(.sched_getaffinity, 1, cpus.len, @intFromPtr(&cpus));
-            } else {
+            } else if (scenario == 4) {
                 _ = linux.syscall3(.sched_setaffinity, 0, 0, 0);
+            } else if (scenario == 5) {
+                var value: i32 = 0;
+                var length: u32 = 4;
+                _ = linux.syscall5(.getsockopt, 0, 1, 3, @intFromPtr(&value), @intFromPtr(&length));
+            } else if (scenario == 6) {
+                _ = linux.syscall2(.eventfd2, 1, VirtioOwner.EVENT_FLAGS);
+            } else {
+                _ = linux.syscall2(.eventfd2, 0, VirtioOwner.EVENT_FLAGS | 1);
             }
             _ = linux.syscall1(.exit_group, 44);
             unreachable;
@@ -84,6 +119,179 @@ test "seccomp: enforced readiness and own-affinity query retain restrictions" {
 test "kvm: ioctl preserves negative syscall errors" {
     try std.testing.expectError(error.BadFd, abi.ioctl(-1, abi.c.KVM_GET_API_VERSION, 0));
     try std.testing.expectError(error.BadFd, abi.ioctlVoid(-1, abi.c.KVM_GET_API_VERSION, 0));
+}
+
+test "virtio: notification admission rejects malformed or unready queues" {
+    var device = try VirtioMmio.initVsock(virtio.MMIO_BASE, 5, 3, "test.sock");
+    defer device.deinit();
+    device.status = virtio.STATUS_DRIVER_OK;
+    device.queues[1] = .{ .size = 4, .ready = true, .desc_addr = 64, .avail_addr = 128, .used_addr = 192 };
+    var notify: [4]u8 = undefined;
+    std.mem.writeInt(u32, &notify, 1, .little);
+    try std.testing.expectEqual(@as(?u32, 1), device.decodeNotify(&notify));
+    try std.testing.expect(device.decodeNotify(notify[0..2]) == null);
+    std.mem.writeInt(u32, &notify, 0x10001, .little);
+    try std.testing.expect(device.decodeNotify(&notify) == null);
+    std.mem.writeInt(u32, &notify, 3, .little);
+    try std.testing.expect(device.decodeNotify(&notify) == null);
+    std.mem.writeInt(u32, &notify, 0, .little);
+    try std.testing.expect(device.decodeNotify(&notify) == null);
+    device.queue_sel = 1;
+    device.queues[1].ready = false;
+    std.mem.writeInt(u32, &notify, 0x10004, .little);
+    device.handleWrite(virtio.MMIO_QUEUE_NUM, &notify);
+    try std.testing.expectEqual(@as(u16, 4), device.queues[1].size);
+    device.queues[1].ready = true;
+    std.mem.writeInt(u32, &notify, 2, .little);
+    device.handleWrite(virtio.MMIO_QUEUE_READY, &notify);
+    try std.testing.expect(device.queues[1].ready);
+    device.queues[1].desc_addr += 1;
+    std.mem.writeInt(u32, &notify, 1, .little);
+    try std.testing.expect(device.decodeNotify(&notify) == null);
+}
+
+test "virtio queue: wrapping publication rejects overrun and preserves indices" {
+    var mem = try Memory.init(4096);
+    defer mem.deinit();
+    var queue = Queue{ .size = 2, .ready = true, .desc_addr = 64, .avail_addr = 128, .used_addr = 192, .last_avail_idx = 65535, .next_used_idx = 65535 };
+    const avail = try mem.slice(128, 8);
+    std.mem.writeInt(u16, avail[2..4], 1, .little);
+    std.mem.writeInt(u16, avail[6..8], 1, .little);
+    std.mem.writeInt(u16, avail[4..6], 0, .little);
+    try std.testing.expect(queue.hasAvail(&mem));
+    try std.testing.expectEqual(@as(?u16, 1), try queue.popAvail(&mem));
+    try std.testing.expectEqual(@as(?u16, 0), try queue.popAvail(&mem));
+    try std.testing.expect(!queue.hasAvail(&mem));
+    try queue.pushUsed(&mem, 1, 17);
+    try queue.pushUsed(&mem, 0, 19);
+    const used = try mem.slice(192, 20);
+    try std.testing.expectEqual(@as(u16, 1), std.mem.readInt(u16, used[2..4], .little));
+    try std.testing.expectEqual(@as(u32, 17), std.mem.readInt(u32, used[16..20], .little));
+    try std.testing.expectEqual(@as(u32, 19), std.mem.readInt(u32, used[8..12], .little));
+    std.mem.writeInt(u16, avail[2..4], 4, .little);
+    try std.testing.expect(!queue.hasAvail(&mem));
+    try std.testing.expectError(error.QueueOverrun, queue.popAvail(&mem));
+    try std.testing.expectEqual(@as(u16, 1), queue.last_avail_idx);
+}
+
+test "owner mailbox: condition fences do not lose sleep-boundary wakeups" {
+    const Shared = struct {
+        mutex: sync.Mutex = .{},
+        condition: sync.Condition = .{},
+        published: u32 = 0,
+        acknowledged: u32 = 0,
+
+        fn produce(self: *@This()) void {
+            for (1..129) |number| {
+                self.mutex.lock();
+                while (self.acknowledged + 1 != number) self.condition.wait(&self.mutex);
+                self.published = @intCast(number);
+                self.condition.broadcast();
+                self.mutex.unlock();
+            }
+        }
+    };
+    var shared: Shared = .{};
+    const thread = try std.Thread.spawn(.{}, Shared.produce, .{&shared});
+    defer thread.join();
+    for (1..129) |number| {
+        shared.mutex.lock();
+        while (shared.published != number) shared.condition.wait(&shared.mutex);
+        shared.acknowledged = @intCast(number);
+        shared.condition.broadcast();
+        shared.mutex.unlock();
+    }
+    shared.mutex.lock();
+    defer shared.mutex.unlock();
+    try std.testing.expectError(error.Timeout, shared.condition.timedWait(&shared.mutex, 1_000_000));
+}
+
+test "virtio net: EAGAIN preserves the outstanding descriptor until writable" {
+    const linux = std.os.linux;
+    var fds: [2]i32 = undefined;
+    const created: isize = @bitCast(linux.syscall2(.pipe2, @intFromPtr(&fds), 0x80800));
+    try std.testing.expectEqual(@as(isize, 0), created);
+    defer {
+        _ = linux.close(fds[0]);
+        _ = linux.close(fds[1]);
+    }
+    var filler: [4096]u8 = @splat(17);
+    while (@as(isize, @bitCast(linux.write(fds[1], &filler, filler.len))) > 0) {}
+    var mem = try Memory.init(4096);
+    defer mem.deinit();
+    var queue = Queue{ .size = 2, .ready = true, .desc_addr = 64, .avail_addr = 128, .used_addr = 192 };
+    var descriptor = Queue.Desc{ .addr = 1024, .len = 256, .flags = 0, .next = 0 };
+    try mem.write(64, std.mem.asBytes(&descriptor));
+    const avail = try mem.slice(128, 8);
+    std.mem.writeInt(u16, avail[2..4], 1, .little);
+    const payload = try mem.slice(1024, 256);
+    for (payload, 0..) |*byte, index| byte.* = @intCast(index);
+    var net = Net{ .tap_fd = fds[1], .mac = @splat(0) };
+    try std.testing.expect(!net.processTxBudget(&mem, &queue, 32));
+    try std.testing.expect(net.tx_blocked);
+    try std.testing.expectEqual(@as(u16, 0), queue.last_avail_idx);
+    try std.testing.expectEqual(@as(u16, 0), queue.next_used_idx);
+    while (@as(isize, @bitCast(linux.read(fds[0], &filler, filler.len))) > 0) {}
+    try std.testing.expect(net.processTxBudget(&mem, &queue, 32));
+    try std.testing.expect(!net.tx_blocked);
+    try std.testing.expectEqual(@as(u16, 1), queue.next_used_idx);
+    const read: isize = @bitCast(linux.read(fds[0], &filler, filler.len));
+    try std.testing.expectEqual(@as(isize, 256), read);
+    try std.testing.expectEqualSlices(u8, payload, filler[0..256]);
+}
+
+test "virtio vsock: queued bytes retain integrity and credit means forwarded bytes" {
+    const linux = std.os.linux;
+    var fds: [2]i32 = undefined;
+    const created: isize = @bitCast(linux.syscall4(.socketpair, linux.AF.UNIX, linux.SOCK.STREAM | linux.SOCK.NONBLOCK | linux.SOCK.CLOEXEC, 0, @intFromPtr(&fds)));
+    try std.testing.expectEqual(@as(isize, 0), created);
+    defer _ = linux.close(fds[0]);
+    var filler: [4096]u8 = @splat(17);
+    while (@as(isize, @bitCast(linux.write(fds[1], &filler, filler.len))) > 0) {}
+    var vsock = try Vsock.init(3, "test.sock");
+    defer vsock.deinit();
+    vsock.connections[0] = .{
+        .state = .established,
+        .fd = fds[1],
+        .guest_port = 7000,
+        .host_port = 7001,
+        .write_buf = try std.heap.page_allocator.alloc(u8, 262144),
+    };
+    var mem = try Memory.init(131072);
+    defer mem.deinit();
+    var queue = Queue{ .size = 2, .ready = true, .desc_addr = 64, .avail_addr = 128, .used_addr = 192 };
+    var header_desc = Queue.Desc{ .addr = 512, .len = 44, .flags = virtio.DESC_F_NEXT, .next = 1 };
+    var data_desc = Queue.Desc{ .addr = 1024, .len = 65536, .flags = 0, .next = 0 };
+    try mem.write(64, std.mem.asBytes(&header_desc));
+    try mem.write(80, std.mem.asBytes(&data_desc));
+    const avail = try mem.slice(128, 8);
+    std.mem.writeInt(u16, avail[2..4], 1, .little);
+    const header = try mem.slice(512, 44);
+    std.mem.writeInt(u64, header[0..8], 3, .little);
+    std.mem.writeInt(u64, header[8..16], 2, .little);
+    std.mem.writeInt(u32, header[16..20], 7000, .little);
+    std.mem.writeInt(u32, header[20..24], 7001, .little);
+    std.mem.writeInt(u32, header[24..28], 65536, .little);
+    std.mem.writeInt(u16, header[28..30], 1, .little);
+    std.mem.writeInt(u16, header[30..32], 5, .little);
+    std.mem.writeInt(u32, header[36..40], 262144, .little);
+    const payload = try mem.slice(1024, 65536);
+    for (payload, 0..) |*byte, index| byte.* = @truncate(index);
+    try std.testing.expect(vsock.processTxBudget(&mem, &queue, 32));
+    try std.testing.expectEqual(@as(u32, 65536), vsock.connections[0].write_len);
+    try std.testing.expectEqual(@as(u32, 0), vsock.connections[0].rx_cnt);
+    while (@as(isize, @bitCast(linux.read(fds[0], &filler, filler.len))) > 0) {}
+    var received: usize = 0;
+    while (received < payload.len) {
+        vsock.flushPendingWrites();
+        const count: isize = @bitCast(linux.read(fds[0], &filler, filler.len));
+        try std.testing.expect(count > 0);
+        const length: usize = @intCast(count);
+        try std.testing.expectEqualSlices(u8, payload[received..][0..length], filler[0..length]);
+        received += length;
+    }
+    try std.testing.expectEqual(@as(u32, 65536), vsock.connections[0].rx_cnt);
+    try std.testing.expectEqual(@as(u32, 0), vsock.connections[0].write_len);
 }
 
 test "kvm: IO exit reads translated payload and rejects out of bounds data" {
@@ -382,16 +590,16 @@ test "seccomp: filter starts with arch check and ends with allow" {
     try std.testing.expectEqual(@as(u16, 0x06), filter[filter.len - 1].code); // BPF_RET
     try std.testing.expectEqual(@as(u32, 0x7FFF0000), filter[filter.len - 1].k); // ALLOW
 
-    // Layout: header4, simpleN, dispatch4, default1, argument checks14, allow1.
-    const N = filter.len - 24;
-    try std.testing.expectEqual(@as(u32, 0x80000000), filter[4 + N + 4].k); // KILL_PROCESS
+    const N = filter.len - 38;
+    try std.testing.expectEqual(@as(u32, 0x80000000), filter[4 + N + 6].k); // KILL_PROCESS
 }
 
 test "seccomp: log filter uses LOG as default action" {
     const filter = &seccomp_mod.log_filter;
-    const N = filter.len - 24;
+    const N = filter.len - 38;
     // Default action position uses LOG instead of KILL
-    try std.testing.expectEqual(@as(u32, 0x7FFC0000), filter[4 + N + 4].k); // RET_LOG
+    try std.testing.expectEqual(@as(u32, 0x7FFC0000), filter[4 + N + 6].k); // RET_LOG
+
 }
 
 test "snapshot: header version validation" {
@@ -478,6 +686,7 @@ test "seccomp: Unix API additions retain argument confinement" {
                         0 => nr,
                         4 => 0xC000003E,
                         16 => arg0,
+                        24 => 0,
                         32 => arg2,
                         else => unreachable,
                     },

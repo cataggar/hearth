@@ -1,6 +1,6 @@
 # Execution Plan: Profile VirtIO ioeventfd/irqfd
 
-**Status**: Blocked after partial W0; W1–W8 not executed
+**Status**: In progress — W1/W2 controlled servicing implementation
 
 **Date**: 2026-10-04
 
@@ -10,12 +10,30 @@
 
 ## Outcome and boundaries
 
+### Parent-directed W1/W2 continuation
+
+The preserved L0 stalls justify the common servicing repair, not stopping the
+experiment. Implement a per-device blocking owner so synchronous block work
+cannot head-of-line-block network/vsock. One owner serializes each device's
+transport, rings, backend descriptors and completion IRQs; MMIO is a synchronous
+control request, kicks/readiness are bounded data work, and lifecycle commands
+fence admission before snapshots. Dynamic vsock registrations carry generations
+and conditional IN/OUT interest; queue publication uses acquire/release.
+
+C00 retains MMIO queue kicks and the common trigger-aware IRQ-line path with
+this same plumbing (edge pulses, level assert/ACK deassert).
+Only after C00 no-heartbeat integrity/quiescence works, freeze control gates and
+compare C10/C01/C11 against it. L0→C00 is a separate correctness/scheduling
+contrast, never an attributed eventfd acceleration gain. Original failures,
+private artifacts, shared jail fixes and incomplete draft PR remain preserved.
+
 Produce a reproducible keep/reject decision for queue-kick ioeventfd and
 completion-interrupt irqfd, independently and combined, on **nested Azure
 KVM**. Preserve correctness, snapshot/lifecycle semantics and isolation.
-W0 verification and baseline collection have produced reproducible failures
-and profiles. No accelerated mode or
-default decision has occurred. Completing W0 does not complete this experiment.
+W0 verification and baseline collection produced reproducible failures and
+profiles. W1/W2 now implement all four controlled modes; no adoption/default
+decision has occurred. Completing correctness prototypes does not complete the
+performance experiment.
 
 ### Current execution
 
@@ -33,7 +51,11 @@ the diagnostic heartbeat. Private jail ownership and missing ordinary
 readiness syscalls were corrected and actual enforced boot/connect verified
 separately. Earlier CPU8/client0 samples share an SMT core and remain
 supplementary; repeated CPU8/client1 L0 profiles are retained separately.
-No numeric gates are frozen, and no controlled candidate exists.
+Controlled candidates now exist and have real correctness evidence. Five
+functioning C00 A/A controls froze numeric gates before candidate measurements.
+The85-cell controls fail whole-matrix noise qualification; three17-cell candidate
+matrices and five longer primary windows/mode are explicitly exploratory.
+No threshold relaxation or adoption has occurred.
 
 Post-provisioning support reused #1's exact prerequisite
 `f2f9ab4c8e7a67097f2c3f52636327e9c41d5084` (local cherry-pick2305b11)
@@ -52,11 +74,19 @@ TAP validates initial64B/eight64KiB messages then fails after two seconds of
 silence. Latest host controls record78.09busyCPU seconds/4.8906wall (~15.967
 busy cores). No quiet A/A baseline or numeric gates can be inferred from this.
 
-**Hold / not eligible for performance merge.** Required remaining work is the
-baseline backpressure/credit correctness prerequisite, W1–W6 ownership,
-validation, IRQ/lifecycle and controlled modes, plus TAP/concurrency/active-I/O
-and cross-mode restore coverage and W3/W7 matched gates/matrix. The plan stays
-active/blocked, not completed. Existing benchmark commands below that describe
+**Hold / not eligible for performance merge.** Per-device blocking owners,
+exact per-queue ioeventfd, trigger-aware irqfd/resampling and v2 quiescence now
+pass actual focused checks. Both static-musl Debug/Safe builds pass39 unit,
+12 dedicated (eleven real KVM cases plus one policy unit) and7 existing integration
+tests each. Four-mode native/agent/TAP checks,16 new-process cross-mode restores,
+and four simultaneous block/TAP/vsock active snapshots pass. Each mode executes
+100 reset/fence/reconfigure, ten partial-setup and ten genuine post-registration
+owner failure FD-leak checks per optimization.
+Longer primary diagnostic CPU means improve19–24%, but frozen whole-matrix noise,
+incomplete paired inference and C10/C11 severe pause costs prevent acceptance.
+Further active fresh-process restore stress, multi-sandbox/connection coverage
+and CLI lifecycle verification are executing. The plan stays active,
+not completed. Existing benchmark commands below that describe
 future selectors/matrix runners remain proposals; only the W0 tool README
 documents implemented options.
 
@@ -117,8 +147,10 @@ on EOI and requires userspace to requeue still-pending device interrupts.
 
 ## Workstreams and real dependencies
 
-W0 is partially executed; the remaining workstreams below are proposed, not
-completed. Seven integration cases pass per optimization mode, but only five
+W0 evidence is preserved, W1/W2 and independent W4/W5 prototypes are implemented,
+and W6 has partial real acceptance. W3 numeric gates are frozen; W7 has actual
+matched matrices but fails noise/inference qualification. W8 is
+pending. Seven existing integration cases pass per optimization mode, but only five
 boot a real guest; two exercise CLI errors. Their serial heartbeat does not
 satisfy no-heartbeat or active-device lifecycle coverage.
 

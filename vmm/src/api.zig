@@ -94,8 +94,7 @@ pub fn serve(sock_path: []const u8, io: Io, allocator: std.mem.Allocator) !VmCon
     // Accept connections and handle requests until InstanceStart
     while (true) {
         const stream = server.accept(io) catch |err| {
-            log.err("accept failed: {}", .{err});
-            continue;
+            return err;
         };
 
         const started = handleConnection(stream, io, allocator, &config) catch |err| {
@@ -497,7 +496,7 @@ const SnapshotCreateBody = struct {
 };
 
 /// Run the post-boot API server. Accepts connections until the VM exits.
-/// Uses a self-pipe to wake accept() when the VM exits, avoiding a hang.
+/// VM exit shuts down the owned listener/current stream to unblock I/O.
 pub fn servePostBoot(
     sock_path: []const u8,
     io: Io,
@@ -506,6 +505,16 @@ pub fn servePostBoot(
 ) !void {
     var server = try listenUnix(sock_path, io);
     defer server.deinit(io);
+    runtime.mutex.lock();
+    runtime.api_listener = server.socket.handle;
+    const already_exited = runtime.exited.load(.acquire);
+    runtime.mutex.unlock();
+    defer {
+        runtime.mutex.lock();
+        runtime.api_listener = -1;
+        runtime.mutex.unlock();
+    }
+    if (already_exited) return;
 
     log.info("post-boot API listening on {s}", .{sock_path});
 
@@ -517,10 +526,16 @@ pub fn servePostBoot(
             continue;
         };
 
-        handlePostBootConnection(stream, io, allocator, runtime) catch |err| {
+        runtime.mutex.lock();
+        runtime.api_stream = stream.socket.handle;
+        const exited = runtime.exited.load(.acquire);
+        runtime.mutex.unlock();
+        if (!exited) handlePostBootConnection(stream, io, allocator, runtime) catch |err| {
             log.err("post-boot connection error: {}", .{err});
         };
-
+        runtime.mutex.lock();
+        runtime.api_stream = -1;
+        runtime.mutex.unlock();
         stream.close(io);
     }
 
@@ -609,7 +624,7 @@ fn handleVmPatch(
 
         // Set immediate_exit AFTER winning the cmpxchg to avoid racing with
         // a concurrent pause request that could clear it.
-        runtime.vcpu.kvm_run.immediate_exit = 1;
+        @atomicStore(u8, &runtime.vcpu.kvm_run.immediate_exit, 1, .release);
 
         // Kick the vCPU thread out of a blocking KVM_RUN (e.g., guest in HLT).
         // immediate_exit only takes effect on the *next* KVM_RUN call, so if
@@ -617,31 +632,40 @@ fn handleVmPatch(
         runtime.kickVcpu();
 
         // Wait for the run loop to acknowledge it has left KVM_RUN
-        var spin_count: u32 = 0;
+        runtime.mutex.lock();
+        defer runtime.mutex.unlock();
         while (!runtime.ack_paused.load(.acquire)) {
             if (runtime.exited.load(.acquire)) {
                 runtime.paused.store(false, .release);
                 respondError(request, .bad_request, "VM has exited");
                 return;
             }
-            spin_count += 1;
-            if (spin_count < 1000) {
-                std.atomic.spinLoopHint();
-            } else {
-                const ts = std.os.linux.timespec{ .sec = 0, .nsec = 1_000_000 }; // 1ms
-                _ = std.os.linux.nanosleep(&ts, null);
-            }
+            runtime.condition.timedWait(&runtime.mutex, 10_000_000_000) catch {
+                respondError(request, .service_unavailable, "backend pause is still pending");
+                return;
+            };
         }
         log.info("VM paused", .{});
         respondOk(request);
     } else if (std.mem.eql(u8, parsed.value.state, "Resumed")) {
+        if (!runtime.ack_paused.load(.acquire)) {
+            respondError(request, .bad_request, "backend pause is not acknowledged");
+            return;
+        }
         // Atomically transition true→false; rejects if not paused
         if (runtime.paused.cmpxchgStrong(true, false, .acq_rel, .acquire) != null) {
             respondError(request, .bad_request, "VM is not paused");
             return;
         }
-        // Clear ack_paused after unpausing so the next pause must wait for a fresh ack
-        runtime.ack_paused.store(false, .release);
+        runtime.mutex.lock();
+        defer runtime.mutex.unlock();
+        runtime.condition.broadcast();
+        while (runtime.ack_paused.load(.acquire) and !runtime.exited.load(.acquire)) {
+            runtime.condition.timedWait(&runtime.mutex, 10_000_000_000) catch {
+                respondError(request, .service_unavailable, "backend resume is still pending");
+                return;
+            };
+        }
         log.info("VM resumed", .{});
         respondOk(request);
     } else {
@@ -655,8 +679,8 @@ fn handleSnapshotCreate(
     allocator: std.mem.Allocator,
     runtime: *main_mod.VmRuntime,
 ) void {
-    if (!runtime.paused.load(.acquire)) {
-        respondError(request, .bad_request, "VM must be paused before creating a snapshot");
+    if (!runtime.paused.load(.acquire) or !runtime.ack_paused.load(.acquire)) {
+        respondError(request, .bad_request, "VM must be paused with an acknowledged whole-VM fence before creating a snapshot");
         return;
     }
 
@@ -763,11 +787,8 @@ fn handlePostBootAction(
         // Signal the VM to exit by setting the exited flag.
         // The VMM doesn't emulate i8042/ACPI, so we can't inject Ctrl+Alt+Del.
         // Instead, mark the VM as exited so the run loop terminates.
-        runtime.vcpu.kvm_run.immediate_exit = 1;
-        runtime.exited.store(true, .release);
-        // Kick the vCPU thread out of KVM_RUN so it sees the exited flag
-        runtime.kickVcpu();
         respondOk(request);
+        runtime.requestExit();
     } else {
         respondError(request, .bad_request, "unknown action_type (post-boot supports: SendCtrlAltDel)");
     }

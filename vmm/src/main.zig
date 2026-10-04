@@ -6,6 +6,7 @@ const Memory = @import("memory.zig");
 const loader = @import("boot/loader.zig");
 const Serial = @import("devices/serial.zig");
 const VirtioMmio = @import("devices/virtio/mmio.zig");
+const VirtioOwner = @import("devices/virtio/owner.zig");
 const virtio = @import("devices/virtio.zig");
 const abi = @import("kvm/abi.zig");
 const c = abi.c;
@@ -14,8 +15,10 @@ const api = @import("api.zig");
 const snapshot = @import("snapshot.zig");
 const jail = @import("jail.zig");
 const seccomp = @import("seccomp.zig");
+const sync = @import("sync.zig");
 
 const log = std.log.scoped(.flint);
+var virtio_mode: VirtioOwner.Mode = .L0;
 
 const SnapshotOpts = struct {
     vmstate_path: ?[*:0]const u8 = null,
@@ -37,19 +40,42 @@ pub const VmRuntime = struct {
 
     // Pause mechanism: API thread sets paused=true and immediate_exit=1,
     // then sends SIGUSR1 to the vCPU thread to kick it out of KVM_RUN.
-    // KVM_RUN returns -EINTR, run loop sees paused=true and spins on
-    // the flag. API thread does its work, then sets paused=false.
+    // KVM_RUN returns -EINTR, then backend owners fence admission and the
+    // run loop waits on the condition until the API resumes it.
     paused: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     // Set by the run loop when it has actually stopped executing guest code.
-    // The API thread polls this after setting paused=true to confirm the
-    // vCPU is safe to inspect.
+    // The API waits for this whole-VM acknowledgement before inspecting state.
     ack_paused: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     // Set by the run loop when the guest exits (halt/shutdown/error).
     // Tells the API thread to stop accepting connections.
     exited: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    run_failed: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     // TID of the vCPU thread, used to send SIGUSR1 to kick it out of
     // a blocking KVM_RUN (e.g., when the guest is in HLT).
     vcpu_tid: std.atomic.Value(i32) = std.atomic.Value(i32).init(0),
+    mutex: sync.Mutex = .{},
+    condition: sync.Condition = .{},
+    api_listener: i32 = -1,
+    api_stream: i32 = -1,
+
+    pub fn requestExit(self: *VmRuntime) void {
+        self.mutex.lock();
+        self.exited.store(true, .release);
+        self.paused.store(false, .release);
+        self.condition.broadcast();
+        self.mutex.unlock();
+        @atomicStore(u8, &self.vcpu.kvm_run.immediate_exit, 1, .release);
+        self.kickVcpu();
+    }
+
+    fn notifyExit(self: *VmRuntime) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        self.exited.store(true, .release);
+        self.condition.broadcast();
+        if (self.api_stream >= 0) _ = std.os.linux.shutdown(self.api_stream, 2);
+        if (self.api_listener >= 0) _ = std.os.linux.shutdown(self.api_listener, 2);
+    }
 
     /// Send SIGUSR1 to the vCPU thread to break it out of KVM_RUN.
     /// This is needed because immediate_exit only takes effect on the
@@ -77,6 +103,7 @@ const CliArgs = struct {
     tap: ?[*:0]const u8 = null,
     @"vsock-cid": ?[*:0]const u8 = null,
     @"vsock-uds": ?[*:0]const u8 = null,
+    @"virtio-mode": [*:0]const u8 = "L0",
 
     // Snapshot
     restore: bool = false,
@@ -140,6 +167,9 @@ pub fn main(init: std.process.Init) !void {
             got_initrd = true;
         }
     }
+
+    virtio_mode = std.meta.stringToEnum(VirtioOwner.Mode, std.mem.span(cli.@"virtio-mode")) orelse return error.InvalidVirtioMode;
+    log.info("VirtIO mode: {s}", .{@tagName(virtio_mode)});
 
     // Jail setup runs before anything else — after this, the process is
     // in a mount namespace with pivot_root'd filesystem and dropped privileges.
@@ -451,9 +481,11 @@ fn bootVmWithApi(
 
     api.servePostBoot(api_sock_path, io, allocator, &runtime) catch |err| {
         log.err("post-boot API error: {}", .{err});
+        runtime.requestExit();
     };
 
     thread.join();
+    if (runtime.run_failed.load(.acquire)) return error.BackendRuntimeFailed;
 }
 
 /// Restore a VM from snapshot files instead of booting a kernel.
@@ -578,9 +610,11 @@ fn restoreVmWithApi(
 
     api.servePostBoot(api_sock_path, io, allocator, &runtime) catch |err| {
         log.err("post-boot API error: {}", .{err});
+        runtime.requestExit();
     };
 
     thread.join();
+    if (runtime.run_failed.load(.acquire)) return error.BackendRuntimeFailed;
 }
 
 // Memory layout for boot structures (all below boot_params at 0x7000)
@@ -818,18 +852,24 @@ fn runLoopThread(runtime: *VmRuntime) void {
         runtime,
     ) catch |err| {
         log.err("run loop exited with error: {}", .{err});
+        runtime.run_failed.store(true, .release);
     };
-    runtime.exited.store(true, .release);
+    runtime.notifyExit();
 }
 
 fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *DeviceArray, device_count: u32, snap_opts: SnapshotOpts, runtime: ?*VmRuntime) !void {
     const linux = std.os.linux;
+    installKickSignal();
+    var owners: VirtioOwner.Set = .{};
+    if (virtio_mode != .L0) try owners.start(devices, device_count, vm, mem, virtio_mode);
+    defer owners.stop();
 
     // Set up epoll for efficient device fd polling. Instead of blind-polling
     // every device fd after each KVM exit, we use epoll_wait(timeout=0) to
     // check which fds actually have data. Falls back to blind polling if
     // epoll_create fails (shouldn't happen on Linux 2.6+).
     const epoll_fd: i32 = blk: {
+        if (virtio_mode != .L0) break :blk -1;
         const rc: isize = @bitCast(linux.epoll_create1(linux.EPOLL.CLOEXEC));
         if (rc < 0) break :blk -1;
         break :blk @intCast(rc);
@@ -852,53 +892,54 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
     }
 
     var exit_count: u64 = 0;
+    var pending_io = false;
     while (true) {
+        if (owners.failed.load(.acquire)) return error.BackendOwnerFailed;
+        if (runtime) |rt| {
+            if (rt.exited.load(.acquire)) return owners.finish();
+            if (rt.paused.load(.acquire) and pending_io) {
+                // KVM does not snapshot pending userspace emulation. Re-entry
+                // with immediate_exit retires it without executing guest code.
+                @atomicStore(u8, &vcpu.kvm_run.immediate_exit, 1, .release);
+            } else if (rt.paused.load(.acquire)) {
+                try owners.pause();
+                rt.mutex.lock();
+                rt.ack_paused.store(true, .release);
+                rt.condition.broadcast();
+                while (rt.paused.load(.acquire) and !rt.exited.load(.acquire)) rt.condition.wait(&rt.mutex);
+                if (rt.exited.load(.acquire)) {
+                    rt.mutex.unlock();
+                    return owners.finish();
+                }
+                rt.mutex.unlock();
+                try owners.unpause();
+                @atomicStore(u8, &vcpu.kvm_run.immediate_exit, 0, .release);
+                rt.mutex.lock();
+                rt.ack_paused.store(false, .release);
+                rt.condition.broadcast();
+                rt.mutex.unlock();
+            }
+        }
         const exit_reason = vcpu.run() catch |err| {
             // KVM_RUN returns EINTR when interrupted by a signal. This happens
             // when: (a) immediate_exit was set, or (b) SIGUSR1 kicked us out
             // of a blocking HLT. Check if this was a pause request.
             if (err == error.Interrupted) {
-                if (runtime) |rt| {
-                    // Check if we were signaled to exit (e.g., SendCtrlAltDel)
-                    if (rt.exited.load(.acquire)) {
-                        log.info("vCPU exiting (signaled)", .{});
-                        return;
-                    }
-                    if (rt.paused.load(.acquire)) {
-                        rt.ack_paused.store(true, .release);
-                        log.info("vCPU paused by API request", .{});
-                        var spin_count: u32 = 0;
-                        while (rt.paused.load(.acquire)) {
-                            if (rt.exited.load(.acquire)) {
-                                log.info("vCPU exiting while paused (signaled)", .{});
-                                return;
-                            }
-                            spin_count += 1;
-                            if (spin_count < 1000) {
-                                std.atomic.spinLoopHint();
-                            } else {
-                                const ts = std.os.linux.timespec{ .sec = 0, .nsec = 1_000_000 }; // 1ms
-                                _ = std.os.linux.nanosleep(&ts, null);
-                            }
-                        }
-                        log.info("vCPU resumed", .{});
-                        vcpu.kvm_run.immediate_exit = 0;
-                        continue;
-                    }
-                }
-                // Spurious signal — just re-enter KVM_RUN
+                pending_io = false;
+                // Pause/failure/exit admission is checked before re-entering.
                 continue;
             }
             log.err("KVM_RUN failed: {}", .{err});
             return err;
         };
+        pending_io = exit_reason == c.KVM_EXIT_IO or exit_reason == c.KVM_EXIT_MMIO;
         exit_count +%= 1;
         if (exit_count <= 5) log.info("exit #{}: reason={}", .{ exit_count, exit_reason });
 
         // Flush pending vsock write buffers
-        for (devices[0..device_count]) |*dev_opt| {
+        if (virtio_mode == .L0) for (devices[0..device_count]) |*dev_opt| {
             if (dev_opt.*) |*dev| dev.flushPendingWrites();
-        }
+        };
 
         // Poll device fds for incoming data. Epoll checks which fds have
         // data ready; vsock (dynamic connection fds) still uses blind polling.
@@ -927,7 +968,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
                     }
                 }
             }
-        } else {
+        } else if (virtio_mode == .L0) {
             for (devices[0..device_count]) |*dev_opt| {
                 if (dev_opt.*) |*dev| {
                     if (dev.pollRx(mem)) {
@@ -960,10 +1001,18 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
             c.KVM_EXIT_MMIO => {
                 const mmio = vcpu.getMmioData();
                 const len = @min(mmio.len, 8);
-                for (devices[0..device_count]) |*dev_opt| {
+                for (devices[0..device_count], 0..) |*dev_opt, index| {
                     if (dev_opt.*) |*dev| {
                         if (dev.matchesAddr(mmio.phys_addr)) {
                             const offset = mmio.phys_addr - dev.mmio_base;
+                            if (virtio_mode != .L0) {
+                                if (mmio.is_write) {
+                                    try owners.owners[index].write(offset, mmio.data, len);
+                                } else {
+                                    vcpu.kvm_run.unnamed_0.mmio.data = try owners.owners[index].read(offset, len);
+                                }
+                                break;
+                            }
                             if (mmio.is_write) {
                                 const data: [8]u8 = mmio.data;
                                 dev.handleWrite(offset, data[0..len]);
@@ -987,12 +1036,12 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
             c.KVM_EXIT_HLT => {
                 log.info("guest halted after {} exits", .{exit_count});
                 if (snap_opts.vmstate_path) |sp| {
-                    // vCPU is stopped (just exited KVM_RUN), safe to snapshot
+                    try owners.pause();
                     snapshot.save(sp, snap_opts.mem_path.?, vcpu, vm, mem, serial, devices, device_count) catch |err| {
                         log.err("snapshot save failed: {}", .{err});
                     };
                 }
-                return;
+                return owners.finish();
             },
             c.KVM_EXIT_SHUTDOWN => {
                 log.info("guest shutdown (triple fault) after {} exits", .{exit_count});
@@ -1003,7 +1052,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
                     log.info("  cr0=0x{x} cr3=0x{x} cr4=0x{x} efer=0x{x}", .{ sregs.cr0, sregs.cr3, sregs.cr4, sregs.efer });
                     log.info("  cs: sel=0x{x} base=0x{x} type={} l={} db={}", .{ sregs.cs.selector, sregs.cs.base, sregs.cs.type, sregs.cs.l, sregs.cs.db });
                 } else |_| {}
-                return;
+                return owners.finish();
             },
             c.KVM_EXIT_FAIL_ENTRY => {
                 const fail = vcpu.kvm_run.unnamed_0.fail_entry;

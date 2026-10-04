@@ -81,6 +81,20 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_tests.step);
 
+    const eventfd_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/eventfd_tests.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    eventfd_tests.root_module.addImport("kvm_abi", kvm.mod);
+    const run_eventfd_tests = b.addRunArtifact(eventfd_tests);
+    run_eventfd_tests.has_side_effects = true;
+    b.step("eventfd-test", "Run actual enforced KVM notification/IRQ races; no skips")
+        .dependOn(&run_eventfd_tests.step);
+
     // Integration tests: spawn flint binary and test end-to-end behavior.
     // Requires /dev/kvm and a configured Linux kernel fixture.
     // Run with: zig build integration-test

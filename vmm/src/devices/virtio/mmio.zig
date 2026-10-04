@@ -180,16 +180,16 @@ pub fn snapshotRestore(self: *Self, buf: []const u8) usize {
 
     std.debug.assert(pos == IDENTITY_SIZE + TRANSPORT_STATE_SIZE + Queue.SNAPSHOT_SIZE * 3);
 
-    // For vsock devices, sync the host-side queue tracking indices with the
-    // guest's used ring. After snapshot restore, any in-flight descriptors from
-    // prior connections are stale (the host-side fds are gone). By setting
-    // last_avail_idx = next_used_idx (from restored state), we tell the host
-    // to skip all descriptors that were pending at snapshot time, effectively
-    // draining the stale queue. The guest driver will post fresh descriptors
-    // when the agent reconnects.
+    // Host connections cannot survive a new process. Retain the v2 queue-index
+    // compatibility policy and notify the guest through its existing event
+    // queue so the unchanged agent reconnects instead of waiting on a dead fd.
     if (self.device_id == virtio.DEVICE_ID_VSOCK) {
         for (&self.queues) |*q| {
             q.last_avail_idx = q.next_used_idx;
+        }
+        switch (self.backend) {
+            .vsock => |*vsock| vsock.restore_pending = true,
+            else => {},
         }
     }
 
@@ -203,7 +203,7 @@ pub fn snapshotRestore(self: *Self, buf: []const u8) usize {
     return pos;
 }
 
-fn numQueues(self: Self) u32 {
+pub fn numQueues(self: Self) u32 {
     return switch (self.backend) {
         .blk => 1,
         .net => Net.NUM_QUEUES,
@@ -227,11 +227,21 @@ fn reset(self: *Self) void {
     self.queue_sel = 0;
     self.interrupt_status = 0;
     for (&self.queues) |*q| q.reset();
+    switch (self.backend) {
+        .vsock => |*v| v.deinit(),
+        .net => |*n| n.tx_blocked = false,
+        else => {},
+    }
 }
 
 fn selectedQueue(self: *Self) ?*Queue {
     if (self.queue_sel < self.numQueues()) return &self.queues[self.queue_sel];
     return null;
+}
+
+fn configuringQueue(self: *Self) ?*Queue {
+    const queue = self.selectedQueue() orelse return null;
+    return if (!queue.ready) queue else null;
 }
 
 fn setLow32(target: *u64, val: u32) void {
@@ -316,17 +326,22 @@ pub fn handleWrite(self: *Self, offset: u64, data: []const u8) void {
         virtio.MMIO_DRIVER_FEATURES_SEL => self.driver_features_sel = val,
         virtio.MMIO_QUEUE_SEL => self.queue_sel = val,
         virtio.MMIO_QUEUE_NUM => {
-            if (self.selectedQueue()) |q| {
-                const size: u16 = @intCast(val & 0xFFFF);
-                if (size == 0 or size > Queue.MAX_QUEUE_SIZE or @popCount(size) != 1) {
-                    log.warn("rejected invalid queue size: {}", .{size});
+            if (self.configuringQueue()) |q| {
+                if (val == 0 or val > Queue.MAX_QUEUE_SIZE or @popCount(val) != 1) {
+                    log.warn("rejected invalid queue size: {}", .{val});
                 } else {
-                    q.size = size;
+                    q.size = @intCast(val);
                 }
             }
         },
         virtio.MMIO_QUEUE_READY => {
             if (self.selectedQueue()) |q| {
+                if (val > 1) return;
+                if (val == 0) {
+                    q.last_avail_idx = 0;
+                    q.next_used_idx = 0;
+                    q.generation +%= 1;
+                }
                 q.ready = val == 1;
                 if (q.ready) {
                     log.info("queue {} ready (size={})", .{ self.queue_sel, q.size });
@@ -351,25 +366,63 @@ pub fn handleWrite(self: *Self, offset: u64, data: []const u8) void {
             }
         },
         virtio.MMIO_QUEUE_DESC_LOW => {
-            if (self.selectedQueue()) |q| setLow32(&q.desc_addr, val);
+            if (self.configuringQueue()) |q| setLow32(&q.desc_addr, val);
         },
         virtio.MMIO_QUEUE_DESC_HIGH => {
-            if (self.selectedQueue()) |q| setHigh32(&q.desc_addr, val);
+            if (self.configuringQueue()) |q| setHigh32(&q.desc_addr, val);
         },
         virtio.MMIO_QUEUE_DRIVER_LOW => {
-            if (self.selectedQueue()) |q| setLow32(&q.avail_addr, val);
+            if (self.configuringQueue()) |q| setLow32(&q.avail_addr, val);
         },
         virtio.MMIO_QUEUE_DRIVER_HIGH => {
-            if (self.selectedQueue()) |q| setHigh32(&q.avail_addr, val);
+            if (self.configuringQueue()) |q| setHigh32(&q.avail_addr, val);
         },
         virtio.MMIO_QUEUE_DEVICE_LOW => {
-            if (self.selectedQueue()) |q| setLow32(&q.used_addr, val);
+            if (self.configuringQueue()) |q| setLow32(&q.used_addr, val);
         },
         virtio.MMIO_QUEUE_DEVICE_HIGH => {
-            if (self.selectedQueue()) |q| setHigh32(&q.used_addr, val);
+            if (self.configuringQueue()) |q| setHigh32(&q.used_addr, val);
         },
         else => {},
     }
+}
+
+pub fn decodeNotify(self: *const Self, data: []const u8) ?u32 {
+    if (data.len != 4 or self.status & virtio.STATUS_DRIVER_OK == 0 or self.status & virtio.STATUS_FAILED != 0) return null;
+    const index = std.mem.readInt(u32, data[0..4], .little);
+    if (index >= self.numQueues() or !self.queues[index].isReady()) return null;
+    return index;
+}
+
+pub fn processQueue(self: *Self, mem: *Memory, index: u32) bool {
+    if (index >= self.numQueues() or !self.queues[index].isReady() or self.status & virtio.STATUS_DRIVER_OK == 0 or self.status & virtio.STATUS_FAILED != 0) return false;
+    var work = false;
+    switch (self.backend) {
+        .blk => |b| {
+            var count: u32 = 0;
+            while (count < 32) : (count += 1) {
+                const head = self.queues[0].popAvail(mem) catch break orelse break;
+                b.processRequest(mem, &self.queues[0], head) catch {
+                    self.queues[0].pushUsed(mem, head, 0) catch {};
+                };
+                work = true;
+            }
+        },
+        .net => |*n| {
+            if (index == Net.TX_QUEUE) work = n.processTxBudget(mem, &self.queues[index], 32);
+            if (index == Net.RX_QUEUE) work = n.pollRxBudget(mem, &self.queues[index], 32);
+        },
+        .vsock => |*v| {
+            if (index == Vsock.EVT_QUEUE) work = v.deliverRestore(mem, &self.queues[index]);
+            if (index == Vsock.TX_QUEUE) work = v.processTxBudget(mem, &self.queues[index], 32);
+            if (self.queues[Vsock.RX_QUEUE].isReady()) {
+                work = v.deliverPending(mem, &self.queues[Vsock.RX_QUEUE]) or work;
+                if (index == Vsock.RX_QUEUE) work = v.pollRx(mem, &self.queues[Vsock.RX_QUEUE]) or work;
+            }
+        },
+    }
+    if (work) self.interrupt_status |= virtio.INT_USED_RING;
+    return work;
 }
 
 /// Process pending requests on the virtqueue(s).
@@ -395,7 +448,7 @@ pub fn processQueues(self: *Self, mem: *Memory) bool {
                 did_work = true;
             }
         },
-        .net => |n| {
+        .net => |*n| {
             // Process TX queue (queue 1)
             if (self.queues[Net.TX_QUEUE].isReady()) {
                 if (n.processTx(mem, &self.queues[Net.TX_QUEUE])) did_work = true;
@@ -432,7 +485,8 @@ pub fn pollRx(self: *Self, mem: *Memory) bool {
         },
         .vsock => |*v| {
             if (!self.queues[Vsock.RX_QUEUE].isReady()) return false;
-            if (v.pollRx(mem, &self.queues[Vsock.RX_QUEUE])) {
+            const restored = self.queues[Vsock.EVT_QUEUE].isReady() and v.deliverRestore(mem, &self.queues[Vsock.EVT_QUEUE]);
+            if (v.deliverPending(mem, &self.queues[Vsock.RX_QUEUE]) or v.pollRx(mem, &self.queues[Vsock.RX_QUEUE]) or restored) {
                 self.interrupt_status |= virtio.INT_USED_RING;
                 return true;
             }
