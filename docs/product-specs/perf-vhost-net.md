@@ -1,6 +1,6 @@
 # Product Spec: Capability-gated vhost-net Evaluation
 
-**Status**: Evaluation blocked; reject current vhost adoption, userspace unchanged
+**Status**: Direct-ring S1 proposal rejected; full implementation blocked, userspace unchanged
 **Last updated**: 2026-10-04
 **Issue**: [#2 — Perf-profile and evaluate a vhost-net backend for Flint](https://github.com/cataggar/hearth/issues/2)
 **Execution plan**: [perf-vhost-net](../exec-plans/active/perf-vhost-net.md)
@@ -13,6 +13,12 @@ conditional on S0 relevance and the mandatory lifecycle gates.
 
 ## Executed disposition (2026-10-04)
 
+The parent reopened exact-kernel S1 investigation after the diagnostic results.
+That investigation now includes publisher-verified Azure kernel source,
+byte-identical installed/published modules and actual non-root vhost memory,
+ring, eventfd and TAP experiments. Known userspace readiness bugs are not the
+reason to reject the direct-ring proposal.
+
 The [execution evidence](../perf-results/vhost-net-20261004.md) records three
 unchanged nested-Azure boots, 120 unsuccessful requested TAP workload runs,
 seven validated active RPC responses, actual system-wide software/KVM profiles,
@@ -24,9 +30,16 @@ available. The full active-window and tail observation floors are not met.
 Reject/defer adding a vhost backend for the current product. This is **not**
 a measured vhost loss or improvement: A′ and B were not implemented or run.
 Non-root vhost feature probing succeeds after host provisioning, but device
-presence does not prove 12-byte framing, worker quiescence, authoritative used
-cursors, snapshot portability, CoW, confinement or resource isolation. Those
-mandatory contracts remain unproven. The execution plan stays active/blocked
+presence alone does not prove lifecycle or confinement. The S1 characterization
+does demonstrate checked 12-byte TX/RX, bounded detach fencing, kernel-shadow
+used progress, explicit reseeding and file-backed private CoW. It also proves
+that the pinned direct-ring kernel accepts INDIRECT without negotiating it,
+contrary to this proposal's required unadvertised-feature validation. Live
+pre-scanning cannot enforce that rule against guest mutation. A mediated/shadow
+ring design would be a different proposal, not a silently equivalent backend.
+Used-cursor inference also requires a proved conservation invariant and sticky
+fatal error handling; GET_VRING_BASE alone is insufficient. VM IRQ/ACK, traffic
+restore and enforced worker confinement remain unexecuted. The plan stays active/blocked
 rather than claiming implementation completion or recommending a performance
 merge. There is no new selector, SDK mode, jail relaxation or runtime change.
 
@@ -37,7 +50,9 @@ Lower-volume whole-host stack/direct-KVM idle recordings and no-VM controls
 succeed, but background saturation remains about 16 cores. Earlier partial
 environment samples are diagnostics, not a controlled comparison; profiler
 overload/frontend failures are preserved. Readiness does not resolve relevance,
-qualified A/A noise or kernel lifecycle/confinement proof.
+qualified A/A noise or complete lifecycle/confinement proof. Two final S1
+repetitions each execute nine UAPI cases/eight characterization assertions;
+undesirable kernel behavior is retained, not counted as product acceptance.
 
 ## Objective and applicability
 

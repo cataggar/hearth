@@ -1,4 +1,4 @@
-# Original-userspace TAP diagnostic
+# Userspace TAP diagnostic and exact-kernel characterization
 
 This fixture is instrumentation for issue #2, **not** a shipped TAP consumer,
 SDK networking mode, vhost prototype, or evidence of a performance improvement.
@@ -51,6 +51,8 @@ MTU 1500, three blocking TCP listeners and **no heartbeat or timer wakeup
 workaround**. TAP offloads are explicitly disabled. Only Flint's existing
 VERSION_1/MAC/STATUS features, two split queues and 12-byte header are offered.
 Guest route, interface, queue discovery and TAP counters are retained.
+The network-only kernel download runs outside the fleet lock; verification
+and CPU-heavy preparation run inside it.
 
 `collect.py` validates each 64-byte sequence/payload RPC, handles partial reads,
 and separately drives upload (port 7001) and download (7002). Bulk payload is
@@ -104,3 +106,39 @@ summary and artifact hashes can be committed without exposing those samples.
 loopback namespace (no VM/TAP) to check the fixture protocol independently.
 `quiet` retains matched 60 s stat/record controls **without a VM**; a saturated
 control is a qualification failure, not CPU cost attributable to Flint.
+
+## Exact-kernel UAPI characterization
+
+`uapi_probe.py` is a real vhost/TAP ring experiment, **not a Flint backend, real
+KVM correctness suite, production jail test or performance arm B**. Run only on
+the provisioned pinned kernel from this worktree:
+
+```sh
+umask 077
+flock -x -w 600 /d/hearth/.perf/fleet/host.lock timeout 90 bash -c '
+  cd /d/hearth/.perf/worktrees/vhost-net &&
+  umask 077 &&
+  mkdir .perf/vhost-net/s1/uapi-new &&
+  timeout 60 sudo -n unshare --net -- python3 benchmarks/vhost-net/uapi_probe.py \
+    --output "$PWD/.perf/vhost-net/s1/uapi-new/results.json"
+'
+```
+
+The output must not already exist. The root supervisor owns only an ephemeral
+network namespace, `hn2s1tap0` and its AF_PACKET peer. The vhost/TAP owner drops
+to UID/GID 1000, clears supplementary groups, sets NoNewPrivs and CPU 8, and opens
+its own device FDs. No privileged device FD is passed to Flint. Seccomp remains
+**0** in this characterization; it is not an enforced production filter.
+
+The probe configures two 256-entry split queues, bounded GPA-0 memory, only
+VERSION_1 in vhost, 12-byte TAP headers, no offloads, kick/call/error eventfds
+and file-backed MAP_PRIVATE RAM. Nine sequential cases observe checked TX/RX,
+guest used-index mutation, deliberately broken naive resume, trusted-counter
+reseeding, unnegotiated INDIRECT acceptance, invalid TX direction, out-of-range
+GPA and a cyclic chain. Eight assertions verify the expected observations,
+including undesirable acceptance; they are **not eight product acceptance
+gates**. An explicit detached kick plus incoming frame checks a bounded write
+fence; close-before-unmap checks worker disappearance, FD counts and untouched
+CoW backing. It does not prove VM IRQ/ACK handoff, arbitrary races, cross-backend
+traffic restore or cgroup limits. Exact-kernel source/provenance and actual
+results are in the [report](../../docs/perf-results/vhost-net-20261004.md).

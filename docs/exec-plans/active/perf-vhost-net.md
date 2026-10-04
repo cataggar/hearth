@@ -1,6 +1,6 @@
 # Execution Plan: Evaluate Flint vhost-net
 
-**Status**: Blocked after S0 rejection and unsuccessful S3 qualification
+**Status**: Blocked — direct-ring S1 contract mismatch; adoption unqualified
 **Last updated**: 2026-10-04
 **Issue**: [#2](https://github.com/cataggar/hearth/issues/2)
 **Spec**: [Capability-gated vhost-net Evaluation](../../product-specs/perf-vhost-net.md)
@@ -19,6 +19,19 @@ valid keep/reject outcome. The default remains userspace.
 See [actual results and exclusions](../../perf-results/vhost-net-20261004.md).
 S0 found a direct CLI/API capability but no demonstrated current consumer;
 the SDK still uses vsock. The diagnostic fixture is not product demand.
+The parent reopened S1 on 2026-10-04: known exit-driven readiness failures do
+not alone reject a net-only functioning A′ adapter/prototype. Investigate exact
+kernel detach/flush, authoritative used-cursor error paths, pending IRQ handoff
+and worker isolation with concrete source/API evidence before rejecting safety
+or selecting a safe strict opt-in prototype. Reuse the exact separate shared
+jail prerequisite when available; never count its repair as a speedup. Default
+adoption remains unjustified without meaningful demand and qualified measurements.
+The ensuing publisher-verified exact-kernel investigation and real non-root
+UAPI probes are now recorded in the report's S1 section. The direct guest-ring
+proposal fails required unadvertised-feature validation: kernel TX processes
+INDIRECT despite VERSION_1-only SET_FEATURES. Pre-scanning mutable guest rings
+cannot enforce the constraint. A mediated/shadow-ring implementation would
+need a separately justified design; this task does not silently add one.
 
 The unchanged safe binary boots a real VirtIO-MMIO/TAP guest on nested Azure.
 Across three boots, all 120 requested network runs fail before completing their
@@ -33,9 +46,15 @@ cleanup on a post-spawn metadata failure).
 The baseline cannot establish deciding CPU/unit noise or credible tails.
 Pre-existing unrelated processes consume nearly all 16 host CPUs despite the
 fleet lock. No such resources were killed or reconfigured. The device appeared
-after parent provisioning: UID 1000 `VHOST_GET_FEATURES` succeeds, but no owner,
-memory table, queue, eventfd or TAP backend was activated. Exact kernel worker
-fences/used-cursor authority and production jail/resource contracts are unproven.
+after parent provisioning: UID 1000 `VHOST_GET_FEATURES` succeeds. Initially no
+backend was activated; later S1 probes do configure actual owner, memory table,
+rings, eventfds and TAP outside Flint. These are characterization, not A′/B.
+They verify checked framing, sampled detach/write fencing, file-private CoW
+and worker join/FD cleanup. Naive used-index handoff is demonstrably wrong:
+poisoned RAM seeds 30482 rather than expected 3; explicit trusted reseeding
+works in the controlled case. Malformed TX advances avail without used and
+signals ERR, requiring sticky fatal handling before any inferred handoff.
+Production IRQ/ACK, traffic snapshot and enforced worker isolation are unrun.
 
 Current disposition: **reject/defer backend adoption for lack of relevance;
 full execution remains blocked**. A′, B, their before/after deltas, vhost
@@ -60,8 +79,12 @@ VM idle and matched no-VM captures; software reports lose zero samples, but
 the no-VM software control still consumes 959.75 CPU s/60 s (~15.996 cores).
 Corrected global `perf kvm -i ... stat report --stdio` syntax produces fourteen
 offline reports without erasing original errors. Six fixture tests still pass.
-No A/A deciding noise, product relevance, kernel-worker/cursor/confinement proof
-or performance delta is established by these retries.
+No A/A deciding noise, product relevance, complete lifecycle/confinement proof
+or performance delta is established by these retries. A fresh locked five-second
+/proc/stat control independently verifies 15.986985 busy cores using
+user+nice+system+irq+softirq, not system-wide task-clock. Two final S1 probe
+repetitions each run nine cases/eight observation assertions, with no FD/thread
+leak; accepting unadvertised INDIRECT is an observed contract failure, not a pass.
 
 ## Source-backed starting point
 

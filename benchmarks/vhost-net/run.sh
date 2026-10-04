@@ -9,6 +9,17 @@ OUT=.perf/vhost-net/20261004
 mkdir -p "$OUT"
 case "${1:-}" in
   prepare)
+    if test -e "$OUT/fixture/hashes.txt"; then
+      echo "refusing to overwrite the retained, pinned fixture" >&2
+      exit 2
+    fi
+    mkdir -p "$OUT/fixture"
+    if ! test -e "$OUT/fixture/bzImage"; then
+      curl --fail --location --max-time 60 \
+        https://github.com/joshuaisaact/hearth/releases/download/kernel-5.10.245/bzImage \
+        --output "$OUT/fixture/bzImage.download"
+      mv "$OUT/fixture/bzImage.download" "$OUT/fixture/bzImage"
+    fi
     flock -x -w 600 "$LOCK" timeout 600 bash -euc '
       cd "$1"
       umask 077
@@ -18,6 +29,7 @@ case "${1:-}" in
         exit 2
       fi
       mkdir -p "$OUT/fixture/guest/bin" "$OUT/fixture/guest/dev" "$OUT/fixture/guest/proc" "$OUT/fixture/guest/sys"
+      echo "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208  $OUT/fixture/bzImage" | sha256sum --check
       zig version > "$OUT/fixture/zig-version.txt"
       zig cc -target x86_64-linux-musl -O2 -static -Wall -Wextra -Werror \
         benchmarks/vhost-net/guest.c -o "$OUT/fixture/guest/bin/peer"
@@ -27,10 +39,6 @@ case "${1:-}" in
       chmod 700 "$OUT/fixture/guest/init"
       (cd "$OUT/fixture/guest" && find . -print | LC_ALL=C sort | bsdcpio -o -H newc) \
         | gzip -n > "$OUT/fixture/initrd.cpio.gz"
-      curl --fail --location --max-time 60 \
-        https://github.com/joshuaisaact/hearth/releases/download/kernel-5.10.245/bzImage \
-        --output "$OUT/fixture/bzImage"
-      echo "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208  $OUT/fixture/bzImage" | sha256sum --check
       sha256sum "$OUT/fixture/bzImage" "$OUT/fixture/initrd.cpio.gz" "$OUT/fixture/guest/bin/"* \
         vmm/zig-out/bin/flint benchmarks/vhost-net/guest.c benchmarks/vhost-net/guest-init.sh \
         > "$OUT/fixture/hashes.txt"
