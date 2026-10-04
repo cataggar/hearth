@@ -1,6 +1,6 @@
 // Integration tests for flint.
 // Spawn the flint binary and test end-to-end behavior.
-// Requires /dev/kvm, /tmp/vmlinuz-minimal, bsdcpio, gzip, and static /usr/bin/busybox.
+// Requires /dev/kvm, the configured kernel, bsdcpio, gzip, and static /usr/bin/busybox.
 //
 // Run with: zig build integration-test
 
@@ -10,7 +10,7 @@ const process = std.process;
 
 const FLINT_BIN = "zig-out/bin/flint";
 const FIXTURE_FLINT_BIN = "../../zig-out/bin/flint";
-const DEFAULT_KERNEL = "/tmp/vmlinuz-minimal";
+const DEFAULT_KERNEL = @import("integration_options").kernel ++ "";
 const INIT_SCRIPT =
     \\#!/bin/sh
     \\set -eu
@@ -70,6 +70,7 @@ fn buildInitrd() !Fixture {
     fixture_counter += 1;
     const root = try std.fmt.bufPrint(&fixture.root, ".zig-cache/flint-integration-{d}-{d}", .{ linux.getpid(), fixture_counter });
     fixture.root_len = root.len;
+    try std.Io.Dir.cwd().createDirPath(io(), ".zig-cache");
     try std.Io.Dir.cwd().createDir(io(), fixture.dir(), .fromMode(0o700));
     errdefer fixture.deinit() catch |err| std.debug.panic("fixture cleanup failed: {s}", .{@errorName(err)});
 

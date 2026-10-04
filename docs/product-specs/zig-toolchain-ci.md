@@ -51,3 +51,19 @@ regressions; do not attribute a compiler change to the later VirtIO experiments.
 
 No ioeventfd/irqfd, vhost-net, async block I/O, new VMM architectures, snapshot
 format changes, or unrelated SDK behavior changes are included.
+
+## Opt-in backend experiment
+
+Issue [#6](https://github.com/cataggar/hearth/issues/6) adds artifact-local
+`-Dvmm-codegen=auto|llvm|native` / `-Dvmm-linker=auto|lld|native` and analogous
+`-Dagent-*` controls. Defaults remain `auto`; source setup still requests safe
+optimization with no backend override. Helper/configurer compilation and the
+immutable translate-c/Aro pins are unaffected.
+
+For genuine repeated acceptance use `-Dperf-force-test-run=true`.
+VMM integration can select a project-relative kernel with
+`-Dperf-test-kernel=.perf-zig-native/bzImage`, resolving it from `vmm/` before
+guest fixture working-directory changes. This does not change installed binary
+paths, KVM permissions, CI requirements or production policy. See the
+[experiment spec](perf-zig-native.md) for support diagnostics and evidence gates;
+explicit native options do not guarantee compiler support or authorize adoption.

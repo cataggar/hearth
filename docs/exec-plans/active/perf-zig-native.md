@@ -1,6 +1,6 @@
 # Execution Plan: Native Zig Codegen and Linker Experiment
 
-**Status**: Planned
+**Status**: Partial implementation verified — native adoption rejected by size; full qualification incomplete
 
 **Date**: 2026-10-04
 
@@ -8,8 +8,8 @@
 
 **Spec**: [Native Zig codegen and linker experiment](../../product-specs/perf-zig-native.md)
 
-Planning only: no build, correctness execution, profiling, measured results,
-production-default change or adoption is claimed. The merged #5 compiler
+Implementation runs on `copilot/perf-zig-native-20261004` at base `b06ec0a`,
+excluding #1/#2/#3. No production-default change or adoption is claimed. The merged #5 compiler
 migration is a prerequisite already completed, not work to repeat.
 
 ## Evidence and fixed scope
@@ -23,11 +23,12 @@ CI, tests and architecture. Consult
 [prior recipe](https://github.com/cataggar/hearth/pull/5#issuecomment-5973822154).
 Those historical acceptance/perf results are not native-backend acceptance.
 
-VMM executable/unit/integration compile artifacts leave `use_llvm`/`use_lld`
-unset today. Source setup requests `safe`; normal VMM development defaults to
-`debug`; agent defaults to safe/static musl. Actual backend/linker resolution
-for each is unverified. Explicit LLVM/LLD and native/native are required probes;
-both mixed configurations are candidates only where supported.
+The unchanged baseline leaves `use_llvm`/`use_lld` unset. The implementation
+adds opt-in controls and preserves those defaults. Source setup requests `safe`;
+normal VMM development defaults to `debug`; agent defaults to safe/static musl.
+Observed CI-target defaults are native/native Debug and LLVM/LLD safe for all
+three VMM artifacts. See the results below; historical planning uncertainty is
+not a current unsupported-safe result.
 
 One frozen compiler binary, source tree and experimental patch, target/CPU/ABI,
 optimization and dependency set must be used throughout. Leave #1/#2/#3 device
@@ -232,13 +233,14 @@ signed compiler, and execute retained snapshots/guest commands for rollback.
 No snapshot conversion or data migration. Complete the plan only after durable
 artifacts/decision are recorded; do not mark implementation complete now.
 
-## Proposed reproducible commands
+## Reproducible interfaces and remaining design examples
 
-**Not executed during planning.** Existing options below were checked against
-current Zig/repository definitions. `vmm-*`, `agent-*`, `perf-force-test-run`,
-`perf-test-kernel` and the Python runner are **proposed W1 interfaces**, not
-available commands today. Their final CLI and fully expanded arguments must
-be stored in the manifest. All files remain under the chosen project root.
+The artifact options, forced tests, project-relative kernel override and
+`run`/`batch`/`summarize`/`probe` recorder are implemented. Exact executed argv,
+status and identities are in private evidence. The `build`/`runtime` subcommands
+below remain **unimplemented design examples**, not executed commands. All
+operations must use `umask 077` and the exclusive fleet lock; direct identity,
+prefetch, build and perf examples also require that lock.
 
 ### Identity and dependency prefetch, outside timing
 
@@ -290,8 +292,10 @@ or `native/lld`; every cell has its own `CACHE`.
 
 No custom install prefix is used in these integration commands. A standalone
 `zig build` command with the same target/options is the measured executable
-build; test compilation/execution are distinct observations. The future runner
-enforces timeout, executed-case checks, exit-code failure and persistent logs.
+build; test compilation/execution are distinct observations. The implemented recorder enforces timeout, exit-code failure and persistent logs.
+It does not enforce test counts/skips or implement the full build experiment;
+the executed correctness logs were explicitly checked for 31 + 7 passes and
+absence of skips/cached runs.
 
 ### Separate agent safe probes
 
@@ -309,7 +313,7 @@ matching native host; x86_64 cross-building AArch64 is build-only evidence.
 
 ### Runner and host perf capture
 
-Proposed runner contract; W1 implements and validates it before use:
+Unimplemented full-measurement runner contract; do not execute or claim it:
 
 ```bash
 python3 scripts/perf-zig-native.py build \
@@ -419,16 +423,87 @@ required evidence. Do not delete shared caches or other experiments' artifacts.
 
 - [x] Spec written first; linked issue, source-backed contract and active plan.
 - [ ] Frozen identity/pins/default evidence, baseline gaps and numeric noise gates.
-- [ ] Opt-in artifact-consistent matrix; unsupported/fallback diagnostics retained.
-- [ ] Real native unit and all KVM integration execution, no skips/cache acceptance.
+- [x] Opt-in artifact-consistent VMM matrix; unsupported/fallback diagnostics retained.
+- [x] Real native unit and all KVM integration execution, no skips/cache acceptance.
 - [ ] API/boot/protocol/exec/PTY/files/I/O/concurrent lifecycle checks.
-- [ ] LLVM -> native and native -> LLVM snapshots with actual restored execution.
+- [x] LLVM -> native and native -> LLVM snapshots with actual restored execution.
 - [ ] Repeated cold/warm/incremental wall/total CPU/tree RSS/size measurements.
 - [ ] Nested Azure perf stat/stack record/report, runtime tails/throughput/CPU/exits.
 - [ ] Heartbeat, unavailable PMU and pre-existing workload gaps explicitly reported.
 - [ ] Independent agent static-musl targets; cross-build/native evidence separated.
-- [ ] Raw reproducible artifacts, limitations and per-target/mode decision persisted.
+- [x] Available raw reproducible artifacts, limitations and non-adoption decision persisted.
 - [ ] If adopted, source builds/CI/docs wired consistently and rollback executed.
 
-Only the planning checkbox is complete. Implementation/testing/benchmarking
-remain future work regardless of whether this planning task is marked done.
+No cell was adopted, so the last item is not applicable; production source
+builds/CI remain unchanged. The plan stays active because mandatory measurement
+and independent-agent acceptance are incomplete. A deterministic size rejection
+does not mark the remaining checkboxes complete.
+
+## Actual results and remaining blockers
+
+- **W0 partial:** exact signed compiler bytes, immutable helper/Aro pins, actual
+  VMM artifact defaults/target/CPU features, non-root KVM API/VM creation and
+  profile permissions are recorded. Compiler source revision is unpublished/
+  unavailable, not inferred from the release mirror. Warm unchanged A/A has
+  20 runs per mode: Debug median 118.21 ms/CV 39.00%; safe 77.60 ms/CV 22.06%.
+  Explicit LLVM Debug A/A median 77.85 ms/CV 52.50%. Ten cold/incremental/runtime
+  control pairs and a demonstrably quiet physical-host window are absent.
+  Frozen gates disallow adoption; no retrospective noise relaxation occurred.
+- **W1 implemented opt-ins/support:** all VMM artifacts and agent executable/
+  POSIX tests receive nullable-default or explicit codegen/linker settings.
+  Native/native, LLVM/native, LLVM/LLD and auto/auto pass in both VMM modes.
+  Native/LLD is genuinely unsupported with the exact diagnostic
+  `self-hosted backends do not support linking with LLD`. Initial kernel-path/
+  configurer mistakes are retained separately, not classified as backend failures.
+  Helper options remain `.{};` and their compiled caches are not cold seeds.
+  Frozen codegen-affecting source patches exist but were never applied/measured.
+  The recorder has ten focused passing tests, immutable command evidence, argv
+  arrays, `wait4` reaped-tree CPU and nominal-20ms live-tree RSS sampling.
+  RSS double-counts shared pages/misses short-lived processes; no cgroup peak
+  or complete detached-worker accounting is claimed.
+- **W2 core execution complete, broader lifecycle partial:** every supported
+  CI-target row runs 31 unit + all 7 KVM tests in Debug and safe (eight
+  invocations), zero skips/cached runtime acceptance. Native-CPU/GNU source-setup
+  safe runs the same 38 tests for auto/auto, LLVM/LLD and native/native.
+  Fixed-agent guest exec/exit/output/timeout/signals, files, disk fsync/read,
+  spawn, PTY input/output/resize and pause/resume pass. Both cross-backend
+  directions and same-backend controls pass with killed creators, independently
+  reopened disk/vsock and actual restored guest state/execution in both
+  CI-target modes and source-setup safe. TAP/concurrent lifecycle/full SDK
+  framing are not accepted: the initial baseline PTY quoted command exposes
+  pre-existing JSON-escape behavior; the harness uses a fixed quote-free command,
+  not an agent/runtime fix. No-heartbeat and SDK CONNECT gaps remain unqualified.
+- **W3 incomplete, size rejection established:** same-patch LLVM/LLD Debug/safe
+  binaries are 7,638,200/6,827,040 bytes; native/native 22,914,417/21,779,241.
+  Native grows **200.00%/219.01%**, failing the frozen 10% output-size gate.
+  LLVM/native grows **81.97%/55.33%**. Source-setup safe native grows **195.95%**
+  (5,973,080→17,677,529 bytes). Single discovery build durations are not controlled
+  compilation-speed comparisons. No ten-pair cold/incremental benefit, phase-cost
+  decomposition or valid build-regression confidence interval is claimed.
+- **W4 partial, real profiles:** four genuine inherited command-mode
+  software/KVM-stat and stack-record/report cells cover Debug/safe LLVM/LLD
+  versus native/native, startup, the smoke operations, snapshot and new-process
+  restore. Hardware PMU is unavailable; privileged trace stat runs a UID1000
+  workload with initialized KVM group, not root VMM acceptance. Stack reports
+  have 130/130/84/114 samples and zero lost samples. The one-window KVM exit
+  counts are respectively 41,218/41,974/42,111/42,114: availability/correctness
+  and exploratory profiles, not normalized repeated regression evidence.
+  Boot/restore smoke times are single noisy samples, not product targets,
+  p99 claims or proof of runtime improvement. Repeated workloads, sampling
+  minima/tails/throughput, concurrency/idle/TAP and profiler overhead remain.
+- **W5 incomplete:** the unchanged fixed x86_64 safe/static-musl agent passes
+  three native POSIX tests. Candidate-agent build/runtime/CPU comparisons and
+  both-target support matrix have not run. Native AArch64 execution is unavailable
+  on this x86_64 host; a cross-build cannot close that specific cell.
+- **W6 non-adoption:** VMM native/native and LLVM/native fail the immutable size
+  budget against explicit LLVM/LLD, regardless of apparent single-build speed.
+  Full statistical qualification is also incomplete. No performance-increasing
+  PR, default/setup/CI adoption, merge or auto-merge is authorized.
+
+Private evidence is retained at
+`/d/hearth/.perf/worktrees/zig-native/.perf-zig-native/`, including manifests,
+frozen gates, full argv/logs/metrics, builtin/cache associations, binary/fixture
+hashes, actual snapshots and `perf.data`/stack reports. Initial invalid support
+attempts and failed baseline PTY evidence remain separate. No downloads are
+included in build-benefit results, and no historical #5 profile is reused as
+native runtime evidence. See the spec's result table for reproducible locations.
