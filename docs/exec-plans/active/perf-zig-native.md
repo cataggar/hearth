@@ -9,7 +9,10 @@
 **Spec**: [Native Zig codegen and linker experiment](../../product-specs/perf-zig-native.md)
 
 Implementation runs on `copilot/perf-zig-native-20261004` at base `b06ec0a`,
-excluding #1/#2/#3. No production-default change or adoption is claimed. The merged #5 compiler
+excluding #1/#2/#3 performance prototypes. A later, separately authorized
+shared jail-correctness baseline is reused byte-for-byte for both arms; its
+results are not pooled with untouched-runtime results or credited as speedups.
+No production-default change or adoption is claimed. The merged #5 compiler
 migration is a prerequisite already completed, not work to repeat.
 
 ## Evidence and fixed scope
@@ -439,7 +442,7 @@ builds/CI remain unchanged. The plan stays active because mandatory measurement
 and independent-agent acceptance are incomplete. A deterministic size rejection
 does not mark the remaining checkboxes complete.
 
-## Actual results and remaining blockers
+## Original untouched-runtime results and remaining blockers
 
 - **W0 partial:** exact signed compiler bytes, immutable helper/Aro pins, actual
   VMM artifact defaults/target/CPU features, non-root KVM API/VM creation and
@@ -497,12 +500,90 @@ does not mark the remaining checkboxes complete.
   minima/tails/throughput, concurrency/idle/TAP and profiler overhead remain.
 - **W5 incomplete:** the unchanged fixed x86_64 safe/static-musl agent passes
   three native POSIX tests. Candidate-agent build/runtime/CPU comparisons and
-  both-target support matrix have not run. Native AArch64 execution is unavailable
+  both-target support matrix had not run in this original phase; see the later
+  mechanical follow-up below. Native AArch64 execution is unavailable
   on this x86_64 host; a cross-build cannot close that specific cell.
 - **W6 non-adoption:** VMM native/native and LLVM/native fail the immutable size
   budget against explicit LLVM/LLD, regardless of apparent single-build speed.
   Full statistical qualification is also incomplete. No performance-increasing
   PR, default/setup/CI adoption, merge or auto-merge is authorized.
+
+### Shared baseline follow-up
+
+- Exact cumulative common runtime/regression files from `5ee81b1` implement
+  parent-authorized prerequisite commits `f2f9ab4` + `5ee81b1`.
+  `tools/perf/blk-io.py` is the unchanged `7a71334` diagnostic dependency.
+  All five selected files are byte-verified against upstream commits; no peer
+  performance backend, issue-specific CI/docs or overlapping fixture options
+  were imported. Original L0 binaries and logs remain separately retained.
+- Repaired CI Debug/safe and native-CPU/GNU safe LLVM/LLD/native/native each
+  actually pass **32 unit + all 7 KVM tests** (six invocations). Explicit forced
+  units/integration side effects retain zero skips/cached runtime acceptance.
+  The original 31-test inventory/results above are historical, not the new
+  repaired-baseline inventory.
+- Repaired native executable growth is **+270.26% Debug, +217.85% safe,
+  +194.00% native-CPU/GNU safe**, against same-repaired-source LLVM/LLD.
+  The unchanged 10% size budget still rejects adoption. Support durations
+  include helpers/tests/cache effects, not qualifying build comparisons.
+- The opt-in guest harness adds actual enforced `--jailed` execution, verifies
+  UID/GID1000, CapEff0, NoNewPrivs1 and Seccomp2, and checks recorded owned task
+  IDs disappear on teardown. It retains snapshot/disk evidence before deleting
+  exact owned sockets/copied files/device nodes. Twelve focused Python tests
+  pass, including wrong-credential/filter rejection and setup-failure cleanup.
+- The earlier unjailed profiles remain unjailed. Shared jail repair does not
+  qualify their performance, hidden-PMU, worker-CPU, tail or lifecycle gaps.
+  The parent-provided **15.961/16 busy-core** control (zero iowait/steal) confirms
+  why a fresh, quiet post-provisioning window and renewed unchanged A/A are
+  still mandatory. Fleet flock is not an unrelated-load/host-idle guarantee;
+  no unrelated process metadata/stacks are published or resources modified.
+- The agent now has `test-build` for same-option POSIX-artifact cross-build
+  discovery without execution. Mechanical support probes do not complete W5
+  repeated build/guest-CPU/performance acceptance; native AArch64 hardware
+  remains a separate required gap.
+- Enforced CI-target snapshots pass all four directions in both modes:
+  **eight** full guest/PTY/disk/lifecycle/new-process restore controls, with
+  non-root/filter and task-teardown metadata. Common prerequisite tests pass
+  **3/3 per CI backend/mode**.
+- GNU safe is **not** enforced-jail accepted. Both same-backend controls time
+  out before the guest channel; common prerequisite tests pass **2/3 each**,
+  with the guest-boot test reporting actual **SIGSYS (-31)**. Scoped owned-child
+  ptrace identifies LLVM's last syscall stop as **28**, including 4096-byte/
+  advice102 arguments, followed by exit159. Native's fatal syscall is not
+  separately attributed. GNU cross-backend jailed restore remains blocked;
+  no filter allowance/tunable/ABI/CPU fallback was introduced. An initial
+  setpriv-based syscall profile loses VMM coverage across sudo bootstrap and
+  is not accepted; direct-root perf captures 188 owned VMM events plus SIGSYS.
+- Separate no-heartbeat safe controls initially respond **2/3 LLVM, 3/3
+  native**. After five seconds, **0/2 and 0/3** execs complete within two seconds
+  while the API remains Running; one LLVM trial already fails initial control.
+  The five connected cases fail the raw SDK base-socket prerequisite with
+  ENOENT. These are observed baseline gaps, not idle CPU/tail/performance or
+  full installed-SDK acceptance.
+- Independent safe agent support now covers all five pairs on both documented
+  static-musl targets. All four supported x86_64 pairs force **3 POSIX tests**
+  and pass four fixed-VMM enforced-jail guest/new-process restore controls.
+  Non-agent cpio contents/metadata, VMM, kernel, disk and 10 ms heartbeat remain
+  fixed. AArch64 auto/auto, LLVM/LLD and LLVM/native compile executable+POSIX
+  artifacts only; no matching-native-hardware run is claimed.
+- Agent native/LLD is explicitly unsupported on both targets. Native/native
+  AArch64 instead **fails**, both compiler artifacts killed with SIGKILL;
+  runner timeout false, 163.13 s, sampled tree RSS 32,610,631,680 B. No OOM attribution,
+  backend-unsupported label, exact-unique-memory claim or weakened retry is
+  made. Native x86_64 agent size grows **442.64%**, LLVM/native **51.62%**;
+  AArch64 LLVM/native **48.18%**. These all fail the original 10% size budget,
+  independently of VMM non-adoption. W5 repeated build/runtime/guest CPU and
+  native AArch64 acceptance remain incomplete.
+
+Repaired evidence adds `shared-jail-source.json`, `repaired-support`,
+`repaired-source-setup`, `repaired-jail-tests`, `repaired-source-jail-tests`,
+`repaired-jailed-snapshot-v2`, `repaired-jailed-gnu-v3` and
+`runner-validation-repaired`. A redundant retention wrapper failed because
+the recorder had already created its output directory; its failed downstream
+GNU paths remain harness failures, not unsupported backends. The valid GNU
+control attempts use the recorder's already-retained `repaired-source-setup`
+binaries and fail as documented above. `agent-support`, `agent-guest`,
+`repaired-identities`, `noheartbeat-diagnostic` and the scoped GNU perf/ptrace
+diagnostics are retained independently; no negative rows are called passing.
 
 Private evidence is retained at
 `/d/hearth/.perf/worktrees/zig-native/.perf-zig-native/`, including manifests,

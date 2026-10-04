@@ -16,3 +16,4 @@ agent/zig-pkg/
 vmm/zig-pkg/
 .perf-zig-native/
 scripts/__pycache__/
+tools/perf/__pycache__/

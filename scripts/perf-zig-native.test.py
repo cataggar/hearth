@@ -137,6 +137,41 @@ class RunnerTests(unittest.TestCase):
         child.kill.assert_called_once()
         child.wait.assert_called_once()
 
+    def test_jail_verification_rejects_wrong_uid_or_unenforced_filter(self):
+        vm = vm_runner.Vm.__new__(vm_runner.Vm)
+        vm.process = MagicMock(pid=4321)
+        entry = MagicMock()
+        entry.name = "4322"
+        for uid, seccomp in ((0, 2), (os.getuid(), 0)):
+            with self.subTest(uid=uid, seccomp=seccomp):
+                def read_child(name):
+                    value = MagicMock()
+                    value.read_text.return_value = (
+                        "4322 (flint) S 4321 4321"
+                        if name == "stat" else
+                        f"Name:\tflint\nUid:\t{uid} {uid} {uid} {uid}\n"
+                        f"Gid:\t{os.getgid()} {os.getgid()} {os.getgid()} {os.getgid()}\n"
+                        f"Groups:\t{os.getgid()}\nCapEff:\t0000000000000000\n"
+                        f"NoNewPrivs:\t1\nSeccomp:\t{seccomp}\n"
+                    )
+                    return value
+                entry.__truediv__.side_effect = read_child
+                with patch.object(vm_runner, "Path") as proc:
+                    proc.return_value.iterdir.return_value = [entry]
+                    with self.assertRaisesRegex(RuntimeError, "incorrect credentials or unenforced jail"):
+                        vm.verify_jail()
+
+    def test_vm_setup_failure_removes_owned_socket_directory(self):
+        output = self.output / "vm-setup-failure"
+        output.mkdir()
+        with patch.object(vm_runner.shutil, "copyfile", side_effect=FileNotFoundError("disk missing")):
+            with self.assertRaisesRegex(FileNotFoundError, "disk missing"):
+                vm_runner.Vm(
+                    self.output / "missing-vmm", output, self.output / "kernel",
+                    self.output / "initrd", self.output / "disk", 0, jailed=True,
+                )
+        self.assertEqual(list((runner.ROOT / ".perf-zig-native" / "s").iterdir()), [])
+
 
 if __name__ == "__main__":
     unittest.main()

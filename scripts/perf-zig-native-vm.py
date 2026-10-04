@@ -96,32 +96,50 @@ def execute(connection, command, expected_code=0, timeout=5):
 
 
 class Vm:
-    def __init__(self, binary, folder, kernel, initrd, disk, cpu, restore=False):
+    def __init__(self, binary, folder, kernel, initrd, disk, cpu, restore=False, jailed=False):
         self.folder = folder
+        self.jailed = jailed
         self.process = None
         self.control = None
         self.log = None
         self.listener = None
         self.socket_dir = ROOT / ".perf-zig-native" / "s" / f"{os.getpid()}-{time.monotonic_ns()}"
         self.socket_dir.mkdir(parents=True, mode=0o700)
+        self.workdir = self.socket_dir if jailed else folder
         self.api_path = self.socket_dir / "a"
         self.vsock_path = self.socket_dir / "v"
-        if len(str(self.vsock_path)) + 5 >= 108:
+        try:
+            if len(str(self.vsock_path)) + 5 >= 108:
+                raise ValueError("Unix socket path too long")
+            self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.listener.settimeout(20)
+            self.listener.bind(str(self.vsock_path) + "_1024")
+            self.listener.listen(1)
+            if restore and jailed:
+                for name in ("disk.ext4", "state.snap", "memory.snap"):
+                    shutil.copyfile(folder / name, self.workdir / name)
+            elif not restore:
+                shutil.copyfile(disk, self.workdir / "disk.ext4")
+            if jailed and not restore:
+                shutil.copyfile(kernel, self.workdir / "bzImage")
+                shutil.copyfile(initrd, self.workdir / "initrd.cpio.gz")
+            self.log = (folder / ("restore.log" if restore else "boot.log")).open("wb")
+            argv = ["taskset", "-c", str(cpu), str(binary),
+                    "--api-sock", "/a" if jailed else str(self.api_path)]
+            if jailed:
+                argv = ["sudo", "-n", "--", *argv, "--jail", str(self.workdir),
+                        "--jail-uid", str(os.getuid()), "--jail-gid", str(os.getgid())]
+            if restore:
+                argv += ["--restore", "--vmstate-path", "state.snap", "--mem-path", "memory.snap",
+                         "--disk", "disk.ext4", "--vsock-cid", "100",
+                         "--vsock-uds", "/v" if jailed else str(self.vsock_path)]
+            self.started = time.perf_counter()
+            self.process = subprocess.Popen(
+                argv, cwd=self.workdir, stdout=self.log, stderr=self.log, start_new_session=jailed,
+            )
+        except BaseException:
             self.close()
-            raise ValueError("Unix socket path too long")
-        self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.listener.settimeout(20)
-        self.listener.bind(str(self.vsock_path) + "_1024")
-        self.listener.listen(1)
-        if not restore:
-            shutil.copyfile(disk, folder / "disk.ext4")
-        self.log = (folder / ("restore.log" if restore else "boot.log")).open("wb")
-        argv = ["taskset", "-c", str(cpu), str(binary), "--api-sock", str(self.api_path)]
-        if restore:
-            argv += ["--restore", "--vmstate-path", "state.snap", "--mem-path", "memory.snap",
-                     "--disk", "disk.ext4", "--vsock-cid", "100", "--vsock-uds", str(self.vsock_path)]
-        self.started = time.perf_counter()
-        self.process = subprocess.Popen(argv, cwd=folder, stdout=self.log, stderr=self.log)
+            raise
         try:
             deadline = time.monotonic() + 10
             while not self.api_path.exists():
@@ -134,18 +152,23 @@ class Vm:
                 api(self.api_path, "GET", "/no-such-route", expected=404)
                 api(self.api_path, "PUT", "/machine-config", {"vcpu_count": 1, "mem_size_mib": 128})
                 api(self.api_path, "PUT", "/boot-source", {
-                    "kernel_image_path": str(kernel), "initrd_path": str(initrd),
+                    "kernel_image_path": "/bzImage" if jailed else str(kernel),
+                    "initrd_path": "/initrd.cpio.gz" if jailed else str(initrd),
                     "boot_args": "console=ttyS0 reboot=k panic=1 pci=off rdinit=/init",
                 })
                 api(self.api_path, "PUT", "/drives/disk", {
                     "drive_id": "disk", "path_on_host": "disk.ext4",
                     "is_root_device": False, "is_read_only": False,
                 })
-                api(self.api_path, "PUT", "/vsock", {"guest_cid": 100, "uds_path": str(self.vsock_path)})
+                api(self.api_path, "PUT", "/vsock", {
+                    "guest_cid": 100, "uds_path": "/v" if jailed else str(self.vsock_path),
+                })
                 api(self.api_path, "PUT", "/actions", {"action_type": "InstanceStart"})
             self.control, _ = self.listener.accept()
             self.control.settimeout(15)
             request(self.control, {"method": "ping"})
+            if jailed:
+                self.verify_jail()
             self.listener.close()
             self.listener = None
             self.ready_ms = (time.perf_counter() - self.started) * 1000
@@ -153,23 +176,86 @@ class Vm:
             self.close()
             raise
 
+    def verify_jail(self):
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdigit():
+                continue
+            try:
+                raw = (entry / "stat").read_text()
+                fields = raw[raw.rfind(")") + 2:].split()
+                if int(fields[2]) != self.process.pid:
+                    continue
+                values = dict(line.split(":", 1) for line in
+                              (entry / "status").read_text().splitlines() if ":" in line)
+                if values["Name"].strip() != "flint":
+                    continue
+                self.jail_status = {"pid": int(entry.name), **{
+                    key: values[key].strip() for key in
+                    ("Uid", "Gid", "Groups", "CapEff", "NoNewPrivs", "Seccomp")
+                }}
+                if (list(map(int, values["Uid"].split())) != [os.getuid()] * 4
+                        or list(map(int, values["Gid"].split())) != [os.getgid()] * 4
+                        or int(values["CapEff"].strip(), 16) != 0
+                        or values["NoNewPrivs"].strip() != "1"
+                        or values["Seccomp"].strip() != "2"):
+                    raise RuntimeError("owned VMM has incorrect credentials or unenforced jail")
+                self.jail_status["task_ids"] = sorted(
+                    int(task.name) for task in (entry / "task").iterdir()
+                )
+                return
+            except (OSError, ValueError, IndexError):
+                continue
+        raise RuntimeError("could not verify owned VMM UID/capabilities/enforced jail")
+
+    def signal(self, value):
+        if self.jailed:
+            subprocess.run(["sudo", "-n", "kill", f"-{value}", "--",
+                            str(-self.process.pid)], check=True, timeout=5)
+        else:
+            self.process.send_signal(getattr(signal, f"SIG{value}"))
+
     def close(self):
         if self.control:
             self.control.close()
             self.control = None
         if self.process and self.process.poll() is None:
-            self.process.send_signal(signal.SIGTERM)
+            self.signal("TERM")
             try:
                 self.process.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                self.process.kill()
+                self.signal("KILL")
                 self.process.wait(timeout=3)
         if self.log:
             self.log.close()
+            self.log = None
         if self.listener:
             self.listener.close()
+            self.listener = None
+        if self.jailed and hasattr(self, "jail_status"):
+            deadline = time.monotonic() + 3
+            while any((Path("/proc") / str(tid)).exists()
+                      for tid in self.jail_status["task_ids"]):
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("owned VMM tasks remain after termination")
+                time.sleep(0.01)
+            self.cleanup_verified = True
         for name in ("a", "v", "v_1024"):
             (self.socket_dir / name).unlink(missing_ok=True)
+        if self.jailed:
+            for name in ("disk.ext4", "state.snap", "memory.snap"):
+                source = self.workdir / name
+                if source.exists():
+                    shutil.copyfile(source, self.folder / name)
+            for name in ("disk.ext4", "state.snap", "memory.snap", "bzImage", "initrd.cpio.gz"):
+                (self.workdir / name).unlink(missing_ok=True)
+            device = self.workdir / "dev" / "kvm"
+            if device.exists():
+                subprocess.run(["sudo", "-n", "rm", "-f", "--", str(device)],
+                               check=True, timeout=5)
+            directory = self.workdir / "dev"
+            if directory.exists():
+                subprocess.run(["sudo", "-n", "rmdir", "--", str(directory)],
+                               check=True, timeout=5)
         if self.socket_dir.exists():
             self.socket_dir.rmdir()
 
@@ -298,6 +384,7 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--cpu", type=int, required=True)
     parser.add_argument("--heartbeat-ms", type=int, choices=(0, 10), required=True)
+    parser.add_argument("--jailed", action="store_true")
     args = parser.parse_args()
     if os.getuid() == 0:
         raise SystemExit("guest acceptance must not run as root")
@@ -309,10 +396,13 @@ def main():
               "kernel_sha256": digest(kernel), "initrd_sha256": digest(initrd),
               "disk_template_sha256": digest(disk), "uid": os.getuid(), "cpu": args.cpu,
               "vcpu": 1, "memory_mib": 128, "heartbeat_ms": args.heartbeat_ms,
-              "workload_sha256": digest(Path(__file__))}
+              "workload_sha256": digest(Path(__file__)), "jailed": args.jailed}
     vm = None
+    vm_role = "creator"
     try:
-        vm = Vm(creator, output, kernel, initrd, disk, args.cpu)
+        vm = Vm(creator, output, kernel, initrd, disk, args.cpu, jailed=args.jailed)
+        if args.jailed:
+            result["creator_jail_status"] = vm.jail_status
         result["boot_ready_ms"] = vm.ready_ms
         result["smoke"] = smoke(vm)
         vm.control.close()
@@ -324,9 +414,15 @@ def main():
             {"snapshot_path": "state.snap", "mem_file_path": "memory.snap"})
         result["snapshot_ms"] = (time.perf_counter() - then) * 1000
         vm.close()
+        if args.jailed:
+            result["creator_cleanup_verified"] = vm.cleanup_verified
         vm = None
-        restored = Vm(restorer, output, kernel, initrd, disk, args.cpu, restore=True)
+        restored = Vm(restorer, output, kernel, initrd, disk, args.cpu,
+                      restore=True, jailed=args.jailed)
         vm = restored
+        vm_role = "restorer"
+        if args.jailed:
+            result["restorer_jail_status"] = restored.jail_status
         assert execute(restored.control, "cat /work/native.txt; cat /mnt/state") == b"cross-backend-file\ndisk-state"
         assert execute(restored.control, "printf restored-exec") == b"restored-exec"
         result["restore_ready_ms"] = restored.ready_ms
@@ -339,9 +435,17 @@ def main():
         result["error"] = repr(error)
         raise
     finally:
-        if vm:
-            vm.close()
-        (output / "results.json").write_text(json.dumps(result, indent=2) + "\n")
+        try:
+            if vm:
+                vm.close()
+                if args.jailed:
+                    result[f"{vm_role}_cleanup_verified"] = vm.cleanup_verified
+        except BaseException as error:
+            result["status"] = "failed"
+            result["cleanup_error"] = repr(error)
+            raise
+        finally:
+            (output / "results.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
 
 

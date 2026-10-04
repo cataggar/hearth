@@ -61,6 +61,8 @@ optimization with no backend override. Helper/configurer compilation and the
 immutable translate-c/Aro pins are unaffected.
 
 For genuine repeated acceptance use `-Dperf-force-test-run=true`.
+The agent's `test-build` compiles the same configured POSIX artifact without
+running it; AArch64 cross-compilation is not matching-hardware execution.
 VMM integration can select a project-relative kernel with
 `-Dperf-test-kernel=.perf-zig-native/bzImage`, resolving it from `vmm/` before
 guest fixture working-directory changes. This does not change installed binary

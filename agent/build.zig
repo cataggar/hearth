@@ -74,6 +74,8 @@ pub fn build(b: *std.Build) void {
     artifactOptions(tests, codegen, linker);
     const run_tests = b.addRunArtifact(tests);
     run_tests.has_side_effects = force_test_run;
+    b.step("test-build", "Build POSIX tests without running")
+        .dependOn(&tests.step);
     b.step("test", "Test blocking POSIX and translated libc bindings")
         .dependOn(&run_tests.step);
 }
