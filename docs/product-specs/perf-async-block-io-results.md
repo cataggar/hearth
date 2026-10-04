@@ -4,7 +4,7 @@
 
 **Issue:** #1
 
-**Decision:** **Blocked at G0; keep synchronous. Not eligible for performance merge.**
+**Decision:** **Evaluation in progress; G0/G1 qualification blocked. Keep synchronous; not eligible for performance merge.**
 
 **Branch:** `copilot/perf-async-block-20261004`
 
@@ -377,6 +377,174 @@ baseline row. This failure and the uncontrolled saturated-host condition
 prevent G0/G1 qualification/backend selection; they do not prove a worker's
 performance merits.
 
+## Continued repaired-sync G0/G1 execution — 2026-10-04 UTC
+
+The shared `repair-perf-jail-baseline` todo is **done**, from the actual enforced
+API/CLI acceptance above. `impl-perf-block-1` remains **in_progress** as requested;
+the complete experiment is not finished. The runtime is still `5ee81b1`, safe
+SHA256 `0f7b0d55…`, with the same kernel/agent/compiler and legacy MMIO/IRQ.
+No peer runtime optimization or async selector/backend was adopted.
+
+### Actual offline disk-root package/build fixture
+
+The verified Ubuntu22.04.5 base input now boots as **`/dev/vda` ext4 root**,
+not an initramfs installation destination. A separate private fixture switches
+root to that single disk, mounts devpts for PTY, and runs the same static agent.
+Its sizing remains one vCPU,512MiB,8GiB. These are workload/tool provisioning
+inputs, not changes to VMM compiler/dependency or advertised guest features.
+
+The actual guest APT resolver first exposes an installed gcc-12-base version
+newer than the release-only index; it fails dependency resolution rather than
+being counted passing. The corrected closure uses **three signature-verified
+Ubuntu archive indices** (jammy, updates, security), all SHA256 checked against
+their signed releases. Actual guest `apt-get --print-uris --yes
+--no-install-recommends install gcc make libc6-dev hello` yields **37 pinned
+packages,53,853,458 bytes**. Every downloaded deb's SHA256/size is checked
+against those verified indices before staging. No host package installation or
+network inside the guest is required.
+
+An explicit-list `dpkg -i` script executes offline inside the guest. **One real
+installation passes in6.654472s**, including guest sync, hello and tool-version
+checks. **One real SQLite3.46.1 build passes in44.749365s**, using pinned
+GCC11.4/make4.3 and `make -C /mnt/build-src -j1 clean all`; scratch is on the
+VirtIO-backed disk. The built executable reports3.46.1, inserts/reads **1337**
+from a real database, and hashes to
+`3bfd0d41645dcdd8f5034037e4114bbf26a83bd28dc9241871f043920352fd79`.
+After guest sync and VM exit, an owned host `debugfs` dump of that database
+also reads1337 through read-only SQLite. These are **single capability timings**,
+not paired package/build performance distributions or gains.
+
+Frozen input hashes:
+
+- Ubuntu base archive:
+  `242cd8898b33ea806ef5f13b1076ed7c76f9f989d18384452f7166692438ff1a`.
+- Exact37-package closure JSON:
+  `f7e1c4000d4f945d294ebb2d9cd01be1dd3a9ca9751fd2b00a10dd1ad461dc62`.
+- Official SQLite3.46.1 amalgamation archive:
+  `77823cb110929c2bcb0f5d48e4833b5c59a8a6e40cdea3936b99e199dbbe5784`.
+
+Initial safe tar extraction rejects valid absolute guest-root symlinks; those
+are rebased to equivalent relative in-image links without allowing host escape.
+A later bootstrap fails because a renamed BusyBox chooses its basename as an
+applet; the corrected fixture retains the `busybox` basename. Both failures
+remain preserved. An initial metadata field accidentally hashes the agent
+instead of the Ubuntu input because of a reused builder variable. The builder
+is corrected; a separate **validated-capability-manifest** records the old
+incorrect field, correct archive hash, three explicitly reverified signature
+exit codes0 and accepted guest results. Preexecution manifests are not
+silently overwritten. The private builder also now enforces collector exit
+status rather than treating a logged signature command as sufficient.
+
+Artifacts: `pkg-input/`, distinct `pkg-root-sync*` stages, and final
+`pkg-root-sync-5/fixture/validated-capability-manifest.json`,
+`install-build-1/`, `fixture/disk.packaged-built.ext4`. Exact source/Makefile/
+toolchain/deb hashes, logs and retained executed scripts are private.
+
+### Actual loaded exec, PTY and concurrent topology
+
+Two separately retained short windows each check **100 unloaded and100
+build-loaded exec replies** with exact tokens. The corrected PTY window checks
+**32 echo-disabled `ACK:<token>` replies**, while actual background SQLite
+compilation is still active; the build subsequently completes successfully.
+Existing agent behavior forces a guest-initiated reconnect after interactive
+kill. The first window verifies32 ACKs but then times out by trying to reuse the
+old connection; it is retained as a failed overall trial. The corrected runner
+accepts that existing reconnect and passes the complete window. No runtime
+protocol, timer or notification repair is hidden in the harness.
+
+Actual **1/2/4 simultaneous jailed VM topology checks all pass**: seven fresh
+VMs total, distinct CPUs8..11 and explicit CIDs100..103, separate disks/sockets,
+one vCPU512MiB each. Every guest writes, syncs and reads its own identified
+disk marker while all VMs in the declared group are alive. These are topology/
+integrity capabilities, not60s aggregate throughput/fairness or fixed-total-CPU
+comparisons. Exec/PTy cases use the declared10ms diagnostic heartbeat, do not
+meet10000-observation/tail-confidence requirements, and do not resolve the
+no-heartbeat idle failures above.
+
+Artifacts: `g0-interactive/`, `g0-interactive-2/`, `g0-concurrent/`.
+
+### Actual jailed disk/agent snapshot lifecycle
+
+A real guest writes/syncs an identified disk marker. **Pause, snapshot,
+disk-copy while paused and resume pass**; the original guest then executes and
+reads the same marker. One observed operation timing is pause1.552ms,
+snapshot324.386ms, three-file copy381.978ms, resume1.635ms. These are single
+capability samples, not100-sample lifecycle distributions.
+
+The frozen memory/state/disk are then restored into fresh enforced jails.
+The first API-mode restore loads real512MiB memory, block/vsock devices, runs
+guest serial heartbeat and serves its API, but **no guest agent reconnect
+arrives within30s**. After the storage cleanup below, separate API-mode and
+CLI-mode repeats also time out30s: **3/3 actual restored-agent/state checks
+blocked**, not passed from `Running`, heartbeat or file existence. Consequently
+the restored guest application/disk acceptance remains unmet. The original
+seven unjailed integrations' resumed serial marker is separate coverage.
+
+Artifacts: `g0-disk-snapshot/original/`, `frozen/`, `restored/`,
+`api-repeat-2/`, `cli/`, `capability.json`, `restore-repeats.json`.
+
+### Actual full-window flush diagnostic and syscall latency
+
+One corrected process-scoped profiled fio trial runs **10s ramp+60s measured**
+4KiB direct random write, sync engine, QD1, fdatasync per write and final fsync.
+All job errors are0; fio reports **2548.040866IOPS**,152885 measured writes.
+An initial wrapper fails after fio because bare `sync` is absent from the
+BusyBox-only fixture; it remains a failed capture. The accepted repeat uses
+verified BusyBox paths, parses guest JSON before exit, and collects all three
+listed VMM TIDs (unchanged before/after) with syscall entry/exit traces.
+
+Trace duration includes warmup and final drain. It pairs **183862 pwrite64**
+and **183826 fdatasync** calls, no unmatched entries/exits or reported lost
+events. Timestamp resolution is1µs:
+
+| Actual host syscall wall time | Mean / median / p95 / p99 / max |
+|---|---|
+| pwrite64 | **5.047 /4 /7 /10 /10737 µs** |
+| fdatasync | **145.054 /60 /126 /2662 /205442 µs** |
+
+Fio measured write-latency median/p95/p99 are91.648/112.128/284.672µs;
+guest sync-latency median/p95/p99 are152.576/493.568/3194.880µs.
+These process-scoped durations include external scheduling and I/O wait;
+they do not isolate disk wait, provide complete asynchronous kernel/writeback
+CPU accounting, or constitute unprofiled paired confidence. The long flush
+outliers warrant preserving diagnosis, **not selecting a backend from one
+confounded profile** while mandatory qualification is blocked.
+
+Artifacts: `g1-flush-diagnostic/`, accepted `g1-flush-diagnostic-2/`, raw perf,
+script, checked guest JSON and `syscall-duration-summary.json`.
+
+### Current noise/storage controls and bounded cleanup
+
+A new locked5s host control after package/capability work observes
+**98.824118%busy**. Unowned load remains untouched; this is not attributable
+VMM/kernel I/O CPU. The shared600GiB filesystem also reaches99% use and a
+further restore-copy fails **ENOSPC**, before a VM starts. That failed repeat
+is not an executed restore or a pass.
+
+To avoid consuming other users' space, only **14 explicitly named, completed
+read/idle run disk copies** are released after checking their recorded PIDs
+absent:30,251,024,384 allocated bytes. All raw JSON/logs/perf/stat/exit data,
+original unchanged baseline binaries/assets, canonical repaired fixtures and
+frozen snapshots remain. The cleanup manifest lists every removed image and
+retained input. Observed headroom rises from6.4GiB to37GiB (94%used); the later
+restore repeats are separately declared post-cleanup. Do not compare this
+storage regime with earlier profiles as an optimization gain.
+
+Later independent shared-host changes leave120GiB available (81%used) at
+18:26 UTC; that additional space is **not attributed to this task's cleanup**.
+A fresh locked5s control at **18:27:40 UTC** nevertheless measures
+**99.849962%busy**. Original baseline VMM/agent/kernel hashes still match;
+`continued-g0-cleanup.json` checks **183 recorded owned PIDs absent**, no owned
+device nodes or sockets. Storage capacity is no longer the immediate blocker,
+but neither the noisy host nor required idle/restored-agent acceptance is
+resolved.
+
+**Remaining:** real no-heartbeat idle progress, restored-agent/disk acceptance,
+controlled host/storage/cache strata, full ten-pair workload matrix,10000
+interactive and100 lifecycle observations, all-worker/attributable kernel CPU,
+frozen numeric gates and the conditional G2–G5 experiment. Prerequisite done
+does not mean the async plan is done. No backend/default/performance merge.
+
 ## Original diagnostic validation
 
 | Command / coverage | Actual result |
@@ -431,10 +599,10 @@ frozen from these startup counters. Proposed thresholds remain provisional.
 | Random read/write 4 KiB, QD1/8/32, achieved depth | **0; blocked** |
 | Sequential read/write, QD1/16 | **0; blocked** |
 | Flush-heavy and guest direct/buffered/host-cache strata | **0; blocked** |
-| Offline package and representative build | **0; fixture not provisioned** |
-| 1/2/4 concurrent VMs and fairness | **0; blocked** |
-| Loaded/no-load exec first-byte/response and identified PTY replies | **0; blocked** |
-| Idle after load; pause/snapshot/disk copy/resume/restore distributions | **0; blocked** |
+| Offline package and representative build | **0 qualifying comparisons; one actual pinned offline install/build capability passes** |
+| 1/2/4 concurrent VMs and fairness | **0 qualifying comparisons; seven actual topology/disk checks pass** |
+| Loaded/no-load exec first-byte/response and identified PTY replies | **0 qualifying comparisons; short heartbeat-assisted capabilities pass** |
+| Idle after load; pause/snapshot/disk copy/resume/restore distributions | **0 qualifying comparisons; pause/copy/resume pass; idle3/3 and restored-agent3/3 checks block** |
 | Async faults/mutation/backpressure/wake/generation/drain/isolation | **0; no backend selected** |
 | Non-nested comparison | Unavailable; no extrapolation |
 
@@ -448,9 +616,10 @@ merge recommendation is made.
 Next work: use the declared repaired synchronous configuration identically on
 both sides; reserve/control a host suitable for total CPU
 attribution; establish real no-heartbeat idle control progress without treating
-#3's optional notification optimization as a prerequisite; provision the pinned
-offline package/build fixture; execute the full synchronous matrix/A/A profiles
-and freeze gates. Guest fio/higher-QD and the written dataset are now verified.
+#3's optional notification optimization as a prerequisite; establish actual
+restored-agent/disk acceptance; execute the full synchronous matrix/A/A profiles
+and freeze gates. Guest fio/higher-QD/written dataset and the pinned disk-root
+offline package/build capability are now verified.
 Only then choose a bounded worker, implement the specified coupled ownership,
 wake and lifecycle surfaces, and run all remaining acceptance/comparison gates.
 
@@ -484,6 +653,16 @@ Raw evidence remains private in the isolated worktree:
   no-heartbeat startup/idle controls, retained executed scripts and summaries.
   `final-cleanup-evidence.json` checks **83 recorded owned PIDs absent** and
   no remaining owned device nodes/socket paths.
+- `pkg-input/`, `pkg-root-sync*/`: signed/pinned offline inputs, failed and
+  accepted disk-root stages, actual package/build and host backing DB checks.
+- `g0-interactive*`, `g0-concurrent/`, `g0-disk-snapshot/`: actual loaded token
+  integrity/topology/lifecycle evidence, including failed restored-agent cases.
+- `g1-flush-diagnostic*`, `post-package-host-control/`: full-window single
+  flush diagnostic/syscall wall-duration trace and later whole-host control.
+- `redundant-image-cleanup.json`: exact14 owned redundant images released on
+  ENOSPC, retained canonical inputs and raw measurements; no other tree touched.
+- `post-cleanup-host-control/`, `continued-g0-cleanup.json`: separately timed
+  current99.849962%busy control,183 recorded PID checks and original asset hashes.
 
 All compilation, test execution, installation/extraction, fixture generation
 and VM/perf probe series take the **common absolute** exclusive fleet lock.

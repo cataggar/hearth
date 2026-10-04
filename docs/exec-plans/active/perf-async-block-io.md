@@ -1,6 +1,6 @@
 # Execution Plan: Profile and Evaluate Async VirtIO Block I/O
 
-**Status**: Blocked at G0 — baseline capabilities diagnosed, backend not selected
+**Status**: In progress — repaired synchronous G0/G1 execution; qualification blocked, backend not selected
 **Last updated**: 2026-10-04
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
@@ -100,6 +100,36 @@ The offline package/build, loaded PTY, concurrent and lifecycle matrix still
 requires execution after baseline liveness/controlled-host prerequisites.
 Raw commands, actual counts, limitations and distinct artifacts are linked
 in the results. This active plan is **not complete**.
+
+### Continuing capability execution after prerequisite separation
+
+The shared `repair-perf-jail-baseline` todo is complete from actual enforced
+API/CLI acceptance; `impl-perf-block-1` remains in progress. Continue bounded
+G0 capability work independently of whether host noise permits G1 qualification.
+Construct a distinct disk-root package/build variant from the already verified
+Ubuntu base input, with the same kernel, static agent and repaired synchronous
+VMM. Verify signed package metadata and freeze the offline package/toolchain
+closure before installing it inside the guest, never on the host. All package
+writes and build outputs must land on the single VirtIO-backed disk. Retain
+failures and no-heartbeat restrictions; do not turn diagnostic success into
+a qualified baseline or choose a worker while mandatory gates are unmet.
+
+The disk-root variant now actually passes37-package offline install and a
+pinned SQLite3.46.1 GCC11.4/make4.3 build, with backing DB value1337 verified
+after VM exit. Short unloaded/build-loaded exec and32 identified echo-disabled
+PTY replies pass;1/2/4 simultaneous jailed topology/disk checks pass. A real
+pause/snapshot/disk-copy/resume passes and executes guest state afterward.
+Fresh API/CLI restored-agent acceptance nevertheless blocks3/3 at30s.
+
+One actual10s-ramp/60s flush profile and process-scoped syscall durations are
+retained, not ten-pair G1 confidence. Latest locked host control99.849962%busy,
+incomplete kernel attribution, and missing no-heartbeat/restore acceptance
+still prohibit backend selection. Shared ENOSPC required releasing only14
+named redundant completed-run disk copies, keeping all raw measurements and
+canonical baseline assets; storage regimes are explicitly separate. Detailed
+counts, failures, inputs and exact scripts are in the results. The separate
+repair todo is done; implementation todo remains in progress and this plan
+must not move to completed or recommend performance merge.
 
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
 and a measured keep/reject decision. Execution has started in the isolated

@@ -1,6 +1,6 @@
 # Product Spec: Evaluate Asynchronous VirtIO Block I/O
 
-**Status**: Blocked at G0 — synchronous default unchanged; no backend selected
+**Status**: Evaluation in progress — baseline qualification incomplete; synchronous default unchanged
 **Last updated**: 2026-10-04
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Execution plan**: [perf-async-block-io](../exec-plans/active/perf-async-block-io.md)
@@ -63,6 +63,16 @@ repairs are complete; mandatory baseline idle progress and controlled total
 CPU attribution remain blocked. The detailed results preserve both successful
 capabilities and failed trials. No async worker/default or performance merge
 is justified, and the full plan remains active/incomplete.
+
+Further execution verifies the actual pinned offline disk-root package/build
+fixture, short loaded exec/identified PTY and1/2/4 jailed topology capabilities.
+Pause/snapshot/disk-copy/resume executes real guest state; fresh API/CLI
+restored-agent checks block3/3 within30s. A single full-window flush profile
+retains actual syscall wall-duration outliers, not qualified paired confidence.
+Matched host controls98.824118%/99.849962%busy and shared ENOSPC/owned-image cleanup expose
+additional environmental limits, not optimization gains. The separate jail
+prerequisite todo is done; the implementation todo remains in progress.
+See the results before treating any mandatory row or gate as accepted.
 
 ## Objective and scope
 
