@@ -1,10 +1,10 @@
-# Async block I/O: baseline capability results
+# Async block I/O: baseline capabilities and opt-in worker experiment
 
 **Date:** 2026-10-04
 
 **Issue:** #1
 
-**Decision:** **Evaluation in progress; G0/G1 qualification blocked. Keep synchronous; not eligible for performance merge.**
+**Decision:** **Default-disabled worker implemented and correctness-exercised; G0/G1/performance qualification blocked. Keep synchronous; not eligible for performance merge.**
 
 **Branch:** `copilot/perf-async-block-20261004`
 
@@ -14,7 +14,7 @@
 
 ## What was implemented
 
-The integration suite now accepts `-Dintegration-kernel=<path>` relative to
+The original diagnostic integration suite accepts `-Dintegration-kernel=<path>` relative to
 `vmm/`, resolving it before child tests change working directories. The default
 and CI fixture use `../.ci/guest/bzImage`; CI no longer installs a kernel outside
 the project. README and plan recipes use this implemented option.
@@ -34,6 +34,135 @@ introduced in the original diagnostic commit. Those untouched L0 executions
 use runtime sources from `b07f73b26b8ae876928d9c515b94bba1e9945870`.
 The separately authorized correctness prerequisite below changes only jail
 permissions and trace-proven Unix API syscall compatibility, not a backend.
+
+## Parent-authorized ordered worker continuation
+
+After `a401bf8`, parent independently verified15.961/16 visible cores busy
+under the fleet lock and explicitly authorized safe opt-in implementation
+despite blocked performance qualification. The backend is an experiment,
+not a profile-qualified winner or permission to change adoption gates.
+
+Implemented interfaces: CLI `--block-backend sync|worker` (default sync),
+CLI `--force-sync` overriding CLI/REST requests before admission, REST
+drive `io_backend` (default sync). Every boot/restore route applies the same
+choice. There is no SDK option, runtime switch, io_uring, new guest feature,
+eventfd/irqfd notification acceleration or borrowed sibling runtime patch.
+
+One ordered worker/device, one logical-request credit reserved before avail
+consumption, fixed64KiB host staging and up to256 captured direct descriptors.
+Header/sector, directions, ranges, status destination, queue identity and
+generation are validated/captured before I/O. Valid larger payloads stream
+in bounded chunks; later write chunks are staged when submitted, **not** an
+atomic whole-payload snapshot. Worker never follows guest memory pointers.
+Owner alone copies read data and publishes status/used/IRQ. EOF/short writes,
+IOERR/no replay, used-length quirks and FIFO flush match the retained sync path.
+
+READY publication precedes atomic immediate_exit and SIGUSR1. Owner clears
+the byte before pause/completion checks and never afterward before entry.
+Pause drains accepted work without taking retained avail before fresh epoch
+acknowledgment; snapshot rejects an unacknowledged pause. Queue disable/reset/
+reconfiguration drains/discards before mutation and invalidates generation.
+Workers join before FD/vCPU/memory release; partial device init and restore
+cleanup order were corrected. Initialization OOM has focused pre-admission
+sync fallback coverage; there is no live fallback or write replay.
+
+One later Safe full run exposed a real restored-application stall (15/16Python
+cases). It is retained, not masked by a retry. The coupled quiescence repair
+completes KVM's pending IO/MMIO emulation using KVM_RUN with immediate_exit
+before acknowledging pause. The [KVM API contract](https://docs.kernel.org/virt/kvm/api.html)
+explicitly says that pending operations are not in userspace-visible snapshot
+state and must complete before migration. A real PIO-IN test supplies0x5a,
+verifies RAX is still0 before completion, then verifies RAX0x5a/RIP advancement
+without executing the following HLT. Current final source passes the full
+Debug/Safe suites; **three additional Safe lifecycle cases** also pass
+(each exercises three pause/resume cycles and fresh API+CLI application restore).
+This correctness change is not a performance gain or#3 runtime dependency.
+
+### Actual correctness, not compile-only or mocked acceptance
+
+Frozen Zig0.17.0, `-Dtarget=x86_64-linux -Doptimize=debug|safe`, existing
+dependency/guest feature settings. Each mode: **44/44units,8/8real KVM
+integrations,16/16Python cases**; no skipped cases counted. Unit additions
+cover metadata/status mutation, staged payloads, credit retention/refill,
+larger chunks, flush ordering, partial write/no replay, read/flush faults,
+invalid ranges/overflow, real memfd differential EOF/GET_ID, reset/disable/
+ring reuse generation, quiescence admission and pre-entry notification windows.
+
+The new actual KVM integration runs `cli;hlt` with IF clear and no PIT.
+A bounded external observer of only its owned owner waits for
+`wchan=kvm_vcpu_block` before releasing gated I/O. The production notification
+then returns KVM_RUN/EINTR with completion ready. A second window handles the
+signal before entry yet immediate_exit still prevents blocked entry. This
+proves the shared notification mechanism, not ordinary Linux timer-assisted
+boot and not legacy vsock readiness.
+
+Real enforced-jail API **and CLI** worker guests write/flush/read/hash128KiB,
+with host verification of the untouched remainder. Force-sync executes the
+same guest without a worker. Actual worker rosters have UID/GID1000, no
+supplementary groups, CapEff0, NoNewPrivs1, Seccomp2. Three rapid pause/resume
+cycles leave the disk stable while paused. A populated quiescent snapshot
+restored into **fresh API and CLI processes** continues a RAM application
+counter and its backing-disk writes without repeating `APPLICATION_INITIAL_BOOT`.
+This does not retroactively accept the earlier failed vsock-agent restore.
+
+Initial compile errors, one changed error-text regression (fixed preserving
+the original response), a reset fixture missing DRIVER_OK and CLI fixture/PID
+startup races are retained. They are not passing trials. Final logs:
+`lifecycle-debug-4.log`, `lifecycle-safe-1.log` (Zig52/52, initial Python
+harness race), and `final-python-debug.log`/`final-python-safe.log` (16/16).
+The subsequent pre-quiescence stall is `final-acceptance-safe.log`; final
+repaired logs are `quiescent-safe-1.log` (52+16), `quiescent-debug-1.log`
+(52), `quiescent-python-debug-1.log` (16), and
+`quiescent-repeat-safe-{1,2,3}.log` (one lifecycle case each).
+
+### Owned-only exploratory profiles and limits
+
+Two RPC-controlled worker fio trials time out despite retained heartbeat and
+actual I/O. No complete fio result/backing output is accepted from either;
+failed commands and partial captures remain in `profile-1/`. Its all-four-TID
+13s stat reports9.598386338CPU-s,326377context switches,556036KVM entry/exit,
+82617pread64,9pwrite64,2fdatasync. These are **partial failure diagnostics**.
+An initial small report-preview decode outside the fleet lock is not a
+qualified observation; complete alternate collectors/decoders below ran
+inside the common lock.
+
+A practical alternate fixture retains the same kernel/compiler, block/vsock
+devices, guest features, libaio closure and1GiB dataset, but starts fio
+autonomously and reports by serial (no heartbeat or dependency on RPC reply).
+Both complete, sync and independent backing-file JSON extraction verifies
+error0. The same Safe ELF runs force-sync and worker under one bounded lock.
+These are **single exploratory, saturated-host10s windows**, no warmup/full
+matrix/repeated variance/qualification:
+These profiles used the preserved earlier Safe ELF
+`2f709685d2c70b37d32d9ec8f3eac0b23a1600171cf6059e0672ac77b305e0e5`,
+before the final pending-emulation quiescence correction; they are not a
+performance qualification of the final source.
+
+| Variant | Read IOPS | Raw199Hz samples | Lost records | Listed owned tasks |
+|---|---:|---:|---:|---:|
+| Force-sync | 13465.453455 | 2023 | 0 | 3 |
+| Worker | 10541.145885 | 1905 | 0 | 4 |
+
+The raw worker point is lower, not evidence of a win. `n=1` each; SD/CV,
+qualified delta and frozen `B/N` are **null**, not invented zeroes.
+Software record estimated CPU-event counts10165827875/9572863125 are not a
+savings claim: completed work differs and no quiet/noise gate exists.
+All actual VMM workers plus the listed `kvm-nx-lpage-re` task are included;
+its observed Kthread is0, so it is not mislabeled an unfiltered userspace
+worker. Kernel CPU inside owned I/O syscalls is captured; deferred/background
+filesystem/writeback attribution is incomplete. Guest/hypervisor symbolic
+maps remain unavailable; hardware cycles/instructions remain unsupported.
+Do not subtract unrelated saturation or publish unrelated task metadata.
+
+Artifacts: private `.perf/blk-io/worker-correctness/` (executed recipes, logs,
+ELFs, manifests, raw perf/data/dumps/reports) and `.perf/blk-io/jail-tests/`
+(owned launches/credentials/guest results/actual snapshots). Existing original
+L0 and repaired-sync artifacts remain distinct and preserved.
+This active plan is **not completed**: full supported disk/cache/writeback,
+loaded interactive/concurrent/idle/lifecycle matrix, quiet-host A/A/frozen
+numeric gates, attributable kernel totals and legacy control readiness remain
+mandatory. Shared prerequisite convergence with#3 is still pending. Keep
+default sync, retain draftPR7, no auto-merge or performance merge recommendation.
 
 ## Frozen source and assets
 

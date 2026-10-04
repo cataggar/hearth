@@ -1,6 +1,6 @@
 # Product Spec: Evaluate Asynchronous VirtIO Block I/O
 
-**Status**: Evaluation blocked — mandatory corrected-baseline capabilities and host qualification fail; synchronous default unchanged
+**Status**: Default-disabled ordered-worker correctness experiment implemented; performance qualification blocked; synchronous default unchanged
 **Last updated**: 2026-10-04
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Execution plan**: [perf-async-block-io](../exec-plans/active/perf-async-block-io.md)
@@ -10,8 +10,9 @@ The untouched L0 execution verified project-local kernel/test support and retain
 actual startup perf/stack diagnostics, but the unchanged enforced-jail API is
 killed on `recvmsg` and the CLI cannot open jail device nodes created under
 private umask. G0/G1 workload acceptance and A/A gates remain incomplete.
-No asynchronous backend or qualifying performance comparison was implemented;
-this is not an optimization rejection or a performance-merge recommendation.
+The original diagnostic commits implemented no asynchronous backend. The later
+parent-authorized opt-in worker is described below; there is still no qualified
+performance comparison or performance-merge recommendation.
 Common host tools became available later; the results record the post-provisioning
 inventory explicitly. Earlier captures remain capability diagnostics only.
 Mandatory baseline sampling and frozen gates must use a newly established,
@@ -221,6 +222,30 @@ Multiple workers and io_uring are conditional alternatives only if measured
 worker cost/serialization warrants them. Ring support, required operations,
 kernel/policy restrictions, cancellation, fixed-buffer lifetime and kernel
 io-wq accounting must be verified. SQPOLL/idle spinning is not an assumed win.
+
+### Parent-authorized correctness-only opt-in continuation
+
+On2026-10-04 the parent independently measured15.961/16 busy cores and
+explicitly authorized safe opt-in implementation/focused correctness despite
+blocked performance qualification. This supersedes the earlier stop-before-G2
+for **correctness work only**; numeric gates, adoption and merge remain blocked.
+Use one ordered worker, one admitted logical request and one64KiB host staging
+buffer per block device. Capture at most the unchanged256-entry queue's full
+descriptor metadata; larger valid payloads progress in bounded chunks.
+Each write chunk is staged before its worker consumes it. This is not an
+atomic snapshot of arbitrarily large guest payloads; guest mutation cannot
+redirect captured metadata, worker memory access or completion publication.
+
+Proposed implementation interfaces are `--block-backend sync|worker`,
+pre-admission `--force-sync`, and API drive `io_backend: "sync"|"worker"`.
+They are not existing until implemented and validated. Default remains sync;
+no io_uring or notification optimization. A ready-state publication and
+KVM immediate-exit byte use sequentially consistent ordering: owner clears
+the byte before checking ready/pause state, never after that check; worker
+publishes ready, sets the byte, then signal-kicks the owner. Test all entry
+windows and preserve terminal HLT behavior. Drain accepted chunks and publish
+before pause acknowledgment; invalidate/drain before queue mutation and
+join before vCPU/guest-memory teardown on every normal/error/restore path.
 
 ## Measurement and decision contract
 

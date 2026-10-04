@@ -244,7 +244,7 @@ def inventory():
 
 class OwnedVm:
     def __init__(self, path, cpu, jailed=True, heartbeat=True, boot_mode="api",
-                 trace_startup=False, startup_perf="none", startup_frequency=199):
+                 trace_startup=False, startup_perf="none", startup_frequency=199, extra_args=()):
         self.path = path
         self.path_created = False
         self.cpu = cpu
@@ -254,6 +254,7 @@ class OwnedVm:
         self.trace_startup = trace_startup
         self.startup_perf = startup_perf
         self.startup_frequency = startup_frequency
+        self.extra_args = tuple(extra_args)
         self.process = None
         self.pid = None
         self.agent = None
@@ -293,6 +294,7 @@ class OwnedVm:
                 argv.extend([prefix + "bzImage", prefix + "initrd.cpio.gz", boot_args,
                              "--disk", prefix + "disk.ext4", "--vsock-cid", "100",
                              "--vsock-uds", prefix + "vsock"])
+            argv.extend(self.extra_args)
             if self.trace_startup:
                 if not self.jailed:
                     raise ValueError("startup trace requires the unchanged enforced jail")

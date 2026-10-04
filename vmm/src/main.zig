@@ -14,6 +14,8 @@ const api = @import("api.zig");
 const snapshot = @import("snapshot.zig");
 const jail = @import("jail.zig");
 const seccomp = @import("seccomp.zig");
+const Blk = @import("devices/virtio/blk.zig");
+const BlockWorker = @import("devices/virtio/blk_worker.zig");
 
 const log = std.log.scoped(.flint);
 
@@ -50,6 +52,20 @@ pub const VmRuntime = struct {
     // TID of the vCPU thread, used to send SIGUSR1 to kick it out of
     // a blocking KVM_RUN (e.g., when the guest is in HLT).
     vcpu_tid: std.atomic.Value(i32) = std.atomic.Value(i32).init(0),
+    pause_epoch: std.atomic.Value(u32) = .init(0),
+    paused_ack_epoch: std.atomic.Value(u32) = .init(0),
+
+    pub fn wakePaused(self: *VmRuntime) void {
+        _ = self.pause_epoch.fetchAdd(1, .seq_cst);
+        BlockWorker.wakeState(&self.pause_epoch);
+    }
+
+    pub fn requestExit(self: *VmRuntime) void {
+        if (self.exited.swap(true, .seq_cst)) return;
+        self.wakePaused();
+        @atomicStore(u8, &self.vcpu.kvm_run.immediate_exit, 1, .seq_cst);
+        self.kickVcpu();
+    }
 
     /// Send SIGUSR1 to the vCPU thread to break it out of KVM_RUN.
     /// This is needed because immediate_exit only takes effect on the
@@ -77,6 +93,8 @@ const CliArgs = struct {
     tap: ?[*:0]const u8 = null,
     @"vsock-cid": ?[*:0]const u8 = null,
     @"vsock-uds": ?[*:0]const u8 = null,
+    @"block-backend": ?[*:0]const u8 = null,
+    @"force-sync": bool = false,
 
     // Snapshot
     restore: bool = false,
@@ -140,6 +158,12 @@ pub fn main(init: std.process.Init) !void {
             got_initrd = true;
         }
     }
+    const requested_backend: Blk.Backend = if (cli.@"block-backend") |value|
+        std.meta.stringToEnum(Blk.Backend, std.mem.span(value)) orelse return error.InvalidBlockBackend
+    else
+        .sync;
+    const selected_backend: Blk.Backend = if (cli.@"force-sync") .sync else requested_backend;
+    log.info("block backend requested={s} force_sync={}", .{ @tagName(requested_backend), cli.@"force-sync" });
 
     // Jail setup runs before anything else — after this, the process is
     // in a mount namespace with pivot_root'd filesystem and dropped privileges.
@@ -237,14 +261,15 @@ pub fn main(init: std.process.Init) !void {
         // (used by pool manager to spawn controllable child VMs)
         const sock = cli.@"api-sock".?;
         const sock_len = std.mem.indexOfSentinel(u8, 0, sock);
-        try restoreVmWithApi(cli.@"vmstate-path", cli.@"mem-path", cli.disk, cli.tap, cli.@"vsock-cid", cli.@"vsock-uds", sock[0..sock_len], init.io, init.gpa);
+        try restoreVmWithApi(cli.@"vmstate-path", cli.@"mem-path", cli.disk, cli.tap, cli.@"vsock-cid", cli.@"vsock-uds", sock[0..sock_len], init.io, init.gpa, selected_backend);
     } else if (cli.restore) {
         // Restore mode: rebuild VM from snapshot files, no kernel load
-        try restoreVm(cli.@"vmstate-path", cli.@"mem-path", cli.disk, cli.tap, cli.@"vsock-cid", cli.@"vsock-uds");
+        try restoreVm(cli.@"vmstate-path", cli.@"mem-path", cli.disk, cli.tap, cli.@"vsock-cid", cli.@"vsock-uds", selected_backend);
     } else if (cli.@"api-sock") |sock| {
         // API mode: pre-boot config phase, then boot or restore, then post-boot API
         const sock_len = std.mem.indexOfSentinel(u8, 0, sock);
         const config = try api.serve(sock[0..sock_len], init.io, init.gpa);
+        const api_backend: Blk.Backend = if (cli.@"force-sync") .sync else if (cli.@"block-backend" != null) requested_backend else config.block_backend;
 
         if (config.snapshot_path) |sp| {
             // Snapshot/load via API: restore from snapshot files
@@ -253,7 +278,7 @@ pub fn main(init: std.process.Init) !void {
             const tn: ?[*:0]const u8 = if (config.tap_name) |p| p.ptr else null;
             const vc: ?[*:0]const u8 = if (config.vsock_cid) |p| p.ptr else null;
             const vu: ?[*:0]const u8 = if (config.vsock_uds) |p| p.ptr else null;
-            try restoreVmWithApi(sp.ptr, mp, dp, tn, vc, vu, sock[0..sock_len], init.io, init.gpa);
+            try restoreVmWithApi(sp.ptr, mp, dp, tn, vc, vu, sock[0..sock_len], init.io, init.gpa, api_backend);
         } else {
             // Boot via API
             const kp: [*:0]const u8 = config.kernel_path.?.ptr;
@@ -263,7 +288,7 @@ pub fn main(init: std.process.Init) !void {
             const tn: ?[*:0]const u8 = if (config.tap_name) |p| p.ptr else null;
             const vc: ?[*:0]const u8 = if (config.vsock_cid) |p| p.ptr else null;
             const vu: ?[*:0]const u8 = if (config.vsock_uds) |p| p.ptr else null;
-            try bootVmWithApi(kp, ip, ba, dp, tn, vc, vu, config.mem_size_mib, sock[0..sock_len], init.io, init.gpa);
+            try bootVmWithApi(kp, ip, ba, dp, tn, vc, vu, config.mem_size_mib, sock[0..sock_len], init.io, init.gpa, api_backend);
         }
     } else if (kernel_path) |kp| {
         // CLI mode: boot directly from args
@@ -271,11 +296,12 @@ pub fn main(init: std.process.Init) !void {
             .vmstate_path = cli.@"vmstate-path",
             .mem_path = cli.@"mem-path",
         } else .{};
-        try bootVm(kp, initrd_path, cmdline, cli.disk, cli.tap, cli.@"vsock-cid", cli.@"vsock-uds", DEFAULT_MEM_SIZE / (1024 * 1024), snap_opts);
+        try bootVm(kp, initrd_path, cmdline, cli.disk, cli.tap, cli.@"vsock-cid", cli.@"vsock-uds", DEFAULT_MEM_SIZE / (1024 * 1024), snap_opts, selected_backend);
     } else {
         std.debug.print("usage: flint <kernel> [initrd] [--disk <path>] [--tap <name>] [cmdline]\n", .{});
         std.debug.print("       flint --restore [--vmstate-path <path>] [--mem-path <path>]\n", .{});
         std.debug.print("       flint --api-sock <path>\n", .{});
+        std.debug.print("       --block-backend sync|worker [--force-sync]  (experimental; default sync)\n", .{});
         std.debug.print("       --jail <dir> --jail-uid <uid> --jail-gid <gid> [--jail-cgroup <name>]\n", .{});
         std.debug.print("         [--jail-cpu <pct>] [--jail-memory <MiB>] [--jail-io <MB/s>]\n", .{});
         std.debug.print("       --seccomp-audit  (log violations instead of killing)\n", .{});
@@ -316,6 +342,7 @@ fn createVmComponents(
     vsock_cid_str: ?[*:0]const u8,
     vsock_uds_path: ?[*:0]const u8,
     mem_size_mib: u32,
+    block_backend: Blk.Backend,
 ) !VmComponents {
     const mem_size: usize = @as(usize, mem_size_mib) * 1024 * 1024;
     const cmdline: [*:0]const u8 = cmdline_or_args orelse DEFAULT_CMDLINE;
@@ -344,7 +371,7 @@ fn createVmComponents(
     try vm.createPit2();
 
     var devices: DeviceArray = @splat(null);
-    const device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path);
+    const device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path, block_backend);
     errdefer for (&devices) |*d| {
         if (d.*) |*dev| dev.deinit();
     };
@@ -404,9 +431,10 @@ fn bootVm(
     vsock_uds_path: ?[*:0]const u8,
     mem_size_mib: u32,
     snap_opts: SnapshotOpts,
+    block_backend: Blk.Backend,
 ) !void {
     log.info("flint starting", .{});
-    var c_ = try createVmComponents(kernel_path, initrd_path, cmdline_or_args, disk_path, tap_name, vsock_cid_str, vsock_uds_path, mem_size_mib);
+    var c_ = try createVmComponents(kernel_path, initrd_path, cmdline_or_args, disk_path, tap_name, vsock_cid_str, vsock_uds_path, mem_size_mib, block_backend);
     defer c_.deinit();
 
     log.info("entering VM run loop", .{});
@@ -428,9 +456,10 @@ fn bootVmWithApi(
     api_sock_path: []const u8,
     io: std.Io,
     allocator: std.mem.Allocator,
+    block_backend: Blk.Backend,
 ) !void {
     log.info("flint starting (API mode)", .{});
-    var c_ = try createVmComponents(kernel_path, initrd_path, cmdline_or_args, disk_path, tap_name, vsock_cid_str, vsock_uds_path, mem_size_mib);
+    var c_ = try createVmComponents(kernel_path, initrd_path, cmdline_or_args, disk_path, tap_name, vsock_cid_str, vsock_uds_path, mem_size_mib, block_backend);
     defer c_.deinit();
 
     var runtime = VmRuntime{
@@ -453,6 +482,7 @@ fn bootVmWithApi(
         log.err("post-boot API error: {}", .{err});
     };
 
+    runtime.requestExit();
     thread.join();
 }
 
@@ -468,6 +498,7 @@ fn restoreVm(
     tap_name: ?[*:0]const u8,
     vsock_cid_str: ?[*:0]const u8,
     vsock_uds_path: ?[*:0]const u8,
+    block_backend: Blk.Backend,
 ) !void {
     log.info("flint restoring from snapshot", .{});
 
@@ -485,25 +516,27 @@ fn restoreVm(
     try vm.createIrqChip();
     try vm.createPit2();
 
+    var mem: Memory = undefined;
+    var memory_loaded = false;
+    defer if (memory_loaded) mem.deinit();
+    const vcpu_mmap_size = try kvm.getVcpuMmapSize();
+    var vcpu = try vm.createVcpu(0, vcpu_mmap_size);
+    defer vcpu.deinit();
+
     // 2. Re-create device backends from CLI args.
     // The snapshot tells us what device types/slots existed, but backends
     // hold OS resources (fds) that must be opened fresh.
     var devices: [virtio.MAX_DEVICES]?VirtioMmio = @splat(null);
-    var device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path);
+    var device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path, block_backend);
 
     defer for (&devices) |*d| {
         if (d.*) |*dev| dev.deinit();
     };
 
-    // 3. Create vCPU (must exist before snapshot.load() sets its registers)
-    const vcpu_mmap_size = try kvm.getVcpuMmapSize();
-    var vcpu = try vm.createVcpu(0, vcpu_mmap_size);
-    defer vcpu.deinit();
-
     // 4. Load snapshot — registers memory with KVM, restores vCPU/VM state,
     // device transport state, and serial registers
     var serial = Serial.init(1);
-    var mem = try snapshot.load(
+    mem = try snapshot.load(
         vmstate_path,
         mem_snap_path,
         &vcpu,
@@ -512,7 +545,7 @@ fn restoreVm(
         &devices,
         &device_count,
     );
-    defer mem.deinit();
+    memory_loaded = true;
 
     // 5. Enter run loop — guest resumes execution from where it was paused
     log.info("entering VM run loop (restored)", .{});
@@ -532,6 +565,7 @@ fn restoreVmWithApi(
     api_sock_path: []const u8,
     io: std.Io,
     allocator: std.mem.Allocator,
+    block_backend: Blk.Backend,
 ) !void {
     log.info("flint restoring from snapshot (API mode)", .{});
 
@@ -546,19 +580,22 @@ fn restoreVmWithApi(
     try vm.createIrqChip();
     try vm.createPit2();
 
-    var devices: [virtio.MAX_DEVICES]?VirtioMmio = @splat(null);
-    var device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path);
-    defer for (&devices) |*d| {
-        if (d.*) |*dev| dev.deinit();
-    };
-
+    var mem: Memory = undefined;
+    var memory_loaded = false;
+    defer if (memory_loaded) mem.deinit();
     const vcpu_mmap_size = try kvm.getVcpuMmapSize();
     var vcpu = try vm.createVcpu(0, vcpu_mmap_size);
     defer vcpu.deinit();
 
+    var devices: [virtio.MAX_DEVICES]?VirtioMmio = @splat(null);
+    var device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path, block_backend);
+    defer for (&devices) |*d| {
+        if (d.*) |*dev| dev.deinit();
+    };
+
     var serial = Serial.init(1);
-    var mem = try snapshot.load(vmstate_path, mem_snap_path, &vcpu, &vm, &serial, &devices, &device_count);
-    defer mem.deinit();
+    mem = try snapshot.load(vmstate_path, mem_snap_path, &vcpu, &vm, &serial, &devices, &device_count);
+    memory_loaded = true;
 
     var runtime = VmRuntime{
         .vcpu = &vcpu,
@@ -580,6 +617,7 @@ fn restoreVmWithApi(
         log.err("post-boot API error: {}", .{err});
     };
 
+    runtime.requestExit();
     thread.join();
 }
 
@@ -748,13 +786,19 @@ fn initDevices(
     tap_name: ?[*:0]const u8,
     vsock_cid_str: ?[*:0]const u8,
     vsock_uds_path: ?[*:0]const u8,
+    block_backend: Blk.Backend,
 ) !u32 {
     var device_count: u32 = 0;
+    errdefer for (0..device_count) |i| {
+        if (devices[i]) |*dev| dev.deinit();
+        devices[i] = null;
+    };
 
     if (disk_path) |dp| {
         const base = virtio.MMIO_BASE + @as(u64, device_count) * virtio.MMIO_SIZE;
         const irq = virtio.IRQ_BASE + device_count;
         devices[device_count] = try VirtioMmio.initBlk(base, irq, dp);
+        devices[device_count].?.configureBlockBackend(block_backend);
         device_count += 1;
     }
 
@@ -790,19 +834,24 @@ fn sigusr1Handler(_: std.os.linux.SIG) callconv(.c) void {}
 
 /// Install a no-op SIGUSR1 handler so the signal interrupts KVM_RUN
 /// without killing the process (default disposition for SIGUSR1 is Term).
-fn installKickSignal() void {
+fn installKickSignal() !void {
     const linux = std.os.linux;
     var sa: linux.Sigaction = .{
         .handler = .{ .handler = &sigusr1Handler },
         .mask = linux.sigemptyset(),
         .flags = 0, // must NOT use SA_RESTART — we need KVM_RUN to return -EINTR
     };
-    _ = linux.sigaction(linux.SIG.USR1, &sa, null);
+    const rc: isize = @bitCast(linux.sigaction(linux.SIG.USR1, &sa, null));
+    if (rc < 0) return error.KickSignalFailed;
 }
 
 /// Thread entry point for run loop when running alongside the API server.
 fn runLoopThread(runtime: *VmRuntime) void {
-    installKickSignal();
+    installKickSignal() catch |err| {
+        log.err("cannot safely run API vCPU: {}", .{err});
+        runtime.exited.store(true, .seq_cst);
+        return;
+    };
     // Store our TID so the API thread can send us SIGUSR1
     const tid: i32 = @intCast(std.os.linux.gettid());
     runtime.vcpu_tid.store(tid, .release);
@@ -819,11 +868,37 @@ fn runLoopThread(runtime: *VmRuntime) void {
     ) catch |err| {
         log.err("run loop exited with error: {}", .{err});
     };
-    runtime.exited.store(true, .release);
+    runtime.vcpu_tid.store(0, .seq_cst);
+    runtime.exited.store(true, .seq_cst);
 }
 
 fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *DeviceArray, device_count: u32, snap_opts: SnapshotOpts, runtime: ?*VmRuntime) !void {
     const linux = std.os.linux;
+    const wake_available = if (runtime != null) true else available: {
+        installKickSignal() catch |err| {
+            log.warn("requested worker effective=sync before admission: {}", .{err});
+            break :available false;
+        };
+        break :available true;
+    };
+    if (wake_available) {
+        const wake = BlockWorker.Wake{
+            .immediate_exit = &vcpu.kvm_run.immediate_exit,
+            .tid = @intCast(linux.gettid()),
+        };
+        for (devices[0..device_count]) |*item| {
+            if (item.*) |*dev| dev.startBlockWorker(wake);
+        }
+    }
+    defer for (devices[0..device_count]) |*item| {
+        if (item.*) |*dev| {
+            _ = dev.quiesceBlock(mem, true) catch |err| failed: {
+                log.err("block teardown drain failed closed: {}", .{err});
+                break :failed false;
+            };
+            dev.stopBlockWorker();
+        }
+    };
 
     // Set up epoll for efficient device fd polling. Instead of blind-polling
     // every device fd after each KVM exit, we use epoll_wait(timeout=0) to
@@ -853,40 +928,39 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
 
     var exit_count: u64 = 0;
     while (true) {
+        BlockWorker.clearBeforeEntry(&vcpu.kvm_run.immediate_exit);
+        if (runtime) |rt| {
+            if (rt.exited.load(.seq_cst)) return;
+            if (rt.paused.load(.seq_cst)) {
+                try vcpu.completePendingExit();
+                for (devices[0..device_count]) |*item| {
+                    if (item.*) |*dev| {
+                        if (try dev.quiesceBlock(mem, true)) injectIrq(vm, dev.irq);
+                    }
+                }
+                while (rt.paused.load(.seq_cst)) {
+                    if (rt.exited.load(.seq_cst)) return;
+                    const epoch = rt.pause_epoch.load(.seq_cst);
+                    rt.paused_ack_epoch.store(epoch, .seq_cst);
+                    rt.ack_paused.store(true, .seq_cst);
+                    if (rt.paused.load(.seq_cst) and !rt.exited.load(.seq_cst))
+                        BlockWorker.waitState(&rt.pause_epoch, epoch);
+                }
+                rt.ack_paused.store(false, .seq_cst);
+                continue;
+            }
+        }
+        for (devices[0..device_count]) |*item| {
+            if (item.*) |*dev| {
+                if (dev.hasBlockWorker() and dev.processQueues(mem)) injectIrq(vm, dev.irq);
+            }
+        }
         const exit_reason = vcpu.run() catch |err| {
             // KVM_RUN returns EINTR when interrupted by a signal. This happens
             // when: (a) immediate_exit was set, or (b) SIGUSR1 kicked us out
             // of a blocking HLT. Check if this was a pause request.
             if (err == error.Interrupted) {
-                if (runtime) |rt| {
-                    // Check if we were signaled to exit (e.g., SendCtrlAltDel)
-                    if (rt.exited.load(.acquire)) {
-                        log.info("vCPU exiting (signaled)", .{});
-                        return;
-                    }
-                    if (rt.paused.load(.acquire)) {
-                        rt.ack_paused.store(true, .release);
-                        log.info("vCPU paused by API request", .{});
-                        var spin_count: u32 = 0;
-                        while (rt.paused.load(.acquire)) {
-                            if (rt.exited.load(.acquire)) {
-                                log.info("vCPU exiting while paused (signaled)", .{});
-                                return;
-                            }
-                            spin_count += 1;
-                            if (spin_count < 1000) {
-                                std.atomic.spinLoopHint();
-                            } else {
-                                const ts = std.os.linux.timespec{ .sec = 0, .nsec = 1_000_000 }; // 1ms
-                                _ = std.os.linux.nanosleep(&ts, null);
-                            }
-                        }
-                        log.info("vCPU resumed", .{});
-                        vcpu.kvm_run.immediate_exit = 0;
-                        continue;
-                    }
-                }
-                // Spurious signal — just re-enter KVM_RUN
+                // Clear/check at the top also services CLI worker completions.
                 continue;
             }
             log.err("KVM_RUN failed: {}", .{err});
@@ -966,6 +1040,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
                             const offset = mmio.phys_addr - dev.mmio_base;
                             if (mmio.is_write) {
                                 const data: [8]u8 = mmio.data;
+                                try dev.prepareQueueWrite(mem, offset, data[0..len]);
                                 dev.handleWrite(offset, data[0..len]);
 
                                 if (offset == virtio.MMIO_QUEUE_NOTIFY) {
@@ -986,6 +1061,11 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
             },
             c.KVM_EXIT_HLT => {
                 log.info("guest halted after {} exits", .{exit_count});
+                for (devices[0..device_count]) |*item| {
+                    if (item.*) |*dev| {
+                        if (try dev.quiesceBlock(mem, true)) injectIrq(vm, dev.irq);
+                    }
+                }
                 if (snap_opts.vmstate_path) |sp| {
                     // vCPU is stopped (just exited KVM_RUN), safe to snapshot
                     snapshot.save(sp, snap_opts.mem_path.?, vcpu, vm, mem, serial, devices, device_count) catch |err| {

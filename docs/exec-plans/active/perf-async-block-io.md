@@ -210,6 +210,70 @@ blocked; separate jail prerequisite is done. This active plan stays
 incomplete until baseline liveness/restore and owner-controlled host
 conditions permit reproducible qualification. Final frozen diagnostic
 manifest, null gates/decision and raw runs are under `group-clear/`.
+This paragraph records the historical `a401bf8` decision. The following explicit
+parent authorization supersedes stopping implementation, not the performance
+blocker; the shared prerequisite todo was reopened for canonical peer convergence.
+
+### Parent-authorized implementation continuation
+
+Parent independently confirms host saturation15.961/16 cores; performance,
+default and auto-merge qualification remain blocked. It explicitly authorizes
+safe default-disabled opt-in implementation and focused correctness instead of
+stopping at readiness rechecks. Continue common prerequisite coordination
+with#3; retain owned-only profiling and original L0 failures.
+
+Implement one-credit ordered worker with64KiB staging, captured256-descriptor
+metadata, exact status/used-length/short-I/O and FIFO flush semantics. Integrate
+CLI/API/pre-admission force-sync/fallback without new guest feature bits.
+Prove completion publication+immediate-exit+signal entry ordering in both
+run-loop modes; drain before paused acknowledgment/queue mutation, invalidate
+generations and join before vCPU/memory/FD teardown including partial init and
+restore errors. Add focused differential/fault/mutation/backpressure/wake/
+snapshot tests, then execute exact-target Debug/Safe units/KVM and enforced
+jail opt-in acceptance under the fleet lock. No performance selection/default
+promotion is inferred from this correctness experiment.
+
+#### Executed opt-in correctness continuation
+
+Implemented default-sync CLI/REST selection, pre-admission force-sync/OOM
+fallback, one ordered credit, captured256-descriptor metadata,64KiB staged
+chunks, owner-only publication and READY→immediate_exit→SIGUSR1 wake. Queue
+mutation drains/increments generation before changes; pause drains only
+accepted work before epoch acknowledgment, snapshot checks that acknowledgment,
+and teardown joins workers before FD/vCPU/memory release including restore and
+partial-init error paths. There is no io_uring, new guest feature, heartbeat
+completion driver or#3 notification patch.
+
+Actual Debug and Safe each pass **44unit+8KVM integration+16Python cases**.
+The added KVM case runs `cli;hlt` without a PIT and observes only its owned
+owner blocked in `kvm_vcpu_block` before releasing I/O; the handled pre-entry
+signal window also passes. Real enforced-jail API/CLI worker disk/hash and
+force-sync tests pass. Three rapid pause/resume cycles plus quiescent snapshot
+and fresh API/CLI restore continue a RAM application counter and write the
+backing disk without reexecuting initial boot. This is actual restored app
+state, not the still-unaccepted legacy vsock-agent restore.
+One later Safe restore failure exposed missing completion of KVM's pending
+IO/MMIO emulation before pause. The coupled repair and actual PIO-IN test
+verify KVM_RUN/immediate_exit completes it without another guest instruction.
+Current full Debug/Safe acceptance and three extra Safe lifecycle repeats pass;
+the earlier failure remains explicit in the linked evidence.
+
+Two heartbeat-labelled RPC-controlled worker fio profiles time out; partial
+owned stat/stacks are retained, not accepted workload rows. A practical
+autonomous serial-controlled fixture then completes QD8 fio in both variants
+without heartbeat (same kernel/compiler/devices/features/dataset). Single
+exploratory point samples: force-sync13465.453455IOPS, worker10541.145885IOPS;
+repeat variance is unavailable (`n=1` each), and no paired delta/gate is frozen.
+Owned-only199Hz records have2023/1905 raw samples and zero lost records; all
+3/4 actual task rosters are checked. Deferred kernel writeback attribution,
+full matrix, quiet host/noise gates and control liveness remain unqualified.
+
+Keep default sync and draftPR7; **not eligible for performance merge**.
+Shared repair stays in_progress pending#3 canonical prerequisite coordination;
+implementation todo stays blocked by final qualification, not falsely done.
+Raw commands, initial compile/test/harness failures, final acceptances, ELFs,
+private rosters, snapshots and profiles: `.perf/blk-io/worker-correctness/`
+and `.perf/blk-io/jail-tests/`. Full outcome: linked execution evidence.
 
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,
 and a measured keep/reject decision. Execution has started in the isolated

@@ -128,6 +128,21 @@ The kernel option resolves relative to `vmm/`, independently of each test
 fixture's working directory. Missing prerequisites or an
 entirely skipped integration suite are not passing KVM coverage.
 
+### Experimental Flint block worker
+
+Flint defaults to synchronous block I/O. For correctness experiments only,
+append `--block-backend worker` to a normal CLI boot or `--restore` command;
+`--force-sync` overrides all requests before admission. The REST drive body
+accepts `"io_backend":"worker"` (default `"sync"`). Selection is startup-only,
+not a live backend switch or a new Sandbox SDK option.
+
+The opt-in backend uses one ordered request credit and 64 KiB host staging,
+with owner-published completions, event-driven KVM wakeup and lifecycle drains.
+Initialization failure diagnoses synchronous fallback before any admission;
+I/O failures never replay writes. It is **not performance-qualified** and must
+not be promoted by these correctness results. See the
+[spec and measured limitations](docs/product-specs/perf-async-block-io.md).
+
 The hosted job adds its runner user to `kvm` and starts KVM steps with `sg kvm`,
 so new processes inherit access without running as root or making the device
 world-writable. A one-off device ACL is insufficient on runners that reset it.

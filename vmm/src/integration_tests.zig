@@ -5,6 +5,9 @@
 // Run with: zig build integration-test -Dintegration-kernel=../.ci/guest/bzImage
 
 const std = @import("std");
+comptime {
+    _ = @import("devices/virtio/blk_worker_kvm_test.zig");
+}
 const linux = std.os.linux;
 const process = std.process;
 

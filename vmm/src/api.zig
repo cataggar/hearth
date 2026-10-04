@@ -9,6 +9,8 @@ const json = std.json;
 
 const snapshot = @import("snapshot.zig");
 const main_mod = @import("main.zig");
+const Blk = @import("devices/virtio/blk.zig");
+const BlockWorker = @import("devices/virtio/blk_worker.zig");
 
 const log = std.log.scoped(.api);
 
@@ -18,6 +20,7 @@ pub const VmConfig = struct {
     initrd_path: ?[:0]const u8 = null,
     boot_args: ?[:0]const u8 = null,
     disk_path: ?[:0]const u8 = null,
+    block_backend: Blk.Backend = .sync,
     tap_name: ?[:0]const u8 = null,
     vsock_cid: ?[:0]const u8 = null,
     vsock_uds: ?[:0]const u8 = null,
@@ -38,6 +41,7 @@ const DriveBody = struct {
     path_on_host: []const u8,
     is_root_device: bool = false,
     is_read_only: bool = false,
+    io_backend: Blk.Backend = .sync,
 };
 
 const NetIfaceBody = struct {
@@ -251,6 +255,7 @@ fn handleDrive(request: *http.Server.Request, body: ?[]const u8, allocator: std.
         respondError(request, .internal_server_error, "allocation failed");
         return .err;
     };
+    config.block_backend = parsed.value.io_backend;
 
     respondOk(request);
     return .ok;
@@ -602,14 +607,16 @@ fn handleVmPatch(
 
     if (std.mem.eql(u8, parsed.value.state, "Paused")) {
         // Atomically transition false→true; rejects concurrent pause requests
-        if (runtime.paused.cmpxchgStrong(false, true, .acq_rel, .acquire) != null) {
+        if (runtime.paused.cmpxchgStrong(false, true, .seq_cst, .seq_cst) != null) {
             respondError(request, .bad_request, "VM is already paused");
             return;
         }
 
         // Set immediate_exit AFTER winning the cmpxchg to avoid racing with
         // a concurrent pause request that could clear it.
-        runtime.vcpu.kvm_run.immediate_exit = 1;
+        const epoch = runtime.pause_epoch.fetchAdd(1, .seq_cst) +% 1;
+        BlockWorker.wakeState(&runtime.pause_epoch);
+        @atomicStore(u8, &runtime.vcpu.kvm_run.immediate_exit, 1, .seq_cst);
 
         // Kick the vCPU thread out of a blocking KVM_RUN (e.g., guest in HLT).
         // immediate_exit only takes effect on the *next* KVM_RUN call, so if
@@ -618,9 +625,10 @@ fn handleVmPatch(
 
         // Wait for the run loop to acknowledge it has left KVM_RUN
         var spin_count: u32 = 0;
-        while (!runtime.ack_paused.load(.acquire)) {
+        while (!runtime.ack_paused.load(.seq_cst) or runtime.paused_ack_epoch.load(.seq_cst) != epoch) {
             if (runtime.exited.load(.acquire)) {
-                runtime.paused.store(false, .release);
+                runtime.paused.store(false, .seq_cst);
+                runtime.wakePaused();
                 respondError(request, .bad_request, "VM has exited");
                 return;
             }
@@ -636,12 +644,13 @@ fn handleVmPatch(
         respondOk(request);
     } else if (std.mem.eql(u8, parsed.value.state, "Resumed")) {
         // Atomically transition true→false; rejects if not paused
-        if (runtime.paused.cmpxchgStrong(true, false, .acq_rel, .acquire) != null) {
+        if (runtime.paused.cmpxchgStrong(true, false, .seq_cst, .seq_cst) != null) {
             respondError(request, .bad_request, "VM is not paused");
             return;
         }
         // Clear ack_paused after unpausing so the next pause must wait for a fresh ack
-        runtime.ack_paused.store(false, .release);
+        runtime.ack_paused.store(false, .seq_cst);
+        runtime.wakePaused();
         log.info("VM resumed", .{});
         respondOk(request);
     } else {
@@ -655,7 +664,10 @@ fn handleSnapshotCreate(
     allocator: std.mem.Allocator,
     runtime: *main_mod.VmRuntime,
 ) void {
-    if (!runtime.paused.load(.acquire)) {
+    if (!runtime.paused.load(.seq_cst) or !runtime.ack_paused.load(.seq_cst) or
+        runtime.paused_ack_epoch.load(.seq_cst) != runtime.pause_epoch.load(.seq_cst) or
+        runtime.exited.load(.seq_cst))
+    {
         respondError(request, .bad_request, "VM must be paused before creating a snapshot");
         return;
     }
@@ -763,10 +775,8 @@ fn handlePostBootAction(
         // Signal the VM to exit by setting the exited flag.
         // The VMM doesn't emulate i8042/ACPI, so we can't inject Ctrl+Alt+Del.
         // Instead, mark the VM as exited so the run loop terminates.
-        runtime.vcpu.kvm_run.immediate_exit = 1;
-        runtime.exited.store(true, .release);
+        runtime.requestExit();
         // Kick the vCPU thread out of KVM_RUN so it sees the exited flag
-        runtime.kickVcpu();
         respondOk(request);
     } else {
         respondError(request, .bad_request, "unknown action_type (post-boot supports: SendCtrlAltDel)");
