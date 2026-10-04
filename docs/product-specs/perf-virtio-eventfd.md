@@ -289,6 +289,15 @@ These fixes are not C00 or an eventfd performance effect. L0 evidence remains
 tied to its frozen old binary; the corrected isolation build is labelled
 separately. Guest ring/IRQ/snapshot implementation remains unchanged.
 
+The independent TAP prerequisite fixture uses the same numbered payload/FNV
+protocol as the native vsock probe over a guest TCP listener. BusyBox configures
+only a private namespace's owned TAP and guest interface; there is no uplink,
+NAT, SDK CONNECT, timer or heartbeat. The host client is nonroot. The supervisor
+must verify the actual VMM's post-drop credentials and enforced filter before
+traffic, retain failed connections as failures, and remove only its owned
+child/jail. A protocol fixture self-test is not guest/KVM acceptance, and an
+isolation-repaired TAP result is not an original-L0 or C00 measurement.
+
 Legacy delivery remains the default while planned and during experiments.
 Prefer the simplest passing mode, including ioeventfd-only or irqfd-only;
 do not presume combined wins. Default promotion requires the mandatory Azure

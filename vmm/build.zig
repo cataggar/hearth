@@ -49,6 +49,17 @@ pub fn build(b: *std.Build) void {
     b.step("eventfd-guest-probe", "Build the blocking, heartbeat-free guest-initiated vsock probe")
         .dependOn(&b.addInstallArtifact(guest_probe, .{}).step);
 
+    const tcp_probe = b.addExecutable(.{
+        .name = "eventfd-tcp-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/eventfd_tcp_probe.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.step("eventfd-tcp-probe", "Build the blocking, heartbeat-free native TCP guest probe")
+        .dependOn(&b.addInstallArtifact(tcp_probe, .{}).step);
+
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     run_cmd.addPassthruArgs();

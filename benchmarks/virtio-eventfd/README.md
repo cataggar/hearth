@@ -91,6 +91,51 @@ Profiled and unprofiled repetitions must remain separate. The runner terminates
 only its own VMM/profiler processes and removes only its owned listener.
 Artifacts are private under `.perf/eventfd/`; preserve failed runs too.
 
+### Independent native TAP prerequisite
+
+`zig build eventfd-tcp-probe` builds a blocking guest TCP listener using the
+same numbered payload/FNV protocol as the native vsock probe. `prepare
+--tap-probe vmm/zig-out/bin/eventfd-tcp-probe` configures guest eth0 at
+192.0.2.2/30/MTU1500 with BusyBox; it uses no heartbeat, SDK CONNECT or
+guest-side polling loop. The ordinary `run` command rejects TCP fixtures.
+
+`tap_probe.py` requires `sudo unshare --net`, verifies the namespace differs
+from PID1's, creates only owned `hef3tap0` (192.0.2.1/30, MTU1500, offloads
+disabled), and boots the explicitly named CLI jail binary. It verifies
+UID/GID, empty groups/capabilities and Seccomp2/NoNewPrivs1 before traffic.
+The nonroot client checks a 64B echo, eight 64KiB slow-reader messages, then
+repeats both after two-second silences. Each successful phase is retained even
+if a later phase fails. All failure/status, source/binary/fixture hashes,
+aggregate host noise controls, roster/CPU validity and exact launch commands
+remain private. No host NIC, uplink, NAT or unrelated tasks are inspected.
+Owned children are joined before the newly created jail is removed.
+
+Example bounded phases (release the lock between them):
+
+```sh
+cd /d/hearth/.perf/worktrees/virtio-eventfd
+umask 077
+flock -x -w 60 /d/hearth/.perf/fleet/host.lock timeout 120 \
+  sh -c 'cd vmm && ZIG_GLOBAL_CACHE_DIR="$PWD/../.perf/eventfd/cache" zig build eventfd-tcp-probe -Dtarget=x86_64-linux -Doptimize=safe'
+flock -x -w 60 /d/hearth/.perf/fleet/host.lock timeout 60 \
+  python3 benchmarks/virtio-eventfd/run.py prepare \
+  --kernel .perf/eventfd/fixtures/bzImage --agent agent/zig-out/bin/hearth-agent \
+  --tap-probe vmm/zig-out/bin/eventfd-tcp-probe \
+  --out .perf/eventfd/fixtures/tap-no-heartbeat
+flock -x -w 60 /d/hearth/.perf/fleet/host.lock timeout 60 \
+  sudo -n env PYTHONDONTWRITEBYTECODE=1 unshare --net \
+  python3 benchmarks/virtio-eventfd/tap_probe.py \
+  --binary .perf/eventfd/fixtures/isolation-control/flint \
+  --label isolation-control --out .perf/eventfd/results/tap-enforced
+```
+
+`--selftest` instead runs the compiled guest protocol on a private namespace's
+loopback as a nonroot host process. That validates the actual TCP fixture, not
+Flint/KVM/jail performance. Neither diagnostic proves the vCPU stayed halted
+through the silence or replaces sustained workload/lifecycle tests, scoped
+profiling or frozen A/A gates. The repaired jail binary remains a separately
+labelled prerequisite control; never call its effects an eventfd speedup.
+
 `analyze_trace.py --run <trace run> --out <JSON>` derives device addresses/GSIs
 from the actual VMM diagnostics. It separates kernel exits from
 `kvm_userspace_exit`, counts four-byte notify writes per queue, and associates

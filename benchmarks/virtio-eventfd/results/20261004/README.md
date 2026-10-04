@@ -49,6 +49,54 @@ enforced API `recvmsg` and jail ownership; #3 is requesting/reusing its exact
 SHA, excluding #1's async backend, rather than claiming its CLI-only jail
 proof establishes API/lifecycle acceptance.
 
+## Independent native TAP prerequisite (post-provisioning)
+
+The native TCP listener reuses #3's existing numbered-payload/FNV echo
+protocol, compiled with pinned Zig0.17/safe. It does not import #2's backend,
+guest code, system-wide collector or private evidence. Its binary SHA-256 is
+`8a292a7705bb5407f57e8ffa3e8ca3f8e9eb98d2c3365ab72b111f6b11b983ab`;
+the timer-free initrd is
+`eff0336837d75bb50fd6cf0b3a27b0f41e2464d47911d870d32944adcb84872d`.
+The same pinned 5.10.245 kernel and BusyBox are used.
+
+All cases run under bounded exclusive fleet phases in a private network
+namespace, with owned `hef3tap0`, host192.0.2.1/30, guest192.0.2.2/30,
+MTU1500, vnet header and offloads disabled. There is no uplink, NAT, host
+NIC change, heartbeat, SDK CONNECT or polling guest fixture. VMMCPU8 and
+clientCPU1 are separate reported physical cores. The current separately
+labelled **isolation-control** binary, not frozen old L0 or C00, runs in
+the enforced CLI jail. Before client admission its complete two-task roster
+has UID/GID1000, empty groups, CapEff0, Seccomp2 and NoNewPrivs1.
+
+* Native host-loopback protocol self-tests: **2/2 pass** (one initial-only,
+  one including idle-wake phases); these are **not KVM/jail tests**.
+* Initial-only real enforced-jail TAP prerequisite: **1/1 pass**; checked
+  one64B echo and eight64KiB slow-reader messages (250ms delayed reader).
+  This is one operation window, not sustained or halted-vCPU acceptance.
+* Stronger real enforced-jail TAP prerequisite: **1/1 fails**. Initial64B
+  echo and all eight64KiB messages (sequences8–15) validate. After two
+  seconds of silence, sequence16 receives **0/4 header bytes** at the
+  two-second bound. The subsequent after-silence64KiB phase never executes.
+  The equivalent native host protocol passes every phase. No failed
+  operation is assigned a finite latency or speedup.
+* The failed KVM case records 0.03CPU seconds for all VMM tasks over its
+  5.239568s operation window, but aggregate host control records
+  **79.94 busyCPU seconds** (~15.257busy cores; idle/iowait3.83CPU seconds).
+  The earlier initial-only case records27.53busyCPU seconds/1.727226wall
+  (~15.939busy cores). These are saturation/noise controls, not eligible
+  whole-window backend/kernel attribution or frozen performance baselines.
+* Latest existing Python tooling suite: **16/16 pass**. TCP build:3/3 steps
+  pass. Owned child/client processes are joined before the private jail
+  is removed; no unrelated processes, stacks or task lists are collected.
+
+The fixture closes a missing-prerequisite-tool gap while exposing a real
+post-silence TAP servicing failure. It does not repair readiness, establish
+actual halted residency, provide the full workload matrix, select an owner/
+IRQ policy or make the experiment performance eligible. The original L0
+failures and old archives remain unchanged.
+[Owned TAP raw evidence](tap-prerequisites.tar.gz) is a separate checksummed
+archive; it contains no unrelated task lists or system-wide perf data.
+
 ## Environment and controls
 
 Actual host `vm31e`: Microsoft/Azure `Standard_D16ds_v5`, nested KVM,

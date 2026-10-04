@@ -35,6 +35,13 @@ separately. Earlier CPU8/client0 samples share an SMT core and remain
 supplementary; repeated CPU8/client1 L0 profiles are retained separately.
 No numeric gates are frozen, and no controlled candidate exists.
 
+Post-provisioning support work is continuing while awaiting #1's exact,
+separate prerequisite correctness commit. A native TCP/TAP fixture is being
+added without importing #2's runtime or system-wide collector. It shares the
+numbered/checksummed protocol with the existing guest-initiated vsock probe
+and requires a private namespace, nonroot client and verified enforced jail.
+Original frozen L0 failures and isolation-repaired diagnostics stay separate.
+
 **Hold / not eligible for performance merge.** Required remaining work is the
 baseline backpressure/credit correctness prerequisite, W1–W6 ownership,
 validation, IRQ/lifecycle and controlled modes, plus TAP/concurrency/active-I/O

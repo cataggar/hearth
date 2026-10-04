@@ -71,7 +71,8 @@ def prepare(args):
     out = artifact_path(args.out)
     out.mkdir(parents=True, exist_ok=False)
     kernel = artifact_path(args.kernel)
-    agent = artifact_path(args.probe or args.agent)
+    tap_probe = getattr(args, "tap_probe", None)
+    agent = artifact_path(tap_probe or args.probe or args.agent)
     busybox = Path(args.busybox)
     if digest(kernel) != KERNEL_SHA256:
         raise ValueError("kernel does not match the pinned 5.10.245 fixture")
@@ -94,7 +95,14 @@ def prepare(args):
         "/bin/busybox cat /proc/version /proc/cmdline /proc/interrupts\n"
         "/bin/busybox find /sys/bus/virtio/devices -maxdepth 2 -type l\n"
         + heartbeat
-        + ("exec /eventfd-guest-probe\n" if args.probe else "exec /hearth-agent\n")
+        + (
+            "/bin/busybox ip link set lo up\n"
+            "/bin/busybox ip addr add 192.0.2.2/30 dev eth0\n"
+            "/bin/busybox ip link set eth0 mtu 1500 up\n"
+            "exec /eventfd-guest-probe\n" if tap_probe
+            else "exec /eventfd-guest-probe\n" if args.probe
+            else "exec /hearth-agent\n"
+        )
     ).encode()
     entries = [
         ("bin", b"", 0o40755),
@@ -104,7 +112,7 @@ def prepare(args):
         ("bench", b"", 0o40700),
         ("bin/busybox", busybox.read_bytes(), 0o100755),
         ("bin/sh", b"busybox", 0o120777),
-        ("eventfd-guest-probe" if args.probe else "hearth-agent", agent.read_bytes(), 0o100755),
+        ("eventfd-guest-probe" if args.probe or tap_probe else "hearth-agent", agent.read_bytes(), 0o100755),
         ("init", script, 0o100755),
         ("TRAILER!!!", b"", 0),
     ]
@@ -123,8 +131,9 @@ def prepare(args):
             "init_sha256": digest(out / "init"),
             "initrd_sha256": digest(out / "initrd.cpio.gz"),
             "diagnostic_heartbeat_ms": args.heartbeat_ms,
-            "guest_agent_interactive_poll_ms": None if args.probe else 50,
-            "native_probe": bool(args.probe),
+            "guest_agent_interactive_poll_ms": None if args.probe or tap_probe else 50,
+            "native_probe": bool(args.probe or tap_probe),
+            "transport": "tap-tcp" if tap_probe else "vsock",
             "unsupported": ["host-initiated CONNECT", "SDK tar/port-forward bulk"],
         },
     )
@@ -361,6 +370,8 @@ def run(args):
     out.mkdir(parents=True, exist_ok=False)
     binary, fixture = artifact_path(args.binary), artifact_path(args.fixture)
     metadata = json.loads((fixture / "fixture.json").read_text())
+    if metadata.get("transport", "vsock") != "vsock":
+        raise ValueError("use tap_probe.py for a private-namespace TAP fixture")
     kernel = artifact_path(metadata["kernel"])
     initrd = fixture / "initrd.cpio.gz"
     if digest(kernel) != metadata["kernel_sha256"] or digest(initrd) != metadata["initrd_sha256"]:
@@ -669,7 +680,9 @@ def main():
     fixture = commands.add_parser("prepare")
     fixture.add_argument("--kernel", required=True)
     fixture.add_argument("--agent", required=True)
-    fixture.add_argument("--probe", help="Use the timer-free native guest probe instead of the agent")
+    native = fixture.add_mutually_exclusive_group()
+    native.add_argument("--probe", help="Use the timer-free native vsock guest probe instead of the agent")
+    native.add_argument("--tap-probe", help="Use the timer-free native TCP guest probe instead of the agent")
     fixture.add_argument("--busybox", default="/usr/bin/busybox")
     fixture.add_argument("--heartbeat-ms", type=int, default=0)
     fixture.add_argument("--out", required=True)

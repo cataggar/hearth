@@ -36,7 +36,10 @@ pub fn main() !void {
     if (connected < 0) return error.ConnectFailed;
     var marker = "eventfd-native-probe: connected\n".*;
     try transfer(1, &marker, true);
+    try echo(fd);
+}
 
+pub fn echo(fd: i32) !void {
     var payload: [65536]u8 = undefined;
     while (true) {
         var header: [4]u8 = undefined;
