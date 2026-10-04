@@ -23,6 +23,16 @@ default. No worker/selector/force-sync implementation, performance gain, default
 promotion or merge eligibility is claimed. This plan remains active rather than
 being moved to completed.
 
+### Post-provisioning checkpoint — 16:01 UTC
+
+The parent subsequently provisioned Node/npm, iproute, fio with host libaio
+support, and iperf3. A short locked inventory records actual versions and
+glibc/libaio/liburing packages. All earlier startup/stat/stack/idle captures
+remain **pre-provisioning capability diagnostics**, not a controlled baseline.
+No workload was rerun or gate frozen from them. The unchanged jail failures
+and incomplete guest fixture still block G0; new mandatory sampling must
+establish complete fixture/environment controls after provisioning.
+
 ## Outcome and controls
 
 Produce a reproducible baseline, a correctness-qualified experiment if warranted,

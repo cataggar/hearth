@@ -12,6 +12,10 @@ killed on `recvmsg` and the CLI cannot open jail device nodes created under
 private umask. G0/G1 workload acceptance and A/A gates remain incomplete.
 No asynchronous backend or qualifying performance comparison was implemented;
 this is not an optimization rejection or a performance-merge recommendation.
+Common host tools became available later; the results record the post-provisioning
+inventory explicitly. Earlier captures remain capability diagnostics only.
+Mandatory baseline sampling and frozen gates must use a newly established,
+complete post-provisioning environment.
 
 ## Objective and scope
 

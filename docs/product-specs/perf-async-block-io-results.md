@@ -112,6 +112,39 @@ qualify disk throughput, durability under faults, loaded interaction, or
 disk/agent snapshot restore. Its existing 10 ms serial heartbeat is recorded;
 it proves no asynchronous idle-wake behavior.
 
+## Post-provisioning boundary — 16:01 UTC
+
+Common tooling was provisioned by the parent **after the capability captures
+above**. A short, separately locked inventory at `2026-10-04T16:01:42Z` verifies:
+
+| Tool/library | Observed version / package |
+|---|---|
+| Node / npm | `22.22.0` / `10.9.4` |
+| iproute / libbpf | `6.14.0` / `1.6.1` |
+| fio | `3.40`; host `--enghelp=libaio` succeeds |
+| iperf3 | `3.19.1` |
+| glibc | `2.42-10.azl4` |
+| libaio | `0.3.111-23.azl4` |
+| liburing | `2.12-2.azl4` |
+
+Exact executable paths, RPM versions, engine-help output and library inventory
+are retained in `.perf/blk-io/post-provisioning/tools-libraries.txt`. `ldd` reports
+the preserved Flint executable is not dynamic. No additional tool installation,
+VM workload or profiling run was performed by this inventory.
+
+**Every earlier capture in this report is pre-provisioning capability evidence,
+not a fully controlled comparison or frozen performance baseline.** The
+99.938% busy control is a historical five-second window, not an assertion of
+current host utilization. Neither that window nor the startup counters may
+establish post-provisioning A/A noise, margins or a gain.
+
+Host tools being available does not provision/verify them inside the guest,
+prefill the required dataset, repair the unchanged jail failures, or satisfy
+any missing workload row. G0 remains blocked. Future mandatory baseline
+sampling must begin only after a new complete fixture/environment manifest
+and controls are established **after common provisioning**; no numeric
+baseline gates have yet been frozen.
+
 ## Executed validation
 
 | Command / coverage | Actual result |
@@ -132,6 +165,8 @@ loaded lifecycle, fault injection, mutation, backpressure, wake or jail
 acceptance. No required test skip is represented as a pass.
 
 ## Measured numbers and their limits
+
+The following numbers are the **pre-provisioning diagnostics** identified above.
 
 Host cycles/instructions are unsupported even with the root collector. Software
 events work; syscall, scheduler, block and KVM tracepoints are available to the
@@ -198,6 +233,8 @@ Raw evidence remains private in the isolated worktree:
   serial/VMM logs, strace, raw stat CSV/perf data, stacked reports/build IDs.
 - `idle-capability-control/`, `diagnostic-series.json`, `analysis.json`:
   raw host controls, explicit blocked statuses, reproducible analysis.
+- `post-provisioning/tools-libraries.txt`: subsequent tool/library boundary;
+  no workload measurements or performance qualification.
 - `smoke-unjailed-capability/`: actual guest kernel/mount/memory output,
   successful disk marker/flush counters and hash, owned exit record; no profiles.
 
