@@ -273,6 +273,41 @@ assertions**, not real-kernel negative child executions. Actual enforced-filter
 API/CLI permission, disk and all-task identity acceptance comes separately from
 the three standalone cases; keep both evidence layers and counts distinct.
 
+### Standalone cleanup-evidence failure follow-up
+
+The correctness-only `98b10c21` follow-up to canonical `7dfee42` requires
+owned-child joining, log closure and private node/socket removal even when
+saving `cleanup.json` raises ENOSPC. The error must propagate. Its fourth
+standalone case injects that write failure into a real enforced API child;
+this is not a claim that the host filesystem was full during the test.
+The three VMM/runtime/unit blobs remain exactly canonical; no compiler,
+backend, syscall, ABI, CPU or guest-feature change is selected.
+
+Validate the exact updated fixture independently on the four existing immutable
+static-musl Debug/safe × LLVM/native ELFs under bounded exclusive fleet phases,
+retaining the inside-lock512MiB correctness guard. Accept four executed cases
+per cell with no skips, three ordinary cleanup records and one separately
+identified fault audit, all owned PID paths gone and private nodes/sockets
+removed. These results remain a new fixture-only epoch, not renewed forced
+unit/KVM builds or compilation/runtime performance.
+
+Own cherry-pick `3414df4` adopts the two exact follow-up files. Four separately
+locked cells execute **4/4 cases each, 16/16 total, no skips**: eight CLI/API
+guest-disk boots, four ordinary enforced API credential/permission controls,
+and four real enforced API children with injected cleanup-evidence ENOSPC.
+All32 recorded supervisor/VMM PID paths are gone; all private nodes/sockets
+are removed, including each fault case with closed logs and propagated ENOSPC.
+This is fault injection, not a host-full simulation or a borrowed peer control.
+The four ELF hashes still match the canonical bridge and the three VMM/runtime/
+unit blobs remain exactly `7dfee42`; fixture/contract now match `98b10c21`.
+Actual inside-lock free-space observations are3,336,646,656–3,471,482,880B,
+not reservations or quiet-host evidence. Logs, launch identities, all-task
+rosters and cleanup/fault audits are indexed by
+`postcleanup-summary/canonical-cleanup-enospc-v1-final.json`.
+The completed v5 forced counts and all zero-row capacity failures remain
+unchanged. No current-script runtime profile, default/GNU acceptance, native
+size waiver or performance adoption follows from this helper-only epoch.
+
 This is an experiment specification, not a benchmark result
 or decision to change defaults. The compiler migration in
 [#5](https://github.com/cataggar/hearth/pull/5) is complete.

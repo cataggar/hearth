@@ -163,6 +163,28 @@ Retained deny cases are BPF-evaluator assertions in the32-unit suite, not
 real-kernel negative child executions. The separate three-case fixture supplies
 actual enforced API/CLI permissions/disk/all-task-identity acceptance.
 
+### Standalone ENOSPC cleanup follow-up
+
+Reuse only the exact fixture/contract follow-up `98b10c21` on top of canonical
+`7dfee42`. VMM/runtime/unit files and the four named static ELFs remain unchanged.
+Validate four actual standalone cases per Debug/safe × LLVM/native cell,
+including injected cleanup-evidence ENOSPC with owned teardown despite the
+propagated error. Preserve v5 and guard-failure epochs separately. Each bounded
+phase checks512MiB inside the exclusive fleet lock and releases between cells;
+no compilation, profiler, performance image or measurement-guard change.
+Own `3414df4` adopts only the exact two shared follow-up files; all three
+VMM/runtime/unit blobs remain canonical `7dfee42`. Actual fresh cells pass
+4/4 each,16/16 total, no skips, using the four hash-verified named ELFs.
+Eight guest-disk boots and four injected-evidence-failure API children remain
+small synchronous correctness, not agent/timer-free/runtime performance.
+All32 recorded PID paths and private node/socket paths are gone, fault-case
+logs close and injected ENOSPC propagates. Locked capacity is3.336–3.471GB at
+those instants, not reserved capacity or a quiet-host certificate. Commands,
+all-task identities, exact hashes and ordinary/fault cleanup records are in
+`postcleanup-summary/canonical-cleanup-enospc-v1-final.json`. Existing128/28/12
+v5 forced/standalone counts are not relabelled newly executed; all size,
+GNU/default, safe-A/A and full profiling/runtime blockers remain.
+
 ## Evidence and fixed scope
 
 The spec records inspected definitions at Hearth
