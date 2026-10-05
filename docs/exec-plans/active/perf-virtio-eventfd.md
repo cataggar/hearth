@@ -20,8 +20,9 @@ modes; run current Debug/Safe real KVM/mask/reset and full-jail acceptance.
 Preregister unchanged gates, execute five new C00 A/A matrices, and freeze
 noise before any paired candidate samples. Collect bounded primary profiles,
 17 workload classes, paired control/candidates, idle/lifecycle and supported
-scaling. Exact asynchronous IRQ-function CPU is a scoped component, not full
-dispatcher/scheduler/softirq coverage; incomplete accounting cannot qualify.
+scaling. Exact asynchronous IRQ-function CPU is a scoped attribution component,
+not full dispatcher/scheduler/softirq coverage. The refined visible-host busy
+total below may qualify primary CPU independently.
 
 Keep private raw execution separate from allowlisted sanitized uploads.
 Record missing/unexecuted requirements, failures, time/space guards and
@@ -39,6 +40,30 @@ PR9 was verified draft, auto-merge null and labels empty before publication.
 The new label-only source is ready for the parent's trigger, not measured.
 The runner explicitly retains incomplete affected-kernel CPU/lifecycle
 qualification and cannot turn a partial positive result into adoption.
+
+Refinement requested after publication78bdb51: use precisely marked
+aggregate visible-host busy CPU (user+nice+system+irq+softirq, guest once)
+as the hosted primary total, with repeated matched before/after no-VM
+background controls and conservative residual/precision uncertainty.
+Keep owned task/BPF CPU separate, optional attribution, not double counted;
+do not subtract unverified background or claim physical hypervisor CPU.
+Freeze the method and unchanged gates before candidates. If uncertainty can
+hide the required benefit/regression, remain red/inconclusive. Explicitly
+clean only manifested owned test/snapshot images; upload no image contents.
+This may resolve primary marginal-kernel measurement, not other required
+correctness/lifecycle/scaling coverage.
+
+Refinement preparation executed under the fleet lock:36/36 Python tests pass
+(`python3 -m unittest discover -s benchmarks/virtio-eventfd -p 'test_*.py' -v`),
+plus changed Python AST, label-only YAML scope and all shell syntax. The visible-counter
+window, no-double-count, high-background apparent-gain/regression rejection,
+denominator sensitivity, optional failed detail and exact-owned image cleanup
+guards are exercised with the existing collector suite. Job/outer/internal
+bounds are180/165/160minutes to include actual controls, not to reduce evidence.
+No hosted workload or suitability claim is inferred from these source tests.
+Private final logs are `.perf/eventfd/hosted-prepare/visible-final-2-{tests,validation}.log`;
+the prior expanded36-test attempt's misplaced test assertion/NameError remains
+in `visible-final-{tests,validation}.log`, not counted as passing.
 
 ### Parent-directed pause attribution and post-IRET acceptance
 

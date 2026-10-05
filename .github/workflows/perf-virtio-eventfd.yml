@@ -21,7 +21,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'copilot/perf-virtio-eventfd-20261004'
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
       TMPDIR: ${{ github.workspace }}/.perf/eventfd-hosted/scratch
       ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.perf/eventfd-hosted/cache/global
@@ -85,7 +85,7 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          timeout --signal=TERM --kill-after=60s 105m \
+          timeout --signal=TERM --kill-after=60s 165m \
             python3 benchmarks/virtio-eventfd/hosted.py qualify \
               --expected-sha "$EVENTFD_APPROVED_SHA"
       - name: Seal a sanitized receipt even after prerequisite failure

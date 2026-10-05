@@ -19,6 +19,35 @@ Legacy remains the default; PR #9 remains draft without auto-merge.
 
 ## New hosted alternative: source ready, execution pending
 
+The initial source-preparation epoch below is publication78bdb51; it remains
+historical and contains no hosted measurements. A subsequent parent-directed
+refinement changes primary CPU, not its frozen thresholds: exactly bracketed
+visible-host `/proc/stat` busy=user+nice+system+irq+softirq includes all executed
+visible kernel/VMM/peer work, with guest counted once. Owned task/BPF remains
+optional attribution, never added to total CPU. It makes no physical Azure
+hypervisor-cost claim.
+
+Repeated before/after no-VM5.1s matrix/60s native-idle controls establish a
+conservative observed/95% background envelope. Measured CPU is never reduced.
+Worst-case background/counter/read perturbations bound both numerator and
+denominator of paired95% ratios; potentially all-residual controls cannot
+qualify. Neither apparent gains nor apparent CPU regressions hidden by that
+uncertainty become a passing/rigorous negative decision. Single-agent idle
+does not prove pure-HLT scaling. Job/outer/internal limits are now180/165/160
+minutes to accommodate real controls without reducing required coverage.
+Exact owned images are hashed/removed after teardown; upload remains sanitized
+JSON only. The refinement still has **zero hosted measurements** and awaits
+the parent-only label.
+
+Refinement validation actually executed under the exclusive fleet lock:
+**36/36 Python collector tests**, changed Python AST, immutable label-only
+YAML scope and every Bash syntax block pass. Command:
+`python3 -m unittest discover -s benchmarks/virtio-eventfd -p 'test_*.py' -v`.
+Logs: `.perf/eventfd/hosted-prepare/visible-final-2-{tests,validation}.log`.
+The first expanded36-test run had a misplaced assertion/NameError in the new
+test itself; its failed `visible-final-*` logs remain preserved, and it is
+not a passing repetition. No local guest/VM/compiler/profile phase executed.
+
 The parent requested a concrete quiet-environment alternative, not abandonment
 because vm31e is shared. Separate workflow
 `.github/workflows/perf-virtio-eventfd.yml` and `hosted.py` now provide a

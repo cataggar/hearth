@@ -30,8 +30,14 @@ Preregister unchanged gates and five paired blocks, then run five complete
 17-class C00 A/A matrices (nonidle≥5s, idle60s). Noise failure stops candidates.
 Only after a frozen noise-provisionally-acceptable receipt run primary C00
 stat/stacks/trace, five C00+rotated-C10/C01/C11 blocks and matched candidate
-profiles. Report p50/p95/p99, throughput, generation-checked all-task CPU,
-tagged asynchronous IRQ function CPU and paired95% log-ratio intervals.
+profiles. Report p50/p95/p99, throughput, precisely bracketed visible-host
+busy CPU and paired95% log-ratio intervals. `/proc/stat` sums only
+user+nice+system+irq+softirq; guest is already included once. No `-a task-clock`,
+guest double count, background subtraction or physical Azure hypervisor claim.
+The same completed-operation count maps to the explicitly marked window,
+including a fixed100ms zero-new-operation completion tail; boot/warmup is
+excluded. Owned-task CPU is separate detail, never added again. Optional
+BPF is used only in profiles, not unprofiled primary matrices/scaling.
 Separate eligible userspace notify returns/IRQ ioctls from kernel exits and
 non-VirtIO serial; event loss/missing owned samples rejects attribution.
 
@@ -39,14 +45,20 @@ As the bounded resources permit, perform one active mixed snapshot/fresh
 restore per mode and1/4/8-sandbox pure-native60s HLT-idle/wake/concurrency
 cells. These are actual partial acceptance, not20 captures/mode, old/new
 compatibility, full mixed scaling, save-on-halt or storm qualification.
-Dispatcher/scheduler/softirq outside owned task/tagged function intervals
-remains **unmeasured**, not zero or complete affected CPU. The runner therefore
-cannot declare adoption from a known-CPU gain: all outstanding required
-coverage stays explicit. A completed noise rejection or demonstrated
-regression is negative evidence; incomplete execution stays blocked.
+Dispatcher/scheduler/softirq detail outside tagged functions remains
+unattributed, but **visible-host busy total includes its executed CPU**.
+Before/after no-VM5.1s controls for every matrix (60s for native idle) give
+repeated background bounds. Counter/read precision and the conservative
+background95%/observed envelope are added as sensitivity uncertainty to
+the paired ratio, never subtracted from measured CPU. If the bound could
+hide the10% benefit or5% regression limit, the result is inconclusive/red.
+This can qualify visible CPU on an actually isolated/quiet hosted runner,
+not close outstanding lifecycle/mixed-scaling/storm coverage.
 
-The hosted job has a120-minute ceiling,105-minute outer experiment bound,
-100-minute internal deadline and4GiB build/3GiB workload capacity guards.
+The hosted job has a180-minute ceiling,165-minute outer experiment bound,
+160-minute internal deadline and4GiB build/3GiB workload capacity guards.
+The added budget covers the new measured background controls; no evidence
+or frozen numeric gate is reduced to fit. Insufficient time stays blocked.
 Every VM/control/collector is bounded and owned. Local validation still uses
 the shared vm31e fleet lock; hosted execution uses an isolated ephemeral VM,
 not the shared filesystem/runner. No qualified result is yet available:
@@ -57,6 +69,9 @@ Receipts contain pins, sanitized operations/counters/owned rosters, phase
 counts and failure hashes, owned stack symbol reports and decoded attribution.
 Private raw perf/serial/VM files are not uploaded; neither are guest memory/
 disks, environment dumps, cloud resource identifiers or foreign inventories.
+Manifested same-source/full-jail and explicit snapshot/input image leaves are
+hashed then removed only after ownership/regular-file checks; symlinks and
+unnamed files are never deleted.
 `sha256sums.json` seals the receipt set even after interruption/setup failure.
 The job deliberately returns nonzero for negative/incomplete qualification;
 successful individual cells never mean default/merge eligibility.

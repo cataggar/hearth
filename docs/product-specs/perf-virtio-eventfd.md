@@ -29,8 +29,10 @@ unchanged numeric/noise gates **before** any candidate performance sample.
 Collect matched paired controls, primary stat/stacks/exit attribution,
 latency/throughput, all backend task CPU and scoped asynchronous IRQ work,
 lifecycle/idle/scaling where resources permit. Missing kernel dispatcher,
-scheduler or softirq attribution remains an explicit qualification blocker,
-never a zero or a complete-CPU claim. A bounded partial experiment cannot
+scheduler or softirq attribution remains explicit detail coverage, never
+zero or a complete attribution claim. The parent-refined visible-host total
+below may qualify primary CPU independently if its quiet/uncertainty proof
+passes. A bounded partial experiment cannot
 claim adoption or turn unexecuted required coverage into a pass.
 
 Only an explicit allowlist of sanitized receipts is uploaded: no guest
@@ -41,6 +43,18 @@ unsuitable identity/resources and unavailable collection are actual blocked
 outcomes. Parent applies the label only after source is published; until
 then this alternative is **awaiting execution**, not a measured result.
 Legacy default, draft/HOLD, prior evidence and all existing gates remain.
+
+**Parent refinement:** on a verified isolated hosted VM, the primary total
+CPU may instead be aggregate visible-host `/proc/stat`
+user+nice+system+irq+softirq deltas over exactly marked completed-operation
+windows. Linux user/nice already includes guest CPU: never add guest ticks
+again, count `-a task-clock` as busy CPU, subtract unverified background or
+claim Azure's physical hypervisor cost. Owned task/BPF CPU remains separate
+mechanism detail and is never added to this total. Repeated no-VM before/after
+quiet controls, counter/read precision and paired uncertainty bound residual
+background. If that bound could hide the required benefit/regression limit,
+qualification remains inconclusive/red. This is a new measurement epoch,
+not reclassification of vm31e or relaxation of any numeric gate.
 
 The [canonical jail correctness prerequisite](perf-jail-baseline.md) is reused
 from `7dfee42` (`85e6f3b` provenance). Own exact bare canonical Debug/Safe each

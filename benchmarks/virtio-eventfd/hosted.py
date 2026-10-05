@@ -27,6 +27,7 @@ import performance
 import restore_stress
 import run as bench
 import tap_probe
+import visible_cpu
 
 HOME = bench.ROOT / ".perf/eventfd-hosted"
 PUBLIC = HOME / "public"
@@ -123,6 +124,25 @@ def check_space(minimum):
     return free
 
 
+def remove_owned_images(directory, names):
+    directory = directory.resolve()
+    directory.relative_to(bench.ROOT / ".perf")
+    removed = []
+    for name in names:
+        if Path(name).name != name:
+            raise Blocked("image cleanup requires explicit leaf names")
+        path = directory / name
+        if not path.exists():
+            continue
+        if path.is_symlink() or not path.is_file() or path.stat().st_uid != os.getuid():
+            raise Blocked("refusing nonregular/symlink/nonowned image cleanup")
+        record = {"path": str(path.relative_to(bench.ROOT)), "bytes": path.stat().st_size,
+                  "sha256": bench.digest(path)}
+        path.unlink()
+        removed.append(record)
+    return removed
+
+
 def perf_binary():
     paths = [shutil.which("perf"), *sorted(Path("/usr/lib/linux-tools").glob("*/perf"), reverse=True)]
     attempts = []
@@ -150,6 +170,8 @@ def host_probe():
     save(PUBLIC / "host.json", record)
     vm, client = independent_cpus(topology)
     record.update(vm_cpu=vm, client_cpu=client)
+    record["visible_logical_cores"] = len(cpulist(Path("/sys/devices/system/cpu/online").read_text()))
+    record["runner_environment"] = os.environ.get("RUNNER_ENVIRONMENT", "unverified")
     check_space(4 * 1024**3)
     flags = next(line.split(":", 1)[1].split() for line in Path("/proc/cpuinfo").read_text().splitlines()
                  if line.startswith("flags"))
@@ -212,12 +234,15 @@ def host_probe():
             record[privilege + "_perf"][kind] = result
     record["sudo_namespace"] = owned_command(["sudo", "-n", "unshare", "--net", "--", "true"],
                                              "probe-netns", 5)
-    record["full_kernel_accounting"] = {"complete": False, "unmeasured": KERNEL_GAPS}
+    record["cpu_accounting"] = {"primary": visible_cpu.SCOPE, "background_subtracted": False,
+                                "owned_detail_added": False, "owned_attribution_gaps": KERNEL_GAPS}
     save(PUBLIC / "host.json", record)
     if not all(record["kvm"]["capabilities"].values()):
         raise Blocked("actual KVM notification capability unavailable; no downgraded candidate")
     if record["root_perf"]["software"]["returncode"] or record["sudo_namespace"]["returncode"]:
         raise Blocked("scoped software perf or owned network namespace unavailable")
+    if record["runner_environment"] != "github-hosted":
+        raise Blocked("ephemeral hosted isolation provenance unverified")
     return record, perf
 
 
@@ -272,6 +297,14 @@ def build_inputs(phases, source):
             "-p", "test_jail_baseline.py", "-v"], 180, phases, environment=environment)
         if "Ran 3 tests" not in (RAW / f"jail-{optimize}.stderr").read_text():
             raise Blocked("standalone full-jail coverage did not actually execute three cases")
+        for root in sorted((bench.ROOT / ".perf/jail-baseline").glob("*")):
+            launch = root / "launch.json"
+            if launch.is_file():
+                ownership = json.loads(launch.read_text())
+                if (ownership.get("source_revision") == source
+                        and ownership.get("binary_sha256") == pins[optimize + "_sha256"]):
+                    removed = remove_owned_images(root, ("disk.raw", "bzImage", "initrd.cpio.gz"))
+                    save(PUBLIC / f"jail-image-cleanup-{optimize}-{root.name}.json", removed)
     require_execution("agent", [zig, "build", "-Dtarget=x86_64-linux-musl", "-Doptimize=safe"],
                       300, phases, bench.ROOT / "agent")
     require_execution("native-probes", [
@@ -280,9 +313,11 @@ def build_inputs(phases, source):
     require_execution("disk-probe", [
         zig, "cc", "-target", "x86_64-linux-musl", "-O2",
         bench.ROOT / "benchmarks/virtio-eventfd/disk_probe.c", "-o", HOME / "disk-probe"], 120, phases)
-    require_execution("irqfd-observer-build", [
+    observer_build = owned_command([
         "/usr/bin/clang", "-target", "bpf", "-O2", "-g", "-c",
-        bench.ROOT / "tools/perf/irqfd_cpu.bpf.c", "-o", HOME / "irqfd_cpu.bpf.o"], 60, phases)
+        bench.ROOT / "tools/perf/irqfd_cpu.bpf.c", "-o", HOME / "irqfd_cpu.bpf.o"], "irqfd-observer-build", 60)
+    phases.append(observer_build)
+    save(PUBLIC / "phases.json", phases)
     matrix.prepare(SimpleNamespace(out=HOME / "fixture", kernel=HOME / "bzImage",
                    agent=bench.ROOT / "agent/zig-out/bin/hearth-agent",
                    native=bench.ROOT / "vmm/zig-out/bin/eventfd-guest-probe",
@@ -298,11 +333,12 @@ def build_inputs(phases, source):
         save(metadata_path, metadata)
     pins["fixture"] = json.loads((HOME / "fixture/fixture.json").read_text())
     pins["native_fixture"] = json.loads((HOME / "native-fixture/fixture.json").read_text())
-    pins["observer_object_sha256"] = bench.digest(HOME / "irqfd_cpu.bpf.o")
+    pins["observer_object_sha256"] = bench.digest(HOME / "irqfd_cpu.bpf.o") if observer_build["returncode"] == 0 else None
     pins["bpf_compiler_sha256"] = bench.digest(Path("/usr/bin/clang").resolve())
     pins["runner_files_sha256"] = {name: bench.digest(Path(module.__file__))
                                   for name, module in (("hosted", sys.modules[__name__]), ("control", control),
                                                        ("matrix", matrix), ("performance", performance), ("run", bench))}
+    pins["runner_files_sha256"]["visible_cpu"] = bench.digest(Path(visible_cpu.__file__))
     save(PUBLIC / "pins.json", pins)
     return pins
 
@@ -311,6 +347,7 @@ def row_projection(row):
     names = ("name", "status", "latency_ms", "latency", "operations", "bytes", "operation_seconds",
              "owned_all_task_cpu_seconds", "owned_irqfd_function_cpu_seconds",
              "known_scoped_cpu_seconds", "known_scoped_cpu_per_operation", "bytes_per_second",
+             "visible_host_cpu", "visible_host_cpu_per_operation", "completed_workload_end_ns",
              "threads_before", "threads_after", "kernel_work_before", "kernel_work_after",
              "client_cpu_seconds", "host_noise", "idle_wake_ms", "batches")
     result = {key: row[key] for key in names if key in row}
@@ -334,22 +371,37 @@ def kernel_projection(record):
     return result
 
 
+def observer_detail(observer, result, phase, finish=False):
+    if observer is None:
+        return None
+    try:
+        return kernel_projection(observer.finish() if finish else observer.read())
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        observer.abort()
+        result["irqfd_function_detail_status"] = "incomplete; never substituted with zero"
+        result.setdefault("irqfd_detail_failures", []).append({
+            "phase": phase, "type": type(error).__name__,
+            "message_sha256": hashlib.sha256(str(error).encode()).hexdigest()})
+        return None
+
+
 def validate_pins():
     pins = json.loads((PUBLIC / "pins.json").read_text())
     if (bench.digest(HOME / "flint-ReleaseSafe") != pins["ReleaseSafe_sha256"]
             or bench.digest(HOME / "bzImage") != pins["kernel_sha256"]
             or json.loads((HOME / "fixture/fixture.json").read_text()) != pins["fixture"]
             or json.loads((HOME / "native-fixture/fixture.json").read_text()) != pins["native_fixture"]
-            or bench.digest(HOME / "irqfd_cpu.bpf.o") != pins["observer_object_sha256"]):
+            or (pins["observer_object_sha256"] is not None
+                and bench.digest(HOME / "irqfd_cpu.bpf.o") != pins["observer_object_sha256"])):
         raise Blocked("frozen binary/kernel/fixture/accounting inputs changed")
 
 
-def sample(guest, tcp, observer, name):
+def sample(guest, tcp, name, visible_cores):
     before = bench.thread_roster(guest.pid)
-    kernel_before = observer.read()
-    host_before = Path("/proc/stat").read_text()
     client_before = time.process_time()
-    started = time.monotonic()
+    host_before = visible_cpu.capture()
+    started_ns = time.monotonic_ns()
+    started = started_ns / 1e9
     latency, byte_count, _ = performance.workload(guest, tcp, name)
     batches = 1
     if name != "idle":
@@ -358,26 +410,31 @@ def sample(guest, tcp, observer, name):
             latency.extend(more)
             byte_count += size
             batches += 1
-    operation_seconds = time.monotonic() - started
+    completed_ns = time.monotonic_ns()
+    operation_seconds = (completed_ns - started_ns) / 1e9
     time.sleep(.1)
+    accounting_end_ns = time.monotonic_ns()
+    host_cpu = visible_cpu.delta(host_before, visible_cpu.capture(),
+                                 started_ns, accounting_end_ns, visible_cores)
+    host_cpu["fixed_completion_tail_seconds"] = .1
+    host_cpu["completed_workload_end_ns"] = completed_ns
+    host_cpu["new_operations_in_tail"] = 0
     after = bench.thread_roster(guest.pid)
-    kernel_after = observer.read()
     cpu = bench.cpu_delta(before, after)
-    kernel_cpu = kernel_after["kernel_irqfd_cpu_seconds"] - kernel_before["kernel_irqfd_cpu_seconds"]
-    if kernel_cpu < 0 or cpu < 0 or not latency:
+    if cpu < 0 or not latency:
         raise ValueError("invalid CPU/count boundary")
     result = {
         "name": name, "status": "passed", "latency_ms": latency, "latency": performance.summary(latency),
         "operations": len(latency), "bytes": byte_count, "operation_seconds": operation_seconds,
-        "owned_all_task_cpu_seconds": cpu, "owned_irqfd_function_cpu_seconds": kernel_cpu,
-        "known_scoped_cpu_seconds": cpu + kernel_cpu,
-        "known_scoped_cpu_per_operation": (cpu + kernel_cpu) / len(latency),
+        "owned_all_task_cpu_seconds": cpu, "owned_irqfd_function_cpu_seconds": None,
+        "known_scoped_cpu_seconds": None, "known_scoped_cpu_per_operation": None,
+        "visible_host_cpu": host_cpu,
+        "visible_host_cpu_per_operation": host_cpu["busy_cpu_seconds"] / len(latency),
+        "completed_workload_end_ns": completed_ns,
         "bytes_per_second": byte_count / operation_seconds,
         "threads_before": before, "threads_after": after,
-        "kernel_work_before": kernel_before, "kernel_work_after": kernel_after,
         "client_cpu_seconds": time.process_time() - client_before,
         "batches": batches,
-        "host_noise": bench.host_cpu_delta(host_before, Path("/proc/stat").read_text(), time.monotonic() - started),
     }
     if name == "idle":
         result["idle_wake_ms"] = {}
@@ -413,7 +470,7 @@ def profile(guest, observer, args, result):
                                 *map(str, command), "--", sys.executable, "-c",
                                 "from pathlib import Path; import sys,time; "
                                 "Path(sys.argv[1]).touch(); time.sleep(15)", str(ready)], stderr=errors)
-    before = observer.read()
+    before = observer_detail(observer, result, "before")
     operations = 0
     try:
         limit = time.monotonic() + 5
@@ -439,8 +496,8 @@ def profile(guest, observer, args, result):
     result["profiled_owned_all_task_cpu_seconds"] = bench.cpu_delta(roster, after)
     result["threads_before"] = roster
     result["threads_after"] = after
-    result["kernel_work_before"] = kernel_projection(before)
-    result["kernel_work_after"] = kernel_projection(observer.read())
+    result["kernel_work_before"] = before
+    result["kernel_work_after"] = observer_detail(observer, result, "after")
     text = (path / "perf.stderr").read_text()
     if re.search(r"(lost|dropped)\s+[1-9][0-9]*|[1-9][0-9]*\s+(lost|dropped)", text, re.I):
         raise Blocked("profile loss detected; never qualifying attribution")
@@ -453,8 +510,12 @@ def profile(guest, observer, args, result):
                                  "-f", *(["--stdio"] if args.profile == "stacks" else []),
                                  "-i", str(path / "profile.data")], capture_output=True, timeout=45)
         (path / "decoded.txt").write_bytes(decode.stdout)
+        (path / "decode.stderr").write_bytes(decode.stderr)
         if decode.returncode:
             raise Blocked("owned profile decoding failed")
+        if re.search(rb"PERF_RECORD_LOST|\bLOST\s+[1-9]|(?:lost|dropped)\s+[1-9][0-9]*|[1-9][0-9]*\s+(?:lost|dropped)",
+                     decode.stdout + decode.stderr, re.I):
+            raise Blocked("decoded profile loss detected; never qualifying attribution")
         if args.profile == "stacks":
             report = decode.stdout.decode(errors="replace")
             if not re.search(r"\bflint\b", report) or not re.search(r"Samples:\s*[1-9]", report):
@@ -498,21 +559,30 @@ def cell(args):
                                              "outstanding_sources_at_capture") if key in result}
         result["classification"] = "one actual active mixed fresh v2 restore, not20/old-new/full lifecycle"
         result["failure_message_sha256"] = error_hashes
+        result["owned_image_cleanup"] = remove_owned_images(out / "cycle", ("state", "memory", "disk"))
         result["performance_merge_eligible"] = False
         save(out / "result.json", result)
         return 0 if result["status"] == "passed" else 1
     result = {"status": "failed", "mode": args.mode, "rows": [],
               "classification": "profiled" if args.profile else "unprofiled matched matrix",
-              "full_kernel_accounting": False, "unmeasured_kernel_work": KERNEL_GAPS,
+              "visible_host_cpu_method": visible_cpu.SCOPE, "owned_attribution_gaps": KERNEL_GAPS,
               "performance_merge_eligible": False}
     guest, tcp, observer = None, None, None
     try:
+        result["background_controls"] = [visible_cpu.quiet(5.1, host["visible_logical_cores"])]
         guest = control.Guest.__new__(control.Guest)
         guest.__init__(out, HOME / "flint-ReleaseSafe", args.mode, HOME / "fixture",
                        disk=True, tap="hef3tap0", vm_cpu=host["vm_cpu"])
         tcp = socket.create_connection(("192.0.2.2", 11000), timeout=8)
         tcp.settimeout(10)
-        observer = matrix.Observer(guest, HOME / "irqfd_cpu.bpf.o")
+        if args.profile and json.loads((PUBLIC / "pins.json").read_text())["observer_object_sha256"]:
+            try:
+                observer = matrix.Observer(guest, HOME / "irqfd_cpu.bpf.o")
+                result["irqfd_function_detail_status"] = "available"
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+                result["irqfd_function_detail_status"] = "unavailable; never substituted with zero"
+        else:
+            result["irqfd_function_detail_status"] = "not collected in unprofiled primary windows"
         control.agent(guest, True)
         for connection in (tcp, guest.native_connection):
             bench.native_echo(connection, 600, 64)
@@ -521,14 +591,15 @@ def cell(args):
             profile(guest, observer, args, result)
         else:
             for name in performance.WORKLOADS:
-                result["rows"].append(sample(guest, tcp, observer, name))
+                result["rows"].append(sample(guest, tcp, name, host["visible_logical_cores"]))
                 save(out / "result.json", result)
         checksum = matrix.rpc_exec(guest, "/bin/busybox sha256sum /dev/vda", 20).decode().split()[0]
         if checksum != bench.digest(guest.path / "disk"):
             raise ValueError("whole real disk guest/host integrity failure")
         result["shutdown_exit_code"] = guest.shutdown()
-        result["kernel_work_final"] = kernel_projection(observer.finish())
-        observer = None
+        if observer is not None:
+            result["kernel_work_final"] = observer_detail(observer, result, "final", finish=True)
+            observer = None
         result["status"] = "passed"
     except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
         result["failure_type"] = type(error).__name__
@@ -553,6 +624,9 @@ def cell(args):
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
                 result["cleanup_failed"] = True
                 result["status"] = "failed"
+        if not result.get("cleanup_failed"):
+            result.setdefault("background_controls", []).append(
+                visible_cpu.quiet(5.1, host["visible_logical_cores"]))
         save(out / "result.json", result)
     return 0 if result["status"] == "passed" else 1
 
@@ -564,7 +638,7 @@ def native_scale(args, host):
     out = bench.artifact_path(args.out)
     result = {"status": "failed", "mode": args.mode, "count": count,
               "classification": "pure-native1/4/8 idle/concurrency; not mixed-device scaling performance",
-              "full_kernel_accounting": False, "unmeasured_kernel_work": KERNEL_GAPS,
+              "cpu_scope": visible_cpu.SCOPE, "owned_attribution_gaps": KERNEL_GAPS,
               "performance_merge_eligible": False, "guest_agent_present": False, "heartbeat_ms": 0}
     result["available_memory_bytes"] = available
     result["required_memory_bytes"] = (count * 512 + 1024) * 1024**2
@@ -572,8 +646,9 @@ def native_scale(args, host):
         result.update(status="blocked", reason="actual available memory insufficient for complete native scaling cell")
         save(out / "result.json", result)
         return 1
-    guests, observers, workers = [], [], []
+    guests, workers = [], []
     try:
+        result["background_controls"] = [visible_cpu.quiet(60, host["visible_logical_cores"])]
         for index in range(count):
             directory = out / f"g{index}"
             directory.mkdir(mode=0o700)
@@ -581,7 +656,6 @@ def native_scale(args, host):
             guests.append(guest)
             guest.__init__(directory, HOME / "flint-ReleaseSafe", args.mode, HOME / "native-fixture",
                            vm_cpu=host["vm_cpu"])
-            observers.append(matrix.Observer(guest, HOME / "irqfd_cpu.bpf.o"))
             bench.native_echo(guest.connection, 0, 4096)
         time.sleep(.2)
         before = [bench.thread_roster(guest.pid) for guest in guests]
@@ -591,21 +665,22 @@ def native_scale(args, host):
                 text=True, timeout=5).strip() for task in roster]
             if "kvm_vcpu_block" not in channels:
                 raise Blocked("pure-native guest is not verified in actual KVM HLT")
-        kernel_before = [observer.read() for observer in observers]
-        started = time.monotonic()
+        host_before = visible_cpu.capture()
+        started_ns = time.monotonic_ns()
+        started = started_ns / 1e9
         time.sleep(60)
-        seconds = time.monotonic() - started
+        ended_ns = time.monotonic_ns()
+        seconds = (ended_ns - started_ns) / 1e9
+        host_cpu = visible_cpu.delta(host_before, visible_cpu.capture(),
+                                     started_ns, ended_ns, host["visible_logical_cores"])
         after = [bench.thread_roster(guest.pid) for guest in guests]
-        kernel_after = [observer.read() for observer in observers]
         cpu = sum(bench.cpu_delta(a, b) for a, b in zip(before, after))
-        irq = sum(b["kernel_irqfd_cpu_seconds"] - a["kernel_irqfd_cpu_seconds"]
-                  for a, b in zip(kernel_before, kernel_after))
         result["idle"] = {
-            "seconds": seconds, "owned_all_task_cpu_seconds": cpu, "owned_irqfd_function_cpu_seconds": irq,
-            "known_scoped_core_percentage_points_per_sandbox": 100 * (cpu + irq) / seconds / count,
+            "seconds": seconds, "owned_all_task_cpu_seconds": cpu, "owned_irqfd_function_cpu_seconds": None,
+            "visible_host_cpu": host_cpu,
+            "visible_busy_core_percentage_points_per_sandbox": 100 * host_cpu["busy_cpu_seconds"] / seconds / count,
             "threads_before": before, "threads_after": after,
-            "kernel_before": [kernel_projection(x) for x in kernel_before],
-            "kernel_after": [kernel_projection(x) for x in kernel_after],
+            "qualification": "single measured point; background/precision may still hide0.1pp gate",
         }
         result["wake_ms"] = []
         for guest in guests:
@@ -635,20 +710,12 @@ def native_scale(args, host):
             raise Blocked("actual native scaling traffic did not complete with integrity")
         result["concurrent_latency_ms"] = latencies
         result["shutdown_exit_codes"] = [guest.shutdown() for guest in guests]
-        result["kernel_final"] = [kernel_projection(observer.finish()) for observer in observers]
-        observers = []
         result["status"] = "passed"
     except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
         result["failure_type"] = type(error).__name__
         if isinstance(error, Blocked):
             result["reason"] = str(error)
     finally:
-        for observer in observers:
-            try:
-                observer.finish()
-            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
-                observer.abort()
-                result["status"] = "failed"
         for guest in guests:
             if guest.connection is not None and any(worker.is_alive() for worker in workers):
                 try:
@@ -662,6 +729,9 @@ def native_scale(args, host):
                 result["status"] = "failed"
         for worker in workers:
             worker.join(timeout=5)
+        if not result.get("cleanup_failed"):
+            result.setdefault("background_controls", []).append(
+                visible_cpu.quiet(60, host["visible_logical_cores"]))
         save(out / "result.json", result)
     return 0 if result["status"] == "passed" else 1
 
@@ -734,28 +804,30 @@ def freeze(samples, pins):
     for name in performance.WORKLOADS:
         rows = [next(row for row in sample["rows"] if row["name"] == name) for sample in samples]
         if any(row["status"] != "passed"
-               or not isinstance(row["known_scoped_cpu_per_operation"], (int, float))
-               or not math.isfinite(row["known_scoped_cpu_per_operation"])
-               or row["known_scoped_cpu_per_operation"] < 0
-               or (name != "idle" and row["known_scoped_cpu_per_operation"] == 0)
+               or not isinstance(row["visible_host_cpu_per_operation"], (int, float))
+               or not math.isfinite(row["visible_host_cpu_per_operation"])
+               or row["visible_host_cpu_per_operation"] < 0
+               or (name != "idle" and row["visible_host_cpu_per_operation"] == 0)
                or not math.isfinite(row["latency"]["p95"]) or row["latency"]["p95"] <= 0
                or not math.isfinite(row["bytes_per_second"]) or row["bytes_per_second"] < 0
                or (row["bytes"] and row["bytes_per_second"] == 0)
                or (name != "idle" and row["operation_seconds"] < 5) for row in rows):
             raise Blocked("CPU unavailable/zero or sustained baseline incomplete")
         noise[name] = {
-            "known_scoped_cpu_per_operation": performance.summary([row["known_scoped_cpu_per_operation"] for row in rows]),
+            "visible_host_cpu_per_operation": performance.summary([row["visible_host_cpu_per_operation"] for row in rows]),
             "p95_ms": performance.summary([row["latency"]["p95"] for row in rows]),
             "throughput": performance.summary([row["bytes_per_second"] for row in rows]) if rows[0]["bytes"] else None,
         }
     exceeds = [name for name, data in noise.items() if name != "idle" and
-               (data["known_scoped_cpu_per_operation"]["cv"] > .1 or data["p95_ms"]["cv"] > .1
+               (data["visible_host_cpu_per_operation"]["cv"] > .1 or data["p95_ms"]["cv"] > .1
                 or (data["throughput"] and data["throughput"]["cv"] > .05))]
     return {"status": "noise-inconclusive" if exceeds else "noise-provisionally-acceptable",
             "candidate_performance_observed": False, "pins_sha256": hashlib.sha256(json.dumps(pins, sort_keys=True).encode()).hexdigest(),
             "gates": GATES, "noise": noise, "exceeds_noise_caps": exceeds,
-            "cpu_scope": "known all-task plus tagged IRQFD function work; not complete marginal kernel CPU",
-            "full_kernel_accounting": False, "unmeasured_kernel_work": KERNEL_GAPS}
+            "cpu_scope": visible_cpu.SCOPE, "background_subtracted": False, "owned_detail_added": False,
+            "background_bound": visible_cpu.background_upper(
+                [control for sample in samples for control in sample["background_controls"]]),
+            "owned_attribution_gaps": KERNEL_GAPS}
 
 
 def paired_interval(control_values, candidates):
@@ -772,8 +844,13 @@ def paired_interval(control_values, candidates):
 
 def compare(blocks):
     result = {"status": "blocked-incomplete-qualification", "performance_merge_eligible": False,
-              "full_kernel_accounting": False, "unmeasured_kernel_work": KERNEL_GAPS,
+              "cpu_scope": visible_cpu.SCOPE, "background_subtracted": False, "owned_detail_added": False,
+              "owned_attribution_gaps": KERNEL_GAPS,
               "unexecuted_required_coverage": REQUIRED_GAPS, "contrasts": {}}
+    background = visible_cpu.background_upper(
+        [control for block in blocks for sample in block.values()
+         for control in sample["background_controls"]])
+    result["background_bound"] = background
     result["diagnostic_gate_checks"] = {}
     for candidate, baseline in (("C10", "C00"), ("C01", "C00"), ("C11", "C00"),
                                 ("C11", "C01"), ("C11", "C10")):
@@ -784,36 +861,62 @@ def compare(blocks):
                 for block in blocks:
                     pair = [next(row for row in block[mode]["rows"] if row["name"] == name)
                             for mode in (baseline, candidate)]
-                    differences.append(100 * (pair[1]["known_scoped_cpu_seconds"] / pair[1]["operation_seconds"]
-                                              - pair[0]["known_scoped_cpu_seconds"] / pair[0]["operation_seconds"]))
-                contrast[name] = {"known_cpu_extra_core_pp": differences, "complete_idle_cpu": False}
+                    differences.append(100 * (pair[1]["visible_host_cpu"]["busy_core_equivalents"]
+                                              - pair[0]["visible_host_cpu"]["busy_core_equivalents"]))
+                contrast[name] = {"visible_busy_extra_core_pp": differences,
+                                  "single60s_agent_idle_is_not_pure_HLT_scaling": True}
                 continue
             values = {}
-            for metric in ("known_scoped_cpu_per_operation", "p95_ms", "bytes_per_second"):
+            for metric in ("visible_host_cpu_per_operation", "p95_ms", "bytes_per_second"):
                 arrays = [[next(row for row in block[mode]["rows"] if row["name"] == name) for block in blocks]
                           for mode in (baseline, candidate)]
                 extract = lambda row: row["latency"]["p95"] if metric == "p95_ms" else row[metric]
                 if metric == "bytes_per_second" and not arrays[0][0]["bytes"]:
                     continue
                 values[metric] = paired_interval(*[[extract(row) for row in rows] for rows in arrays])
+                if metric == "visible_host_cpu_per_operation":
+                    budgets = [visible_cpu.residual_fraction(old, new, background)
+                               for old, new in zip(*arrays)]
+                    bounds = [visible_cpu.sensitivity_bounds(
+                        old, new, background, values[metric]["lower_ratio"], values[metric]["upper_ratio"])
+                        for old, new in zip(*arrays)]
+                    values[metric]["residual_bound_fraction"] = max(budgets)
+                    values[metric]["control_denominator_may_be_all_residual"] = any(
+                        bound["control_denominator_may_be_all_residual"] for bound in bounds)
+                    values[metric]["conservative_upper_ratio"] = (
+                        None if values[metric]["control_denominator_may_be_all_residual"]
+                        else max(bound["conservative_upper_ratio"] for bound in bounds))
+                    values[metric]["conservative_lower_ratio"] = min(
+                        bound["conservative_lower_ratio"] for bound in bounds)
+                    values[metric]["background_subtracted"] = False
             contrast[name] = values
         result["contrasts"][f"{candidate}/{baseline}"] = contrast
         if baseline == "C00":
             regressions = []
+            uncertainty = []
             for name, metrics in contrast.items():
                 if name == "idle":
-                    if any(value > .1 for value in metrics["known_cpu_extra_core_pp"]):
-                        regressions.append({"name": name, "metric": "known idle CPU"})
+                    uncertainty.append({"name": name, "metric": "single-agent idle requires repeated pure-HLT/background bound"})
                     continue
                 for metric, interval in metrics.items():
                     if ((metric == "bytes_per_second" and interval["upper_ratio"] < .97)
-                            or (metric != "bytes_per_second" and interval["lower_ratio"] > 1.05)):
+                            or (metric == "visible_host_cpu_per_operation" and interval["conservative_lower_ratio"] > 1.05)
+                            or (metric == "p95_ms" and interval["lower_ratio"] > 1.05)):
                         regressions.append({"name": name, "metric": metric, "paired95": interval})
+                    if ((metric == "visible_host_cpu_per_operation" and (
+                            interval["conservative_upper_ratio"] is None or interval["conservative_upper_ratio"] > 1.05))
+                            or (metric == "p95_ms" and interval["upper_ratio"] > 1.05)
+                            or (metric == "bytes_per_second" and interval["lower_ratio"] < .97)):
+                        uncertainty.append({"name": name, "metric": metric})
+            primary = contrast["disk-flush-4096"]["visible_host_cpu_per_operation"]["conservative_upper_ratio"]
             result["diagnostic_gate_checks"][candidate] = {
-                "known_primary_benefit_95_lower_at_least_10_percent":
-                    contrast["disk-flush-4096"]["known_scoped_cpu_per_operation"]["upper_ratio"] <= .9,
+                "visible_primary_benefit_95_lower_at_least_10_percent":
+                    primary is not None and primary <= .9,
                 "demonstrated_regressions": regressions,
-                "full_cpu_benefit": "unavailable; incomplete affected kernel CPU",
+                "residual_could_hide_required_benefit":
+                    primary is None or primary > .9,
+                "regression_bounds_inconclusive": uncertainty,
+                "visible_CPU_scope": visible_cpu.SCOPE,
                 "qualified": False}
     result["all_candidates_have_demonstrated_regression"] = all(
         result["diagnostic_gate_checks"][mode]["demonstrated_regressions"] for mode in MODES[1:])
@@ -868,7 +971,7 @@ def qualify(expected):
         raise Blocked("not the approved exact-source ephemeral hosted job")
     if subprocess.run(["git", "diff", "--quiet", "HEAD"], cwd=bench.ROOT).returncode:
         raise Blocked("tracked working source differs from the approved immutable head")
-    deadline = time.monotonic() + 100 * 60
+    deadline = time.monotonic() + 160 * 60
     phases = []
     decision = {"status": "blocked", "source": source, "performance_merge_eligible": False,
                 "default": "legacy", "auto_merge": False}
@@ -882,8 +985,12 @@ def qualify(expected):
                        "candidate_order": [["C10", "C01", "C11"], ["C01", "C11", "C10"], ["C11", "C10", "C01"],
                                            ["C01", "C10", "C11"], ["C11", "C01", "C10"]],
                        "paired_model": "paired log-ratio Student-t(df4), two-sided95%",
-                       "qualification_requires_complete_kernel_accounting": True,
-                       "unmeasured_kernel_work": KERNEL_GAPS, "required_coverage": REQUIRED_GAPS}
+                       "primary_cpu": visible_cpu.SCOPE,
+                       "fixed_completion_tail_seconds": .1, "background_subtracted": False,
+                       "owned_task_BPF_detail_added_to_primary": False,
+                       "background_controls": "before+after no-VM5.1s/matrix;60s/native idle",
+                       "residual_policy": "worst-case background/counter/read perturbation of paired95% ratio must preserve unchanged gates; measured CPU untouched",
+                       "owned_attribution_gaps": KERNEL_GAPS, "required_coverage": REQUIRED_GAPS}
         save(PUBLIC / "preregister.json", preregister)
         samples = [run_cell(f"aa-{index}", "C00", phases, deadline) for index in range(5)]
         gates = freeze(samples, pins)
@@ -921,15 +1028,24 @@ def qualify(expected):
                     run_cell(f"native-scale-{count}-{mode}", mode, phases, deadline, scale_count=count)
             decision["status"] = ("negative-proven-required-regressions"
                                   if comparison["all_candidates_have_demonstrated_regression"]
-                                  else "blocked-incomplete-kernel-lifecycle-scaling-qualification")
-            decision["unmeasured_kernel_work"] = KERNEL_GAPS
+                                  else "blocked-incomplete-lifecycle-scaling-qualification")
+            decision["owned_attribution_gaps"] = KERNEL_GAPS
             decision["unexecuted_required_coverage"] = REQUIRED_GAPS
             decision["reason"] = ("each candidate has a demonstrated mandatory paired regression"
                                   if comparison["all_candidates_have_demonstrated_regression"]
-                                  else "paired diagnostics are not full affected-CPU or complete adoption evidence")
+                                  else "visible total CPU still requires bounded residual uncertainty and complete adoption coverage")
     except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
         decision["reason"] = str(error) if isinstance(error, Blocked) else type(error).__name__
     finally:
+        try:
+            decision["owned_input_image_cleanup"] = remove_owned_images(HOME, ("bzImage", "disk-probe"))
+            for name in ("fixture", "native-fixture"):
+                decision.setdefault("owned_input_image_cleanup", []).extend(
+                    remove_owned_images(HOME / name, ("initrd.cpio.gz",)))
+        except (OSError, ValueError, RuntimeError):
+            decision["owned_image_cleanup_failed"] = True
+            decision["measurement_decision_before_cleanup"] = decision["status"]
+            decision["status"] = "blocked-owned-image-cleanup"
         save(PUBLIC / "decision.json", decision)
         receipt(expected)
         print(json.dumps(decision))
