@@ -104,8 +104,12 @@ numeric PID reuse; failed collector flushing invalidates the capture after
 owned-group cleanup. The current focused21 tests and four actual API-only
 Debug/safe×LLVM/native jail/pidfd/stat/teardown controls pass. Those API-only
 controls are not guest/KVM performance acceptance. v5 correctly rejects its
-stale recorder hash; independently frozen v6 guest pilots form a new epoch,
-not pooled acceptance of earlier recorder/RSS-method measurements.
+stale recorder hash. At the common-prerequisite coordinator's request, the
+queued v6 phase is stopped before manifest preparation/VM startup pending a
+validated correctness-only bridge and independent enforced-jail fixture.
+The owned socket directory is empty and no fleet lock is held. No v6 rows
+execute. Resume only after the bridge's exact hash/commands arrive, then freeze
+new identities; do not pool earlier recorder/RSS-method measurements.
 
 ## Evidence and fixed scope
 

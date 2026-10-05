@@ -178,8 +178,13 @@ enforced-jail controls verify current-guard pidfd acquisition, nonempty inherite
 software stat and complete owned teardown. They are **not guest/KVM/runtime
 performance acceptance**. A stale v5 runtime manifest explicitly rejects the
 changed recorder hash; that is an identity-guard diagnostic, not a backend
-failure. Fresh v6 guest pilots use separately frozen current script hashes,
-without pooling their recorder/RSS-method epoch into earlier measurements.
+failure. The common-prerequisite coordinator then requests pausing CPU work
+until its correctness-only bridge and independent enforced-jail fixture are
+validated. The queued v6 phase is stopped **before manifest preparation or any
+VM**, with an empty owned socket directory and no held fleet lock. No v6 guest
+row is executed or claimed. Resumption must freeze the supplied validated
+bridge/fixture and current script hashes in a new epoch, not pool the changed
+recorder/RSS method into earlier measurements.
 
 This is an experiment specification, not a benchmark result
 or decision to change defaults. The compiler migration in
