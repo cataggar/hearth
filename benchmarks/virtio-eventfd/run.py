@@ -224,33 +224,43 @@ def send_message(connection, request):
     connection.sendall(struct.pack("<I", len(payload)) + payload)
 
 
-def receive_message(connection):
+def receive_message(connection, progress=None, stage="agent-rpc"):
+    if progress is not None:
+        progress(stage, "receive-header")
     size = struct.unpack("<I", recv_exact(connection, 4))[0]
     if size > 16 * 1024 * 1024:
         raise ValueError("oversized guest response")
+    if progress is not None:
+        progress(stage, "receive-body")
     return json.loads(recv_exact(connection, size))
 
 
-def rpc(connection, request):
+def rpc(connection, request, progress=None):
+    if progress is not None:
+        progress("agent-rpc", "send-frame")
     send_message(connection, request)
-    return receive_message(connection)
+    return receive_message(connection, progress)
 
 
-def interactive(connection, command_text, expected):
+def interactive(connection, command_text, expected, progress=None):
     started = time.monotonic()
+    if progress is not None:
+        progress("pty-spawn", "send-frame")
     send_message(connection, {
         "method": "spawn", "cmd": command_text, "interactive": True, "cols": 80, "rows": 24,
     })
     output = bytearray()
     first_byte_ms = None
     while True:
-        message = receive_message(connection)
+        message = receive_message(connection, progress, "pty-stream")
         if message.get("type") == "stdout":
             data = base64.b64decode(message["data"], validate=True)
             if data and first_byte_ms is None:
                 first_byte_ms = (time.monotonic() - started) * 1000
             output.extend(data)
         elif message.get("type") == "exit":
+            if progress is not None:
+                progress("pty-exit", "validate")
             if message.get("code") != 0 or bytes(output) != expected.encode() or first_byte_ms is None:
                 raise ValueError(f"PTY integrity/exit mismatch: {message}, stdout={bytes(output)!r}")
             return {"ok": True, "first_byte_ms": first_byte_ms, "stdout": base64.b64encode(output).decode()}

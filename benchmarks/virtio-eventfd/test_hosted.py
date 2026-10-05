@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import socket
+import struct
 import subprocess
 import sys
 import threading
@@ -38,6 +40,108 @@ def matrices():
 
 
 class HostedGuards(unittest.TestCase):
+    def test_actual_pty_frame_timeout_retains_allowlisted_header_and_body_points(self):
+        for body in (False, True):
+            with self.subTest(body=body):
+                client, peer = socket.socketpair()
+                with client, peer:
+                    client.settimeout(.05)
+                    if body:
+                        peer.sendall(struct.pack("<I", 9))
+                    else:
+                        payload = json.dumps({"type": "stdout", "data": "UFRZ"}).encode()
+                        peer.sendall(struct.pack("<I", len(payload)) + payload)
+                    progress = hosted.WorkloadProgress("interactive")
+                    with self.assertRaises(TimeoutError) as caught:
+                        performance.workload(SimpleNamespace(connection=client), None,
+                                             "interactive", progress.point)
+                    if not body:
+                        self.assertEqual(hosted.hashlib.sha256(str(caught.exception).encode()).hexdigest(),
+                                         "c1da153ef0b9b0a0d96c2cf3178d31a6c91488fdbc21bbe34e8a689798fddf29")
+                    location = progress.snapshot()
+                    self.assertEqual(location["workload"], "interactive")
+                    self.assertEqual(location["suboperations"]["interactive"], {
+                        "substage": "pty-stream",
+                        "error_point": "receive-body" if body else "receive-header",
+                        "operation_index": 0,
+                    })
+                    self.assertNotIn("PTY", json.dumps(location))
+
+    def test_progress_rejects_unknown_and_keeps_concurrent_sources_separate(self):
+        progress = hosted.WorkloadProgress("concurrent")
+        progress.point("tap-65536", "native-echo", "exchange", 8)
+        progress.point("vsock-65536", "native-echo", "exchange", 9)
+        self.assertEqual(set(progress.snapshot()["suboperations"]),
+                         {"concurrent", "tap-65536", "vsock-65536"})
+        original = progress.snapshot()
+        for workload, stage, point, index in (
+                ("PRIVATE", "native-echo", "exchange", 0),
+                ("exec", "PRIVATE", "receive-header", 0),
+                ("exec", "agent-rpc", "PRIVATE", 0),
+                ("exec", "agent-rpc", "receive-header", True)):
+            with self.assertRaisesRegex(hosted.Blocked, "source-allowlisted"):
+                progress.point(workload, stage, point, index)
+        self.assertEqual(progress.snapshot(), original)
+        self.assertNotIn("PRIVATE", json.dumps(progress.snapshot()))
+        progress.point("concurrent", "workload", "begin", 0)
+        self.assertEqual(set(progress.snapshot()["suboperations"]), {"concurrent"})
+
+    def test_failed_cell_persists_preoperation_and_fine_context_without_raw_error(self):
+        root = hosted.bench.ROOT / ".perf/eventfd" / f"aa-location-test-{os.getpid()}"
+        root.mkdir(mode=0o700, parents=True, exist_ok=False)
+        stages = []
+        original = hosted.save
+
+        class Guest:
+            def __init__(self, *_args, **_kwargs):
+                self.native_connection = None
+                self.path = root
+
+            def close(self):
+                raise RuntimeError("PRIVATE cleanup failure")
+
+        def recorded_save(path, result):
+            if path.name == "result.json":
+                stages.append(copy.deepcopy(result))
+            original(path, result)
+
+        def failed_sample(_guest, _tcp, name, _cores, progress):
+            self.assertEqual(name, "interactive")
+            progress.point(name, "pty-stream", "receive-header", 7)
+            raise TimeoutError("PRIVATE guest stderr/argv")
+
+        from unittest.mock import Mock
+        tcp = Mock()
+        (root / "host.json").write_text(json.dumps(
+            {"client_cpu": 0, "vm_cpu": 2, "visible_logical_cores": 4}))
+        with patch.object(hosted.os, "geteuid", return_value=1000), \
+                patch.object(hosted.os, "sched_setaffinity"), \
+                patch.object(hosted, "PUBLIC", root), \
+                patch.object(hosted, "validate_pins"), \
+                patch.object(hosted.visible_cpu, "quiet", return_value={}), \
+                patch.object(hosted.control, "Guest", Guest), \
+                patch.object(hosted.socket, "create_connection", return_value=tcp), \
+                patch.object(hosted.control, "agent"), \
+                patch.object(hosted.bench, "native_echo"), \
+                patch.object(hosted.time, "sleep"), \
+                patch.object(hosted.performance, "WORKLOADS", ["interactive"]), \
+                patch.object(hosted, "sample", side_effect=failed_sample), \
+                patch.object(hosted, "save", side_effect=recorded_save):
+            try:
+                self.assertEqual(hosted.cell(SimpleNamespace(
+                    out=root, mode="C00", profile=None, scale_count=None, lifecycle=False)), 1)
+            finally:
+                shutil.rmtree(root)
+        self.assertEqual(stages[0]["active_workload"]["suboperations"]["interactive"]["error_point"], "begin")
+        final = stages[-1]
+        self.assertEqual(final["failure_type"], "TimeoutError")
+        self.assertEqual(final["active_workload"]["suboperations"]["interactive"]["operation_index"], 7)
+        self.assertEqual(final["active_workload"]["suboperations"]["interactive"]["error_point"], "receive-header")
+        self.assertEqual(final["status"], "failed")
+        self.assertEqual(final["active_phase"], "matrix")
+        self.assertTrue(final["cleanup_failed"])
+        self.assertNotIn("PRIVATE", json.dumps(final))
+
     def test_redirected_cache_prepares_native_fixture_parent_before_build(self):
         root = hosted.bench.ROOT / ".perf/eventfd" / f"hosted-cache-test-{os.getpid()}"
         (root / "vmm").mkdir(mode=0o700, parents=True, exist_ok=False)

@@ -35,12 +35,21 @@ def summary(values):
             "cv": statistics.stdev(values) / statistics.mean(values) if len(values) > 1 and statistics.mean(values) else 0}
 
 
-def workload(guest, tcp, name):
+def workload(guest, tcp, name, progress=None):
+    def point(stage, error_point, operation=0):
+        if progress is not None:
+            progress(name, stage, error_point, operation)
+
     latency, bytes_done = [], 0
+    point("workload", "begin")
+    rpc_progress = ({"progress": lambda stage, error_point: point(stage, error_point)}
+                    if progress is not None else {})
     if name.startswith("disk-"):
         _, operation, size = name.split("-")
         block = int(size)
-        data = json.loads(matrix.rpc_exec(guest, f"/disk-probe {operation} {block} {128 if block == 4096 else 16}", 25))
+        data = json.loads(matrix.rpc_exec(
+            guest, f"/disk-probe {operation} {block} {128 if block == 4096 else 16}", 25,
+            **rpc_progress))
         latency = [value / 1e6 for value in data["latency_ns"]]
         bytes_done = data["operations"] * block
         return latency, bytes_done, data
@@ -48,28 +57,36 @@ def workload(guest, tcp, name):
         transport, size = name.split("-")
         connection = guest.native_connection if transport == "vsock" else tcp
         for index in range(128 if int(size) < 65536 else 64):
+            point("native-echo", "exchange", index)
             started = time.monotonic()
             bench.native_echo(connection, index, int(size))
             latency.append((time.monotonic() - started) * 1000)
             bytes_done += int(size) * 2
         return latency, bytes_done, {"integrity": "all payloads+FNV+sequence verified", "messages": len(latency)}
     if name == "slow-reader":
+        point("native-backpressure", "exchange")
         started = time.monotonic()
         checked = bench.native_backpressure(guest.native_connection, 200, 65536)
         return [(time.monotonic() - started) * 1000], 2 * 8 * 65536, checked
     if name == "exec":
-        for _ in range(64):
+        for index in range(64):
+            rpc_progress = ({"progress": lambda stage, error_point: point(stage, error_point, index)}
+                            if progress is not None else {})
             started = time.monotonic()
-            if matrix.rpc_exec(guest, "printf EXEC") != b"EXEC":
+            if matrix.rpc_exec(guest, "printf EXEC", **rpc_progress) != b"EXEC":
                 raise ValueError("exec integrity failure")
             latency.append((time.monotonic() - started) * 1000)
         return latency, 0, {"commands": 64, "agent_unchanged": True}
     if name == "interactive":
         details = []
-        for _ in range(32):
-            details.append(bench.interactive(guest.connection, "printf PTY", "PTY"))
+        for index in range(32):
+            rpc_progress = ({"progress": lambda stage, error_point: point(stage, error_point, index)}
+                            if progress is not None else {})
+            details.append(bench.interactive(
+                guest.connection, "printf PTY", "PTY", **rpc_progress))
         return [row["first_byte_ms"] for row in details], 0, {"samples": details, "agent_poll_ms": 50}
     if name == "idle":
+        point("idle", "wait")
         time.sleep(60)
         return [60000], 0, {"silence_seconds": 60, "agent_connected": True, "agent_poll_ms": 50,
                            "native_readers_blocking": True, "host_heartbeat": False}
@@ -77,14 +94,14 @@ def workload(guest, tcp, name):
         results, errors = {}, []
         def execute(key):
             try:
-                results[key] = workload(guest, tcp, key)
+                results[key] = workload(guest, tcp, key, progress)
             except Exception as error:
                 errors.append(f"{key}: {error}")
         workers = [threading.Thread(target=execute, args=(key,)) for key in ("tap-65536", "vsock-65536")]
         for worker in workers:
             worker.start()
-        results["disk-flush-4096"] = workload(guest, tcp, "disk-flush-4096")
-        results["interactive"] = workload(guest, tcp, "interactive")
+        results["disk-flush-4096"] = workload(guest, tcp, "disk-flush-4096", progress)
+        results["interactive"] = workload(guest, tcp, "interactive", progress)
         for worker in workers:
             worker.join(timeout=30)
         if errors or any(worker.is_alive() for worker in workers):
@@ -93,11 +110,14 @@ def workload(guest, tcp, name):
             key: {"latency_ms": row[0], "verified": row[2]} for key, row in results.items()}
     if name == "lifecycle":
         values = []
-        for _ in range(20):
+        for index in range(20):
+            point("lifecycle", "pause", index)
             started = time.monotonic()
             guest.api("PATCH", "/vm", {"state": "Paused"})
             values.append((time.monotonic() - started) * 1000)
+            point("lifecycle", "resume", index)
             guest.api("PATCH", "/vm", {"state": "Resumed"})
+            point("lifecycle", "wake", index)
             bench.native_echo(guest.native_connection, 500, 64)
         return values, 0, {"pause_resume_transitions": 20}
     raise ValueError(f"unknown workload {name}")

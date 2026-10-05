@@ -4,6 +4,26 @@
 
 ### Hosted prerequisite failure diagnostics
 
+For workload failures, record the source-allowlisted active workload, batch,
+substage and error point before operations. Stream diagnostics distinguish
+request send, four-byte header receive, body receive and PTY exit validation,
+without guest data, argv, raw error text, traces or inventories. Keep concurrent
+subworkloads separately identified; cleanup must not overwrite the failure
+location. Persist a coarse pre-workload checkpoint outside the measured window;
+fine substage updates are in-memory and saved on failure, not per-frame disk I/O.
+Unknown labels fail explicitly, never become a guessed stage or success.
+Fixed outer phase labels distinguish boot/warmup, matrix/profile, disk
+integrity and shutdown; a new batch clears stale concurrent substage records.
+
+Third hosted37337531285/8a30 is terminal: actual perf ACK admission and native
+71/71 succeed, then aa-0 retains13 passed cells through exec4480 before
+TimeoutError. Its hash exactly matches the source's fixed empty four-byte
+receive-header error template, proving that boundary but not its PTY operation
+index or VM/agent cause. No complete A/A/gate freeze/profile/candidate exists.
+The previous Intel complete-control epoch has identical native/agent source
+hashes, but different ELF/fixture hashes and hardware; it is not acceptance for
+this AMD host. Do not repair an unproved runtime cause or expand deadlines.
+
 Hosted run37323212257 at71bbd4a is a terminal failed epoch: Debug returned1,
 66/71 actual tests passed, no skips, coverage rejected, before any A/A or
 candidate collection. Its public receipt contains only the stderr hash, so the

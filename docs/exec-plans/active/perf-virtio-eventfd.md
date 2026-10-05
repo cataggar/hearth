@@ -4,6 +4,31 @@
 
 **Date**: 2026-10-04
 
+### Third hosted epoch — bounded empty-frame timeout attribution
+
+Preserve14 original JSONs/13 hashes from37337531285/8a30. Pre-build actual
+perf6.17.13/same binary ACK epochs1..3 pass with clean custody; native/jail/builds
+pass. aa-0 retains13 complete cells (five disk, three TAP, three vsock,
+slow-reader, exec4480), then TimeoutError/errnoNone. Supervision passes/no
+survivor/error/unsafe. No complete controls/gates/profiles/candidates/gain.
+
+The fixed source-only template `receive timed out: received=0, expected=4,
+partial_sha256=<empty SHA>` exactly matches recorded messageSHAc1da153e.
+This identifies an empty agent frame-header wait, not the active workload/
+operation or underlying guest/vsock cause. Ordering suggests interactive but
+the old receipt cannot prove its substage. Current/previous complete controls
+share native/agent source digests, not ELF/fixture/hardware identity; no borrowing.
+Inspect PTY/exec/reconnect paths, but do not change runtime policy speculatively.
+
+Add allowlisted workload/batch/substage/error-point updates before operations
+to existing helpers, with coarse pre-window persistence and cheap fine updates
+saved on failure. Preserve fail-closed errors, concurrent source attribution
+and the original failure through cleanup. Real framed socket-pair regressions
+exercise a withheld PTY header/body and safe omission; use ordinary exact-source
+CI only. No new local heavy/probe/fullmatrix: capacity2,672,779,264B below3GiB.
+No timeout/retry/class removal/default/heartbeat/gate/cap/budget/label/rerun.
+Report historical runtime attribution unresolved unless independently proved.
+
 ### Second hosted epoch — exact perf ACK correction
 
 Preserve20 original allowlisted JSONs from37327822801/5cdb as terminal.

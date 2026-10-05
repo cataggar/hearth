@@ -20,6 +20,46 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Third hosted epoch — partial A/A empty-frame timeout, unresolved runtime cause
+
+[37337531285](https://github.com/cataggar/hearth/actions/runs/37337531285)
+at8a30 is terminal FAILURE after7m36s. Debug/Safe71/71/no skips, both jail
+phases and agent/native/disk/observer builds pass. Actual pre-build perf6.17.13,
+binarySHA2d0953, completes disable1/enable2/disable3 with five-byte ACK
+`61636b0a00` and clean supervision. This actually exercises the earlier
+correction; it is not an unsupported ACK/PMU/capability explanation.
+The new nested AMD/svm D4ads host differs from the prior Intel/vmx D4ds.
+
+aa-0 retains13 PASSED rows: five disk, three TAP, three vsock, slow-reader,
+then exec4480. It fails with TimeoutError/errnoNone, messageSHA
+`c1da153ef0b9b0a0d96c2cf3178d31a6c91488fdbc21bbe34e8a689798fddf29`.
+The source's fixed empty four-byte agent-header timeout template hashes
+exactly to that value. This identifies a stream boundary, **not its historical
+workload/PTY operation or VM/agent cause**. The old receipt has no stage marker;
+the next workload's position in the list is not proof. Custody passes/controller1,
+330s work/30s cleanup, actual cleanup.000953151s, no survivors/errors/unsafe.
+The original14 JSONs/13 verified hashes remain private; selected immutable facts
+are in [the terminal receipt](hosted-aa-timeout-receipt.json).
+
+The previous completed controls share native/agent source hashes, but their
+Safe ELF/combined initrd hashes and hardware differ. Neither those controls nor
+the partial13 rows are reused, extended or accepted as a complete cohort.
+There is no current gate freeze/profile/candidate/gain. All three hosted epochs
+remain terminal and performance-merge eligibility stays false.
+
+The bounded change adds fixed-source workload/batch/substage/error-point
+attribution before operations. A coarse checkpoint is persisted outside the
+measured window; finer callbacks remain in memory until failure. Concurrent
+sources remain separate and cleanup cannot replace the original location.
+No guest output, command text, raw errors, stacks or inventories are published.
+Three guards exercise real framed socket-pair header/body timeouts, unknown-label
+rejection/concurrent separation, and actual safe failed-cell persistence through
+a second cleanup failure. These are harness/stream tests, not KVM cause proof.
+Ordinary exact-source CI is pending at initial publication; the local unchanged
+3GiB storage guard blocks tests/probes. No runtime/reconnect/deadline/retry/
+budget/gate/cap/heartbeat/default change, local heavy/fullmatrix, label mutation
+or qualification rerun. Parent review alone permits a future fresh epoch.
+
 ## Second hosted epoch — exact control ACK defect, no candidate gain
 
 [37327822801](https://github.com/cataggar/hearth/actions/runs/37327822801)

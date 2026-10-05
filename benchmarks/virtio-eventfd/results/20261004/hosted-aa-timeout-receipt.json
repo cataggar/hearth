@@ -1,0 +1,91 @@
+{
+  "schema": "virtio-eventfd-hosted-aa-timeout-v1",
+  "run_id": 37337531285,
+  "run_attempt": 1,
+  "source": "8a30a10a130010f8a7973304b5ffc328da42f969",
+  "status": "terminal-independent-failed-epoch",
+  "qualification_job_seconds": 456,
+  "original_allowlisted_json_files": 14,
+  "verified_receipt_digests": 13,
+  "aa_0_sha256": "85a2af131e7933968c0da4cebf3d93292e035a16c07da2a34e503f80e96732d2",
+  "native": {
+    "Debug": {"test_counts": [[71, 71]], "skip_detected": false},
+    "ReleaseSafe": {"test_counts": [[71, 71]], "skip_detected": false},
+    "other_jail_agent_native_disk_observer_builds": "passed"
+  },
+  "host": {
+    "model": "nested AMD/svm Azure Standard_D4ads_v5",
+    "visible_logical_cpus": 4,
+    "visible_smt_pairs": [[0, 1], [2, 3]],
+    "capabilities": {"32": 1, "36": 1, "82": 1, "136": 1},
+    "same_hardware_as_previous_Intel_epoch": false
+  },
+  "actual_prebuild_perf_control_probe": {
+    "status": "passed",
+    "version": "6.17.13",
+    "binary_sha256": "2d0953085bf720a25efbe24f853e97d27b1f12f18a398255ff82cbafde254dad",
+    "fences": [
+      {"command": "disable", "epoch": 1, "ack_hex": "61636b0a00"},
+      {"command": "enable", "epoch": 2, "ack_hex": "61636b0a00"},
+      {"command": "disable", "epoch": 3, "ack_hex": "61636b0a00"}
+    ],
+    "supervision": "passed; controller0; no survivors/errors/unsafe registrations"
+  },
+  "aa_0": {
+    "mode": "C00",
+    "classification": "unprofiled matched matrix",
+    "status": "failed",
+    "passed_rows": [
+      {"name": "disk-read-4096", "operations": 28544},
+      {"name": "disk-write-4096", "operations": 13824},
+      {"name": "disk-flush-4096", "operations": 7168},
+      {"name": "disk-read-1048576", "operations": 6480},
+      {"name": "disk-write-1048576", "operations": 2384},
+      {"name": "tap-64", "operations": 128},
+      {"name": "tap-1400", "operations": 128},
+      {"name": "tap-65536", "operations": 448},
+      {"name": "vsock-64", "operations": 16768},
+      {"name": "vsock-4096", "operations": 5120},
+      {"name": "vsock-65536", "operations": 448},
+      {"name": "slow-reader", "operations": 15},
+      {"name": "exec", "operations": 4480}
+    ],
+    "failure_type": "TimeoutError",
+    "errno": null,
+    "failure_message_sha256": "c1da153ef0b9b0a0d96c2cf3178d31a6c91488fdbc21bbe34e8a689798fddf29",
+    "source_template_match": {
+      "template": "receive timed out: received=0, expected=4, partial_sha256=<SHA256 of empty bytes>",
+      "scope": "fixed empty agent frame-header wait; not underlying runtime cause",
+      "historical_active_workload_and_operation": "not recorded; ordering alone is not proof"
+    },
+    "supervision": {
+      "status": "passed",
+      "controller_returncode": 1,
+      "configured_work_budget_seconds": 330,
+      "work_budget_seconds": 329.99509279200004,
+      "cleanup_budget_seconds": 30,
+      "cleanup_seconds": 0.0009531510000329035,
+      "surviving_generations": [],
+      "cleanup_errors": [],
+      "unsafe_registrations": []
+    }
+  },
+  "comparison_with_previous_complete_controls": {
+    "native_and_agent_source_hashes": "identical",
+    "ReleaseSafe_ELF_hash": "different",
+    "combined_fixture_initrd_hash": "different",
+    "hardware": "different",
+    "borrowed_acceptance": false
+  },
+  "complete_aa_cohorts": 0,
+  "gate_freeze": false,
+  "profiles": 0,
+  "candidate_rows": 0,
+  "paired_gain_rows": 0,
+  "reuse_or_topup_allowed": false,
+  "historical_runtime_cause": "unresolved",
+  "performance_merge_eligible": false,
+  "gates_budgets_deadlines_retries_heartbeat_changed": false,
+  "default": "legacy",
+  "automatic_rerun": false
+}

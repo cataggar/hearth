@@ -467,17 +467,63 @@ def validate_pins():
         raise Blocked("frozen binary/kernel/fixture/accounting inputs changed")
 
 
-def sample(guest, tcp, name, visible_cores):
+PROGRESS_POINTS = frozenset({
+    ("workload", "begin"), ("accounting", "before"), ("accounting", "after"),
+    ("agent-rpc", "send-frame"), ("agent-rpc", "receive-header"), ("agent-rpc", "receive-body"),
+    ("pty-spawn", "send-frame"), ("pty-stream", "receive-header"),
+    ("pty-stream", "receive-body"), ("pty-exit", "validate"),
+    ("native-echo", "exchange"), ("native-backpressure", "exchange"),
+    ("idle", "wait"), ("idle-wake", "tap"), ("idle-wake", "vsock"),
+    ("lifecycle", "pause"), ("lifecycle", "resume"), ("lifecycle", "wake"),
+})
+
+
+class WorkloadProgress:
+    def __init__(self, name):
+        if name not in performance.WORKLOADS:
+            raise Blocked("unknown workload progress label")
+        self.name = name
+        self.batch = 0
+        self.operations = {}
+        self.lock = threading.Lock()
+        self.point(name, "workload", "begin", 0)
+
+    def point(self, workload, stage, error_point, operation):
+        if (workload not in performance.WORKLOADS or (stage, error_point) not in PROGRESS_POINTS
+                or type(operation) is not int or operation < 0):
+            raise Blocked("unknown source-allowlisted workload progress point")
+        with self.lock:
+            if workload == self.name and (stage, error_point) == ("workload", "begin"):
+                self.operations.clear()
+            self.operations[workload] = {
+                "substage": stage, "error_point": error_point, "operation_index": operation,
+            }
+
+    def snapshot(self):
+        with self.lock:
+            return {"workload": self.name, "batch_index": self.batch,
+                    "suboperations": {key: dict(value) for key, value in self.operations.items()}}
+
+
+def sample(guest, tcp, name, visible_cores, progress=None):
+    def point(stage, error_point):
+        if progress is not None:
+            progress.point(name, stage, error_point, 0)
+
+    point("accounting", "before")
     before = bench.thread_roster(guest.pid)
     client_before = time.process_time()
     host_before = visible_cpu.capture()
     started_ns = time.monotonic_ns()
     started = started_ns / 1e9
-    latency, byte_count, _ = performance.workload(guest, tcp, name)
+    progress_args = {"progress": progress.point} if progress is not None else {}
+    latency, byte_count, _ = performance.workload(guest, tcp, name, **progress_args)
     batches = 1
     if name != "idle":
         while time.monotonic() - started < 5:
-            more, size, _ = performance.workload(guest, tcp, name)
+            if progress is not None:
+                progress.batch = batches
+            more, size, _ = performance.workload(guest, tcp, name, **progress_args)
             latency.extend(more)
             byte_count += size
             batches += 1
@@ -490,6 +536,7 @@ def sample(guest, tcp, name, visible_cores):
     host_cpu["fixed_completion_tail_seconds"] = .1
     host_cpu["completed_workload_end_ns"] = completed_ns
     host_cpu["new_operations_in_tail"] = 0
+    point("accounting", "after")
     after = bench.thread_roster(guest.pid)
     cpu = bench.cpu_delta(before, after)
     if cpu < 0 or not latency:
@@ -510,6 +557,7 @@ def sample(guest, tcp, name, visible_cores):
     if name == "idle":
         result["idle_wake_ms"] = {}
         for kind, connection in (("vsock", guest.native_connection), ("tap", tcp)):
+            point("idle-wake", kind)
             began = time.monotonic()
             bench.native_echo(connection, 700, 64)
             result["idle_wake_ms"][kind] = 1000 * (time.monotonic() - began)
@@ -810,9 +858,11 @@ def cell(args):
               "classification": "profiled" if args.profile else "unprofiled matched matrix",
               "visible_host_cpu_method": visible_cpu.SCOPE, "owned_attribution_gaps": KERNEL_GAPS,
               "performance_merge_eligible": False}
-    guest, tcp, observer = None, None, None
+    guest, tcp, observer, progress = None, None, None, None
     try:
+        result["active_phase"] = "background-before"
         result["background_controls"] = [visible_cpu.quiet(5.1, host["visible_logical_cores"])]
+        result["active_phase"] = "boot"
         guest = control.Guest.__new__(control.Guest)
         guest.__init__(out, HOME / "flint-ReleaseSafe", args.mode, HOME / "fixture",
                        disk=True, tap="hef3tap0", vm_cpu=host["vm_cpu"])
@@ -826,25 +876,39 @@ def cell(args):
                 result["irqfd_function_detail_status"] = "unavailable; never substituted with zero"
         else:
             result["irqfd_function_detail_status"] = "not collected in unprofiled primary windows"
+        result["active_phase"] = "warmup"
         control.agent(guest, True)
         for connection in (tcp, guest.native_connection):
             bench.native_echo(connection, 600, 64)
         time.sleep(1)
+        result["active_phase"] = "profile" if args.profile else "matrix"
         if args.profile:
             profile(guest, observer, args, result)
         else:
             for name in performance.WORKLOADS:
-                result["rows"].append(sample(guest, tcp, name, host["visible_logical_cores"]))
+                progress = WorkloadProgress(name)
+                result["active_workload"] = progress.snapshot()
                 save(out / "result.json", result)
+                result["rows"].append(sample(
+                    guest, tcp, name, host["visible_logical_cores"], progress))
+                progress = None
+                result.pop("active_workload", None)
+                save(out / "result.json", result)
+        result["active_phase"] = "disk-integrity"
         checksum = matrix.rpc_exec(guest, "/bin/busybox sha256sum /dev/vda", 20).decode().split()[0]
         if checksum != bench.digest(guest.path / "disk"):
             raise ValueError("whole real disk guest/host integrity failure")
+        result["active_phase"] = "shutdown"
         result["shutdown_exit_code"] = guest.shutdown()
         if observer is not None:
+            result["active_phase"] = "observer-final"
             result["kernel_work_final"] = observer_detail(observer, result, "final", finish=True)
             observer = None
+        result.pop("active_phase", None)
         result["status"] = "passed"
     except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
+        if progress is not None:
+            result["active_workload"] = progress.snapshot()
         result["failure_type"] = type(error).__name__
         if isinstance(error, Blocked):
             result["reason"] = str(error)
