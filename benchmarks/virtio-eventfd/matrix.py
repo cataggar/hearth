@@ -83,7 +83,8 @@ def prepare(args):
 
 
 def rpc_exec(guest, command, timeout=15, progress=None):
-    reply = bench.rpc(guest.connection, {"method": "exec", "cmd": command, "timeout": timeout}, progress)
+    progress_args = {"progress": progress} if progress is not None else {}
+    reply = bench.rpc(guest.connection, {"method": "exec", "cmd": command, "timeout": timeout}, **progress_args)
     if not reply.get("ok") or reply.get("exit_code") != 0:
         raise ValueError(f"guest command failed: {reply}")
     return base64.b64decode(reply.get("stdout", ""), validate=True)
