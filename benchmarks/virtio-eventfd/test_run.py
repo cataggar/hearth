@@ -7,11 +7,13 @@ import io
 import json
 from pathlib import Path
 import shutil
+import signal
 import socket
 import struct
 import subprocess
 import sys
 import threading
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -381,6 +383,53 @@ class HarnessReviewTests(unittest.TestCase):
                         (self.root / "run-disk").touch()
                     elif state == "completed":
                         (self.root / "disk-done").unlink()
+
+    def test_disk_barrier_rejects_actual_sigstop_and_accepts_same_generation_after_sigcont(self):
+        process = self.launch_disk()
+
+        def await_stopped(stopped):
+            deadline = time.monotonic() + 2
+            while True:
+                stat = Path(f"/proc/{process.pid}/stat").read_bytes()
+                state = stat.rpartition(b") ")[2].split()[0]
+                if (state in (b"T", b"t")) == stopped:
+                    return
+                if time.monotonic() >= deadline:
+                    self.fail(f"owned child stop acknowledgement timed out: {state!r}")
+                time.sleep(.005)
+
+        with patch.object(matrix.bench, "rpc", side_effect=self.disk_rpc):
+            identity = matrix.disk_running(self.guest)
+            try:
+                process.send_signal(signal.SIGSTOP)
+                await_stopped(True)
+                self.assertTrue((self.root / "run-disk").is_file())
+                self.assertFalse((self.root / "disk-done").exists())
+                for startup in (False, True):
+                    with self.subTest(startup=startup), \
+                         self.assertRaisesRegex(RuntimeError, "live disk-load shell"):
+                        matrix.disk_running(self.guest, identity, startup=startup)
+            finally:
+                process.send_signal(signal.SIGCONT)
+                await_stopped(False)
+            self.assertEqual(matrix.disk_running(self.guest, identity), identity)
+
+    def test_stopped_and_traced_producers_fail_capture_and_startup_without_retry(self):
+        started = {"ok": True, "exit_code": 0, "stdout": base64.b64encode(b"STARTED").decode()}
+        pending_command = b"/bin/sh\0-c\0" + matrix.DISK_START_COMMAND.encode() + b"\0"
+        for state in (b"T", b"t"):
+            with self.subTest(state=state), \
+                 patch.object(matrix.bench, "rpc", return_value=self.disk_reply(b"/bin/sh\0/disk-load\0", state=state)):
+                with self.assertRaisesRegex(RuntimeError, "live disk-load shell"):
+                    matrix.disk_running(self.guest, {"pid": 42, "start_ticks": 123})
+            with self.subTest(startup_state=state), \
+                 patch.object(matrix.bench, "rpc", side_effect=[
+                     started, self.disk_reply(pending_command, state=state),
+                 ]) as rpc, patch.object(matrix.time, "sleep") as sleep:
+                with self.assertRaisesRegex(RuntimeError, "live disk-load shell"):
+                    matrix.start_disk(self.guest)
+                self.assertEqual(rpc.call_count, 2)
+                sleep.assert_not_called()
 
     def test_disk_start_does_not_replace_an_existing_owned_producer(self):
         process = self.launch_disk()

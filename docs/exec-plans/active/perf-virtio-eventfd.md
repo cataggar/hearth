@@ -4,6 +4,31 @@
 
 **Date**: 2026-10-04
 
+### Stopped producer capture admission — 2026-10-05
+
+Parent reviews frozenf52 and identifies that valid markers/PID/start-time/
+command still admit `T`/`t` proc states. Remove only those states from the
+shared `disk_running` predicate; capture, restore and startup all reuse it.
+Add an owned actual SIGSTOP child, bounded acknowledgement, SIGCONT in finally,
+and same-generation admission after resume. Cover synthetic trace-stop and
+stopped pre-exec rejection without retry; preserve marker-only stop tests.
+
+Immediate-exit admission is already implemented4939/evidence05fc with actual
+source and current-head CI9/9, not a missing prerequisite. Leave native/hosted
+capability136, vm_cpu/Observer, strict retry and all other guards unchanged.
+Run focused guards under bounded fleet phases and exact new-source isolated
+CI; keep f52/80,2dcb/4 and05fc correctness receipts as independent epochs.
+No new-source full active restore/performance qualification is inferred.
+Local actual2 focused regressions and the exact complete CI runner57/57,
+skipped0, pass with10 positive/negative coverage-gate fixtures. The immutable
+pre-fix05fc oracle causes4 assertion subtest failures and2 invalid-retry
+exhaustion errors across the same2 tests; owned children resume/join in finally.
+Initial negative-control checker wrongly expected only2 failures and stopped
+before corrected execution; its failed log remains separate. Corrected
+accounting then runs all actual tests successfully. Both bounded local phases
+release the fleet lock with the unchanged3GiB guard. Source/isolated current-head
+CI publication is pending; no local performance matrix or parent label.
+
 ### Immediate-exit capability admission — 2026-10-05
 
 Parent accepts the actual fixed-host7aec fatal/trigger proof but identifies

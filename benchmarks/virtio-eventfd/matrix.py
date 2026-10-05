@@ -123,7 +123,7 @@ def disk_running(guest, expected=None, *, startup=False):
     fields = fields_bytes.split()
     pid, comm_separator, _ = prefix.partition(b" (")
     if (not separator or not stat_separator or not comm_separator or len(fields) < 20
-            or fields[0] not in (b"R", b"S", b"D", b"T", b"t", b"I", b"W", b"K", b"P")):
+            or fields[0] not in (b"R", b"S", b"D", b"I", b"W", b"K", b"P")):
         raise RuntimeError("recorded disk producer is not a live disk-load shell")
     if not pid.isdigit() or not fields[19].isdigit():
         raise RuntimeError("invalid recorded disk producer identity")

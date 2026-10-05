@@ -20,6 +20,36 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Stopped producer admission — new harness epoch, CI pending
+
+Current `disk_running` rejects proc `T`/`t` before accepting command/identity
+or classifying an exec-start transition. Valid PID/start-generation and
+run/no-completion markers do not make SIGSTOPed/tracing-stopped producers
+runnable. Startup never retries these states. Sleeping/I/O-blocked producers
+remain admitted; only the two stopped states are removed.
+
+Two focused regressions use an actual owned `/bin/sh` disk-load child with
+SIGSTOP acknowledgement, SIGCONT in finally and same-generation admission
+after resume; syntheticT/t capture/pre-exec cases also fail without retries.
+The exact immutable05fc pre-fix function demonstrably fails the same2 tests
+(4 assertion subtest failures,2 invalid-retry exhaustion errors). An initial
+negative-control checker incorrectly expected only2 failures and exits before
+corrected tests; that failed phase is retained, not counted as passing.
+Corrected control accounting then executes2/2 focused cases and the workflow's
+full **57/57**, skipped0, plus10 actual coverage-gate fixtures/YAML/shell/Python
+checks. All children resume/join; local phases use bounded wait60/work90s,
+unchanged inside-lock3GiB guard and separately released fleet leases.
+Private logs: `.perf/eventfd/stopped-producer-admission/final-local{,-2}.log`.
+
+Native/hosted capability136 admission remains4939 unchanged and already
+actual CI-validated at05fc; no duplicate repair, helper/oracle or default
+change is introduced. Reviewed vm_cpu/Observer and explicit exec-start retry
+remain. f52's80,2dcb's4, original invalid80 and05fc's CI are separate source
+epochs, **not new-source restore proof**. Isolated exact-head correctness CI
+will execute all57 guards; new-source CI is pending at initial publication.
+No full active restore/lifecycle rerun, local performance matrix, parent
+label/hosted measurements, new performance qualification or merge.
+
 ## Immediate-exit admission correction — actual correctness-only acceptance
 
 Parent accepts7aec's tested-host fatal/trigger repairs, but API12 alone

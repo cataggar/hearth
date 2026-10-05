@@ -1,6 +1,6 @@
 # Product Spec: VirtIO ioeventfd/irqfd Performance Experiment
 
-**Status**: Blocked qualification — four controlled modes implemented; new corrected80-cycle live-producer restore acceptance passes; historical80-cycle oracle remains invalid; frozen performance gates unmet
+**Status**: Blocked qualification — four controlled modes implemented; f52's corrected80-cycle restore epoch retained separately; current producer admission tightened; original80-cycle oracle invalid; frozen performance gates unmet
 
 ### Explicit readiness policy
 
@@ -506,6 +506,11 @@ The harness must reject inactive or completed disk producers at a mixed-device
 capture barrier, checking the recorded PID/start-time generation and command
 identity as well as controller-stop/completion markers. A live continuous disk
 workload is not proof of a disk syscall in flight at the exact capture instant.
+Stopped/tracing-stopped proc states `T`/`t` are not live continuous producers,
+even with valid markers, command and PID/start-time generation. Reject them
+both at capture/restore barriers and during startup; never retry them as an
+exec transition. A focused owned SIGSTOP/SIGCONT regression must preserve the
+generation and demonstrate rejection while stopped and admission after resume.
 Only startup may retry an explicitly recognized live child still executing
 the exact launching shell command before exec. Its PID/start-time generation
 must remain stable. Transport/backend errors, malformed identities, dead
