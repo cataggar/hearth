@@ -73,6 +73,14 @@ recorded identities are gone. The separate ten-pair matched A/A is queued
 under the common lock; do not collect a qualifying worker until it completes
 and its newly frozen noise is admissible.
 
+That matched A/A subsequently completes20/20, but write p95/fsync p99
+margins20.586688%/22.166669% still exceed20%. All samples/outliers/old gates
+remain. Before any fresh worker result, register exactly ten additional
+pairs and include ALL original20 in the combined40-run/20-pair gates
+(t95/df19 rounded upward2.094; unchanged margins/caps). No early stop or
+further extension. A separate diagnostic worker profile may characterize
+all four owned TIDs if noise remains inadmissible; it is not qualification.
+
 The project-local integration kernel option and capability/diagnostic tooling
 are implemented and executed. Debug/safe unit suites each execute 31 tests;
 debug/safe existing integration suites each execute seven, including actual

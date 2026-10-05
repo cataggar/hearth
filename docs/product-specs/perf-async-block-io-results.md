@@ -210,6 +210,43 @@ Raw executed drivers/source manifests/stat/stacks/distributions/custody:
 `redundancy-reclaim-46.json`. This separate matched regime cannot erase or
 replace the completed inadmissible canonical e2epoch.
 
+### Matched fenced A/A: second complete series, still inadmissible
+
+The same c734Safe source/flags and copied-input fence complete another
+**20/20unprofiled runs, ten pairs**, all error0, actual effective-sync/all
+three TIDs verified. Every run's recorded identities/device node disappear
+and its exact-name redundant image is removed after retaining the output
+hash inventory. These are a separate cohort, not replacements for e2.
+
+| Frozen matched metric | B | Sample SD /CV | Paired95% N | Frozen margin /absolute gate |
+|---|---:|---:|---:|---:|
+| IOPS benefit |5,236.941884 |102.754095 /1.962101% |1.911219% |15% /6,022.483167 minimum |
+| IOPS regression |same |same |same |5% /4,975.094790 minimum |
+| Write p50(ns) |58,112 |234.921711 /0.404257% |0.576552% |5% /61,017.6 maximum |
+| Write p95(ns) |81,753.6 |5,167.126275 /6.320365% |10.293344% |**20.586688%**, inadmissible |
+| Write p99(ns) |113,920 |5,166.942698 /4.535589% |5.463037% |10.926073% /126,366.983 maximum |
+| Fsync p50(ns) |117,964.8 |885.252839 /0.750438% |0.940709% |5% /123,863.04 maximum |
+| Fsync p95(ns) |164,147.2 |4,164.148862 /2.536838% |2.555322% |10% /180,561.92 maximum |
+| Fsync p99(ns) |235,315.2 |27,038.662365 /11.490402% |11.083335% |**22.166669%**, inadmissible |
+
+No fresh worker result has yet been collected. Preserve every outlier,
+including write p9562,720→81,408ns and fsync p99268,288→216,064ns.
+Neither the higher mean than e2 nor the narrower noise is attributed as a
+worker benefit: source/control preparation differ between those epochs.
+Raw registration SHA`da85c2e4…`, series SHA`88098f7f…` and immutable
+`frozen-gates.json` are under`.perf/blk-io/quiet-1/e3/flush/`.
+
+Before any new worker output, register a **fixed ten additional A/A pairs**,
+retaining **all original20 observations**. The combined40-run/20-pair
+baseline uses the same source/recipe, Bmean(all40), and
+`N=maxabs(mean(d)±2.094×sampleSD(d)/sqrt20)` (upward-rounded t95/df19).
+The old frozen20-run gates remain unchanged; the extension has separate
+registration/series/frozen files. Keep identical5%/10%/15% proposals and10%/
+20% noise caps, with **no significance-based early stop or further extension**.
+If still inadmissible, a clearly labelled all-worker diagnostic profile may
+characterize overhead, never qualify a candidate/default. The mandatory
+matrix/liveness/total-cost conditions remain regardless of primary noise.
+
 ## What was implemented
 
 The original diagnostic integration suite accepts `-Dintegration-kernel=<path>` relative to
