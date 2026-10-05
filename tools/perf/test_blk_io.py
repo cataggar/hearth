@@ -126,6 +126,20 @@ class PerfCacheTests(unittest.TestCase):
 
 
 class PreparedImageTests(unittest.TestCase):
+    def test_failed_exit_evidence_still_removes_owned_sockets(self):
+        paths = {name: mock.Mock() for name in ("exit.json", "api.sock", "vsock_1024")}
+        path = mock.MagicMock(spec=Path)
+        path.__truediv__.side_effect = paths.__getitem__
+        vm = MODULE.OwnedVm(path, 8, jailed=False)
+        vm.path_created = True
+        vm.process = mock.Mock()
+        vm.process.poll.return_value = 0
+        with mock.patch.object(MODULE, "save_json", side_effect=OSError("No space left on device")):
+            with self.assertRaisesRegex(OSError, "No space left"):
+                vm.close()
+        for name in ("api.sock", "vsock_1024"):
+            paths[name].unlink.assert_called_once_with(missing_ok=True)
+
     def test_copy_fence_precedes_launch(self):
         path = mock.MagicMock(spec=Path)
         events = []

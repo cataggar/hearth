@@ -507,15 +507,17 @@ class OwnedVm:
         for output in (self.stdout, self.stderr):
             if output is not None:
                 output.close()
-        if self.process is not None:
-            save_json(self.path / "exit.json", {
-                "supervisor_pid": self.process.pid, "vmm_pid": self.pid,
-                "vmm_starttime": self.pid_starttime,
-                "supervisor_exit_code": self.process.returncode,
-            })
-        if self.path_created:
-            for name in ("api.sock", "vsock_1024"):
-                (self.path / name).unlink(missing_ok=True)
+        try:
+            if self.process is not None:
+                save_json(self.path / "exit.json", {
+                    "supervisor_pid": self.process.pid, "vmm_pid": self.pid,
+                    "vmm_starttime": self.pid_starttime,
+                    "supervisor_exit_code": self.process.returncode,
+                })
+        finally:
+            if self.path_created:
+                for name in ("api.sock", "vsock_1024"):
+                    (self.path / name).unlink(missing_ok=True)
 
     def __exit__(self, *_):
         self.close()

@@ -1,6 +1,6 @@
 # Execution Plan: Profile and Evaluate Async VirtIO Block I/O
 
-**Status**: Default-disabled worker implemented; fresh qualification resumed after owner-approved host cleanup; no default/merge eligibility
+**Status**: Default-disabled worker implemented; fresh qualification incomplete/blocked by noise, storage, liveness and missing matrix/cost acceptance; no default/merge eligibility
 **Last updated**: 2026-10-05
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
@@ -80,6 +80,20 @@ pairs and include ALL original20 in the combined40-run/20-pair gates
 (t95/df19 rounded upward2.094; unchanged margins/caps). No early stop or
 further extension. A separate diagnostic worker profile may characterize
 all four owned TIDs if noise remains inadmissible; it is not qualification.
+
+The fixed extension subsequently accepts8new runs, then actual guest journal/
+I/O failure and hostENOSPC interrupt`aa-14-A0`; no40-run gate or qualifying
+comparison is produced. Keep all28accepted rows and the failed input; no
+top-up/outlier removal. Losslessly archived exact profile images and scoped
+owned-intermediate cleanup do not resolve reliable artifact capacity.
+The all-four-TID c734worker diagnostic observes2,924.919169IOPS versus the
+single profiled forced-sync5,055.932401, but artifact phase exits120/ENOSPC:
+n=1each, no accepted performance run/gain/default. Same raw recording's
+bounded decode verifies10,813samples/zero lost; retain the truncated decode.
+Helper persistence-failure cleanup is corrected and actually passes14focused
+cases+2additional actual Safe jailed CLI/API cases. Exact current counts,
+commands/raw paths/source hashes/custody and limitations are in results.
+The implementation todo is blocked, not done; this plan remains active.
 
 The project-local integration kernel option and capability/diagnostic tooling
 are implemented and executed. Debug/safe unit suites each execute 31 tests;

@@ -247,6 +247,89 @@ If still inadmissible, a clearly labelled all-worker diagnostic profile may
 characterize overhead, never qualify a candidate/default. The mandatory
 matrix/liveness/total-cost conditions remain regardless of primary noise.
 
+### Fixed extension interrupted; no replacement gate or qualifying comparison
+
+The additional series accepts **8/20new runs** (combined28accepted rows),
+then`aa-14-A0` actually hits host backing-write failure: guest logs show I/O
+errors, journal abort, read-only remount and`BASELINE_FIO_ERROR`. Host evidence
+persistence then fails with **ENOSPC**. The extension is terminal/incomplete,
+not topped up, trimmed, relabelled or frozen as40passing samples. Its failed
+disk input and all preceding outliers remain. No qualifying A′/B is executed.
+
+Exit evidence ENOSPC also skips a stale owned API-socket unlink in the
+experimental fixture. All recorded VM/TID paths and the device node are
+already gone; the exact remaining current-UID socket is separately verified
+as a socket and removed. The helper now unlinks owned socket paths in`finally`
+even if exit-evidence saving fails. **14/14helper tests** pass, including the
+new persistence-failure regression; **2/2additional actual Safe enforced
+CLI/API worker disk/identity cases** pass. These are additional focused
+executions, not claims that a failed performance workload passed.
+
+Lossless archival retains all exact8GiB bytes of three inactive accepted
+profile inputs (full decoded SHA/length verification): e3sync and e2flush
+archives each about93.37MB, e2read1,075,850,038B. Immutable source templates/
+ELFs, actual VM independent-copy/backing mode and failed input images are
+unchanged. Despite those scoped alternatives, the shared filesystem again
+reaches20,480free bytes. Even a remote branch push succeeds while its local
+remote-tracking ref update fails ENOSPC; the remote head is independently
+verified afterward. No unowned cleanup or storage/security setting change
+is performed.
+
+Raw failures/custody/archival recipes:
+`.perf/blk-io/quiet-1/{matched-aa-extension.log,enospc-helper-tests.log,enospc-helper-jailed.log,lossless-*.log}`,
+`e3/flush/{aa-extended-registration.json,aa-extended-series.json,extension-failure-custody.json}`,
+and each profile's`lossless-input-archive.json`/`disk.ext4.raw.gz`.
+
+### All-four-task worker diagnostic: slower observation, failed artifact phase
+
+After the inadmissible gates, an explicitly **diagnostic-only** c734 worker
+profile verifies effective-worker/no fallback and attaches **all four actual
+owned TIDs** on CPU8. It uses the same exact guest inputs and copy fence.
+Guest fio itself reports error0; the artifact/decoded-output phase runs out
+of space and exits120, so **the overall run is not accepted or performance-
+qualified**. Preserve the original truncated text decode losslessly; do not
+hide the failure by calling the subsequent bounded raw-data decode a retry.
+
+| Single profiled observation, not a paired confidence result | Forced-sync | Worker diagnostic |
+|---|---:|---:|
+| Guest measured write IOPS |5,055.932401 |2,924.919169 |
+| Guest measured write operations |303,361 |175,501 |
+| Write p50/p95/p99(ns) |60,160 /80,384 /115,200 |115,200 /160,768 /224,256 |
+| Fsync p50/p95/p99(ns) |123,392 /168,960 /238,592 |218,112 /309,248 /432,128 |
+| All-owned-task80s CPU(s) |50.968212137 |55.949737508 |
+| Context switches |353,236 |1,541,418 |
+| KVM entries/exits |5,128,865each |3,294,897each |
+| Host pread/pwrite/fdatasync |1 /352,890 /352,852 |1 /206,259 /206,217 |
+| Owned raw CPU-clock samples /lost |10,064 /0 |10,813 /0 |
+
+Descriptive IOPS is42.148768%lower and warmup-inclusive all-task CPU9.773789%
+higher, **n=1each/no variance/unaligned CPU and completion windows**, with
+different observation times and real storage pressure. No statistically
+qualified regression or total CPU/completion value is claimed. In particular,
+do not present the lower active vCPU cost as total savings: worker schedstat
+adds11.320360447runtime seconds/18.436386210s runqueue wait to the active
+owner's47.111485799runtime seconds/5.775771468s runqueue wait. Deferred kernel
+writeback CPU remains unattributed. Inclusive fdatasync/pwrite CPU stacks
+are about6.08%/2.48%; lower KVM counts accompany fewer completed operations,
+not proof of cheaper equivalent work.
+
+The91,732,556-byte raw recording remains. A bounded re-decode of that same
+recording succeeds and reports10,813samples; the earlier truncated421,498,880-
+byte decode is exactly retained in a29,081,600allocated-byte gzip archive.
+Only13named hashed reproducible owned LLVM`*_zcu.o` intermediates are removed
+(106,209,280allocated bytes); all executed ELFs/raw source assets remain.
+All recorded diagnostic VM/TID paths, device node and API socket are gone.
+Raw stat/report/record/source/argv/credentials/custody are in
+`.perf/blk-io/quiet-1/e3/flush/diagnostic-worker-1/`.
+
+**Final decision:** retain the default-disabled prototype and reproducible
+negative/inconclusive evidence; **keep synchronous default, no performance
+merge or auto-merge recommendation**. The issue remains blocked/incomplete:
+fresh noise caps, terminal storage-interrupted extension, timer-free legacy
+post-idle0/3, full workload/control/lifecycle/SDK matrix and aligned all-worker
+plus attributable deferred-kernel-I/O cost still require acceptance. The old
+fifteen-core saturation is historical, not the current reason.
+
 ## What was implemented
 
 The original diagnostic integration suite accepts `-Dintegration-kernel=<path>` relative to
