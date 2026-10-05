@@ -232,6 +232,15 @@ Peer raw receipt:
 This is a separate fixture epoch, **not renewed/pooled128/28/12 acceptance**,
 new compilation/performance, GNU acceptance or a size/guard/default waiver.
 
+Plan#6's later `303831b` publication applies only the positional-CLI token
+correction atop98 as `fd5db24`. Read-only byte comparison verifies that single
+change and unchanged three common runtime/unit sources. Its frozen four-ELF
+CLI-only cohort reports **1/1 each,4 total**,8 PID paths/nodes/sockets gone;
+before/after guest command lines are identical. It does not rerun or pool
+the16-case cleanup or128/28/12 cohorts. Fixture SHA256 is
+`23b15b655d2b93d2ed0431f97be36c842b50c7aa4440e5bdead89842671d4ee6`;
+peer raw receipt is `canonical-cli-positional-v1-final.json`.
+
 The latest reconciliation reads only public PR metadata and Git objects in
 this worktree; it wakes no finished peer and runs no tests, VMs or profiles.
 Plan#2/3's common simple whitelist and clone/socket/mprotect/affinity/epoll/poll
