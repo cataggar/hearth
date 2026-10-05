@@ -356,6 +356,46 @@ jobs:
           timeout --kill-after=10s 2m \
             python3 -m unittest discover -s tools/perf -p test_jail_prerequisites.py -v \
             2>&1 | tee .ci-logs/jail-prerequisites.log
+      - name: Reproduce repeated real PTY completion after exec and backpressure
+        if: matrix.optimize == 'ReleaseSafe'
+        shell: sg kvm -c "bash --noprofile --norc -e -o pipefail {0}"
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p .perf/eventfd-pty/scratch
+          export TMPDIR="$PWD/.perf/eventfd-pty/scratch"
+          timeout --kill-after=10s 5m \
+            bash -c 'cd agent && zig build -Dtarget=x86_64-linux-musl -Doptimize=safe --summary all --color off'
+          timeout --kill-after=10s 5m \
+            bash -c 'cd vmm && zig build eventfd-guest-probe -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe --summary all --color off'
+          python3 - <<'PY'
+          import sys
+          from types import SimpleNamespace
+          sys.path.insert(0, "benchmarks/virtio-eventfd")
+          import matrix
+          matrix.prepare(SimpleNamespace(
+              out=".perf/eventfd-pty/fixture", kernel=".ci/guest/bzImage",
+              agent="agent/zig-out/bin/hearth-agent", native="vmm/zig-out/bin/eventfd-guest-probe",
+              tcp="vmm/zig-out/bin/eventfd-guest-probe", disk_probe=None,
+              vsock_only=True, profile_only=False))
+          PY
+          status=0
+          for mode in L0 C00; do
+            sudo -n python3 benchmarks/virtio-eventfd/pty_repro.py supervise \
+              --out ".perf/eventfd-pty/$mode" --mode "$mode" \
+              --binary "$PWD/vmm/zig-out/bin/flint" --fixture "$PWD/.perf/eventfd-pty/fixture" \
+              || status=1
+          done
+          exit "$status"
+      - name: Retain only source-allowlisted PTY correctness receipts
+        if: always() && matrix.optimize == 'ReleaseSafe'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pty-correctness-${{ github.run_id }}
+          path: .perf/eventfd-pty/pty-proof-*.json
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Trace failed KVM device access
         if: failure()
         working-directory: vmm

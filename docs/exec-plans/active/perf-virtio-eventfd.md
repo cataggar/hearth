@@ -4,6 +4,25 @@
 
 **Date**: 2026-10-04
 
+### Fourth hosted epoch — bounded repeated-PTY root-cause attempt
+
+Preserve37345716921/94c7 and its14 safe JSONs. Actual new AMD/svm D4ads_v7,
+not priorv5; matrix interactive batch41/op8 pty-stream/receive-header timeout
+c1da153e is now reliable localization. Thirteen prior rows through exec7936,
+native71/71 and actual perf controls pass. No complete A/A/gate/profile/gain.
+
+Trace guest frame/completion/HUP/reconnect and C00 socket/credit readiness.
+First distinct bounded attempt: real L0/C00 enforced-jail source fixture with
+7936 execs,15 native slow-reader exchanges,4096 PTYs on the original connection,
+existing5s socket deadline, no keepalive/heartbeat/retry. Reuse current framing,
+fixture and generation-pinned custody helpers; do not invent another oracle.
+Retain private serial/backend logs; safe receipts expose source/binary/fixture,
+actual completed counts and fixed-prefix reconnect counts, not raw traces.
+Run only ordinary isolated CI because local capacity is below unchanged3GiB.
+If reproduced, add a focused cause regression and a surgical fix, then prove
+current exact source; otherwise report unresolved scope after distinct bounded
+attempts. No fifth qualification/label, new agents or peer broadcasts.
+
 ### Third hosted epoch — bounded empty-frame timeout attribution
 
 Preserve14 original JSONs/13 hashes from37337531285/8a30. Pre-build actual

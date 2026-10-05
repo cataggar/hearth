@@ -2,6 +2,31 @@
 
 **Status**: Blocked qualification — four controlled modes implemented; f52's corrected80-cycle restore epoch retained separately; current producer admission tightened; original80-cycle oracle invalid; frozen performance gates unmet
 
+### Repeated PTY correctness, separate from qualification
+
+Fourth hosted37345716921 at94c7 is a terminal failure on a new nested AMD/svm
+D4ads_v7 host. Its recorded matrix/interactive batch41/op8 is an empty PTY
+frame-header wait, not an inferred next workload. Thirteen prior cells through
+exec7936 pass; native71/71 and real perf ACK admission pass. No complete A/A,
+gate freeze, profile or candidate exists. This localization applies only to
+this epoch and does not recover older PTY indices or identify its runtime cause.
+
+Use a bounded real-KVM repeated-PTY correctness fixture, not another full
+qualification: unchanged agent,7936 preceding execs,15 native slow-reader
+exchanges and4096 output/exit-validated PTYs on one connection. Compare L0/C00
+with the same freshly built fixture and enforced jail. Preserve private guest
+logs and publish only fixed-label reconnect counts, progress and error hashes.
+No failed operation retry, keepalive, heartbeat, extended deadline or dropped
+workload. Generation-pinned custody must join all separate-session descendants.
+Actual source/host identity and failed/current attempts remain separate.
+
+Inspect completion versus PTY HUP, frame writes and input carry, then owner
+readiness and both credit directions. A source suspicion is not a demonstrated
+cause: require a real failure plus a focused regression before changing runtime.
+The local3GiB storage guard still prevents heavy execution; ordinary isolated
+CI is authorized. Parent alone reviews any demonstrated fix before a fifth
+fresh qualification; no worker label or measurement trigger.
+
 ### Hosted prerequisite failure diagnostics
 
 For workload failures, record the source-allowlisted active workload, batch,
