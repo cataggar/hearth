@@ -20,6 +20,11 @@ import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
+accounting_spec = importlib.util.spec_from_file_location(
+    "native_guest_accounting", Path(__file__).with_name("perf-zig-native.py"),
+)
+accounting = importlib.util.module_from_spec(accounting_spec)
+accounting_spec.loader.exec_module(accounting)
 
 
 def project_path(value):
@@ -102,6 +107,7 @@ class Vm:
         self.jailed = jailed
         self.collector = collector
         self.process = None
+        self.pidfd = None
         self.control = None
         self.log = None
         self.listener = None
@@ -188,9 +194,9 @@ class Vm:
             raise
 
     def verify_jail(self):
-        for entry in Path("/proc").iterdir():
-            if not entry.name.isdigit():
-                continue
+        _, owned_pids = accounting.process_snapshot(self.process.pid)
+        for pid in sorted(owned_pids):
+            entry = Path("/proc") / str(pid)
             try:
                 raw = (entry / "stat").read_text()
                 fields = raw[raw.rfind(")") + 2:].split()
@@ -211,6 +217,7 @@ class Vm:
                         or values["NoNewPrivs"].strip() != "1"
                         or values["Seccomp"].strip() != "2"):
                     raise RuntimeError("owned VMM has incorrect credentials or unenforced jail")
+                self.jail_status["start_time_ticks"] = int(fields[19])
                 self.jail_status["task_ids"] = sorted(
                     int(task.name) for task in (entry / "task").iterdir()
                 )
@@ -232,6 +239,15 @@ class Vm:
                             or task["NoNewPrivs"].strip() != "1"
                             or task["Seccomp"].strip() != "2"):
                         raise RuntimeError("owned VMM userspace thread has incorrect jail credentials")
+                descriptor = os.pidfd_open(int(entry.name), 0)
+                try:
+                    current = (entry / "stat").read_text()
+                    if int(current[current.rfind(")") + 2:].split()[19]) != int(fields[19]):
+                        raise RuntimeError("owned VMM identity changed before pidfd acquisition")
+                except BaseException:
+                    os.close(descriptor)
+                    raise
+                self.pidfd = descriptor
                 return
             except (OSError, ValueError, IndexError):
                 continue
@@ -239,14 +255,17 @@ class Vm:
 
     def signal(self, value):
         if self.jailed:
-            target = (self.jail_status["pid"] if self.collector and hasattr(self, "jail_status")
-                      else -self.process.pid)
+            if self.collector and self.pidfd is not None:
+                with suppress(ProcessLookupError):
+                    signal.pidfd_send_signal(self.pidfd, getattr(signal, f"SIG{value}"))
+                return
             subprocess.run(["sudo", "-n", "kill", f"-{value}", "--",
-                            str(target)], check=True, timeout=5)
+                            str(-self.process.pid)], check=True, timeout=5)
         else:
             self.process.send_signal(getattr(signal, f"SIG{value}"))
 
     def close(self):
+        collector_failure = False
         if self.control:
             self.control.close()
             self.control = None
@@ -256,7 +275,18 @@ class Vm:
                 self.process.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 self.signal("KILL")
-                self.process.wait(timeout=3)
+                try:
+                    self.process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    if not self.collector:
+                        raise
+                    subprocess.run(["sudo", "-n", "kill", "-KILL", "--",
+                                    str(-self.process.pid)], check=True, timeout=5)
+                    self.process.wait(timeout=3)
+                    collector_failure = True
+        if self.pidfd is not None:
+            os.close(self.pidfd)
+            self.pidfd = None
         if self.log:
             self.log.close()
             self.log = None
@@ -290,6 +320,8 @@ class Vm:
                                check=True, timeout=5)
         if self.socket_dir.exists():
             self.socket_dir.rmdir()
+        if collector_failure:
+            raise RuntimeError("owned collector failed to flush; capture is not valid")
 
 
 def smoke(vm):

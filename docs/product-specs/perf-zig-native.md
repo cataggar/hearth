@@ -44,7 +44,7 @@ kernel CPU remains separately unquantified.
 Fresh binary sizes still reject adoption: Debug LLVM7,670,088/native24,155,761
 (+214.93%); safe LLVM6,855,240/native24,110,761 (+251.71%). These are correctness-build artifacts,
 not ten-pair speed measurements. Own focused recording/guard/archive tests now
-pass19/19; the common protocol/cache suite passes9/9. Invalid unittest discovery
+pass21/21; the common protocol/cache suite passes9/9. Invalid unittest discovery
 (zero tests) and an incorrect non-root perf prefix are retained as harness
 failures, not compiler/counter unsupported outcomes.
 
@@ -111,9 +111,9 @@ owned node is cleaned and the corrected recipe repeated. These four basic
 network controls do not constitute ten-session throughput/tail qualification,
 TCP/UDP workload acceptance or complete asynchronous network CPU attribution.
 
-Full runtime minima and safe/explicit build comparisons remain underway;
-SDK CONNECT, repeated TAP performance, independent agent performance/native AArch64 and complete
-asynchronous kernel CPU remain unqualified.
+Full runtime minima and safe/explicit build comparisons remain incomplete;
+SDK CONNECT, repeated TAP performance, independent agent performance/native
+AArch64 and complete asynchronous kernel CPU remain unqualified.
 
 Private post-cleanup records use `evidence/postcleanup-*`; measurements,
 correctness, codegen proof and exact-owned snapshot/cache archival manifests
@@ -127,7 +127,59 @@ After a second capacity interruption, nine completed own cache trees preserve
 6,434,137,320 logical bytes in1,433,691,060 archive bytes, verified file/hardlink
 contents and symlink targets before original deletion. The5,000,446,260 logical
 byte difference is this task's recovery, not the whole filesystem's fluctuating
-free-space delta. Safe A/A resumes only its two complete same-manifest pairs.
+free-space delta.
+
+### Current partial measurements and ownership hardening
+
+Repeated exact-manifest resumptions stop at the unchanged capacity guards.
+Safe unchanged A/A retains **six complete pairs/36 rows**, and the explicit
+Debug LLVM/LLD versus native/native comparison retains **six pairs/36 rows**;
+neither reaches the required ten pairs. Safe comparison has not started.
+The complete-workload runtime attempt retains **seven passing Debug
+boot/restore rows**, not complete pairs/minimum samples. v4 coverage pilots
+retain42 successful guest rows (Debug none/stat/record12 each, safe none6);
+safe stat/record pilots did not execute in that epoch.
+
+| Incomplete six-pair condition | A median / CV | B median / CV |
+|------------------------------|---------------|---------------|
+| Safe unchanged cold | 138.6584s / 0.7818% | 139.4759s / 2.1367% |
+| Safe unchanged warm | 27.1951ms / 94.4241% | 27.5564ms / 10.2499% |
+| Safe unchanged rebuild | 24.8482s / 1.4469% | 24.7629s / 2.7238% |
+| Debug LLVM/native cold | 119.5240s / 1.2040% | 115.4973s / 1.2604% |
+| Debug LLVM/native warm | 27.0427ms / 5.3849% | 26.3733ms / 71.9047% |
+| Debug LLVM/native rebuild | 4.9599s / 2.2589% | 1.0004s / 6.1134% |
+
+These are partial diagnostics, **not compilation-benefit qualification**.
+Missing paired samples, warm noise, accounting limitations and already-failing
+size gates are not waived. Completed own binary retention additionally verifies
+193 gzip archives against their original bytes and retains emitted `.text`
+hashes:3,262,555,712 original bytes become636,865,577 archive bytes. Together
+with documented snapshot/cache recovery this releases about13.246GB logical
+owned storage; it does not attribute independent filesystem changes.
+Frozen runtime executables, current fixtures and active caches are excluded.
+
+The parent separately reports a fresh locked whole-host control of
+**8.733/16 busy cores**. This is not this task's per-run attributable CPU, a
+quiet-window certificate or retrospective attribution of recorded samples.
+Old sixteen-core saturation remains historical. No unapproved workloads are
+inspected, terminated or moved; no pre/post-cleanup optimization claim is made.
+
+The recorder now walks only the launched process's descendant task `children`
+links, not unrelated `/proc` process metadata. The jail verifier uses that
+owned tree. Profiled Flint termination acquires a pidfd after checked
+credentials and start-time revalidation, then signals the descriptor rather
+than a potentially reused numeric PID. The live owned collector session group
+is terminated only as a cleanup fallback; a collector that cannot flush is
+reported invalid, never accepted.
+
+The focused21-test suite passes, including unrelated-process traversal and
+exited-pidfd regressions. Four actual Debug/safe×LLVM/native **API-only**
+enforced-jail controls verify current-guard pidfd acquisition, nonempty inherited
+software stat and complete owned teardown. They are **not guest/KVM/runtime
+performance acceptance**. A stale v5 runtime manifest explicitly rejects the
+changed recorder hash; that is an identity-guard diagnostic, not a backend
+failure. Fresh v6 guest pilots use separately frozen current script hashes,
+without pooling their recorder/RSS-method epoch into earlier measurements.
 
 This is an experiment specification, not a benchmark result
 or decision to change defaults. The compiler migration in

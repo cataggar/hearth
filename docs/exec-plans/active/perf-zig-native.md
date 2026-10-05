@@ -27,7 +27,7 @@ monitor/reap only owned children and current storage before bounded phases.
 
 Canonical ced/e1 selected files now match byte-for-byte. Explicit CI
 LLVM/LLD/native/native Debug/safe refreshed cells pass forced32+7 and common3
-per cell; unset defaults pass32+7. Own recorder/guard/archive suite passes19,
+per cell; unset defaults pass32+7. Own recorder/guard/archive suite passes21,
 common protocol/cache suite9. Initial fresh locked host control is12.05% busy
 (1.9279/16cores), not assumed quiet. Fresh size artifacts still fail the
 unchanged10% gate. Old noisy/Group0 counts remain a separate epoch.
@@ -38,7 +38,7 @@ restoration on failure, fixed affinity/parallelism, raw artifacts and verified
 archive retention. New `runtime` records actual jailed boots/restores,
 numbered PTY ACKs, exec/disk/vsock, idle and1/2/4/8 concurrency, plus inherited
 private stat/stack collectors; coverage pilots and full sample execution remain
-in progress. Neither tool's completion implies adoption or complete
+incomplete. Neither tool's completion implies adoption or complete
 asynchronous kernel CPU accounting.
 
 Fresh Debug unchanged A/A now completes ten paired repetitions of all three
@@ -48,7 +48,10 @@ codegen-changing rebuild0.982117s/CV3.5770% (20 observations each). The
 restored. Warm live-tree RSS sampling sometimes observes no process and cannot
 qualify peak memory. A real ENOSPC interruption after five pairs is preserved;
 verified same-manifest resume contributes the remaining five, not an automatic
-noise/acceptance decision. Safe A/A and explicit comparisons remain underway.
+noise/acceptance decision. Safe A/A and explicit Debug comparisons each retain
+six complete pairs/36 rows; repeated resumes halt at the unchanged4GiB guard.
+Safe comparison has not started. Partial medians/CVs are recorded in the spec,
+not promoted to compilation-benefit qualification.
 
 Corrected inherited stat captures contain real software/KVM counters. Initial
 v3 group termination prevented stat flushing: empty captures are **not** valid
@@ -79,8 +82,30 @@ Initial TUN-node cleanup failure is preserved separately and its exact owned
 node cleaned before successful repetition. Nine completed own cache trees are
 retained in exact-byte/link-verified archives, reducing logical storage by
 5,000,446,260B without touching active caches/fixtures/other tasks. A second
-capacity guard halts safe A/A after two pairs; verified same-manifest resume
-does not automatically qualify pooling or noise.
+capacity guard halts safe A/A after two pairs; later same-manifest resumes reach six pairs before
+another unchanged guard interruption. Resume does not automatically qualify
+pooling or noise.
+
+The v4 full runtime attempt retains seven passing Debug boot/restore rows;
+v4 pilots retain42 passing guest rows, not minimum-sample qualification.
+An additional193 exact-byte-verified completed binary archives release
+2,625,690,135 logical bytes; snapshot/cache/binary recovery totals about13.246GB.
+Current fixtures, frozen runtime executables and active caches remain intact.
+No independent free-space change is attributed to this task.
+
+The parent's newer8.733/16-core locked whole-host control is separate from
+this task's per-run controls and does not establish a quiet window or explain
+old samples. No other workload is inspected/killed/moved and no cleanup is
+reported as an optimization. Frozen gates and both storage guards remain fixed.
+
+Owned-only descendant task-child traversal replaces global process metadata
+scans. Profiled Flint uses a credential/start-time-checked pidfd to prevent
+numeric PID reuse; failed collector flushing invalidates the capture after
+owned-group cleanup. The current focused21 tests and four actual API-only
+Debug/safe×LLVM/native jail/pidfd/stat/teardown controls pass. Those API-only
+controls are not guest/KVM performance acceptance. v5 correctly rejects its
+stale recorder hash; independently frozen v6 guest pilots form a new epoch,
+not pooled acceptance of earlier recorder/RSS-method measurements.
 
 ## Evidence and fixed scope
 

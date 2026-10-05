@@ -67,6 +67,30 @@ class RunnerTests(unittest.TestCase):
         self.assertGreaterEqual(result["tree_user_seconds"] + result["tree_system_seconds"], 0.15)
         self.assertGreater(len(result["observed_pids"]), 1)
 
+    def test_rss_walk_reads_only_owned_descendant_metadata(self):
+        proc = self.output / "owned-proc"
+        original = (Path("/proc") / str(os.getpid()) / "stat").read_text()
+        fields = original[original.rfind(")") + 2:].split()
+        for pid, parent, children in ((42, 1, "43"), (43, 42, ""), (44, 1, "")):
+            entry = proc / str(pid)
+            (entry / "task" / str(pid)).mkdir(parents=True)
+            current = fields.copy()
+            current[1] = str(parent)
+            (entry / "stat").write_text(f"{pid} (owned-fixture) " + " ".join(current))
+            (entry / "task" / str(pid) / "children").write_text(children)
+        read = Path.read_text
+
+        def owned_read(path, *args, **kwargs):
+            if path == proc / "44/stat":
+                raise AssertionError("unrelated process metadata was inspected")
+            return read(path, *args, **kwargs)
+
+        with patch.object(runner, "Path", side_effect=lambda value: proc if value == "/proc" else Path(value)), \
+                patch.object(Path, "read_text", owned_read):
+            rss, pids = runner.process_snapshot(42)
+        self.assertEqual(pids, {42, 43})
+        self.assertGreater(rss, 0)
+
     def test_refuses_evidence_overwrite(self):
         output = self.output / "existing"
         output.mkdir(parents=True)
@@ -192,9 +216,26 @@ class RunnerTests(unittest.TestCase):
         machine.collector = ["stat"]
         machine.process = MagicMock(pid=4000)
         machine.jail_status = {"pid": 4001}
-        with patch.object(vm_runner.subprocess, "run") as execute:
+        machine.pidfd = 42
+        with patch.object(vm_runner.subprocess, "run") as execute, patch.object(
+            vm_runner.signal, "pidfd_send_signal",
+        ) as send:
             machine.signal("TERM")
-        self.assertEqual(execute.call_args.args[0][-1], "4001")
+        send.assert_called_once_with(42, vm_runner.signal.SIGTERM)
+        execute.assert_not_called()
+
+    def test_exited_profiled_vmm_does_not_signal_a_reused_numeric_pid(self):
+        machine = vm_runner.Vm.__new__(vm_runner.Vm)
+        machine.jailed = True
+        machine.collector = ["stat"]
+        machine.process = MagicMock(pid=4000)
+        machine.jail_status = {"pid": 4001}
+        machine.pidfd = 42
+        with patch.object(vm_runner.subprocess, "run") as execute, patch.object(
+            vm_runner.signal, "pidfd_send_signal", side_effect=ProcessLookupError,
+        ):
+            machine.signal("TERM")
+        execute.assert_not_called()
 
     def test_snapshot_archives_preserve_exact_bytes_before_owned_deletion(self):
         folder = self.output / "archive"
@@ -264,8 +305,10 @@ class RunnerTests(unittest.TestCase):
                     )
                     return value
                 entry.__truediv__.side_effect = read_child
-                with patch.object(vm_runner, "Path") as proc:
-                    proc.return_value.iterdir.return_value = [entry]
+                with patch.object(vm_runner, "Path") as proc, patch.object(
+                    vm_runner.accounting, "process_snapshot", return_value=(0, {4322}),
+                ):
+                    proc.return_value.__truediv__.return_value = entry
                     with self.assertRaisesRegex(RuntimeError, "incorrect credentials or unenforced jail"):
                         vm.verify_jail()
 

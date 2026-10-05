@@ -37,26 +37,27 @@ def sha256(path):
 
 def process_snapshot(root_pid):
     """Linux live tree RSS, including threads only once per address space."""
-    processes = {}
-    for entry in Path("/proc").iterdir():
-        if not entry.name.isdigit():
+    tree = set()
+    pending = [root_pid]
+    rss = 0
+    while pending:
+        pid = pending.pop()
+        if pid in tree:
             continue
+        tree.add(pid)
+        entry = Path("/proc") / str(pid)
         try:
             stat = (entry / "stat").read_text()
             fields = stat[stat.rfind(")") + 2:].split()
-            processes[int(entry.name)] = (
-                int(fields[1]), int(fields[21]) * os.sysconf("SC_PAGE_SIZE")
-            )
+            rss += int(fields[21]) * os.sysconf("SC_PAGE_SIZE")
+            for task in (entry / "task").iterdir():
+                try:
+                    pending.extend(int(child) for child in (task / "children").read_text().split())
+                except (OSError, ValueError):
+                    continue
         except (OSError, ValueError, IndexError):
             continue
-    tree = {root_pid}
-    while True:
-        children = {pid for pid, (parent, _) in processes.items() if parent in tree}
-        expanded = tree | children
-        if expanded == tree:
-            break
-        tree = expanded
-    return sum(processes[pid][1] for pid in tree if pid in processes), tree
+    return rss, tree
 
 
 def run_command(argv, cwd, output, env, timeout=900, sample_interval=0.02):
