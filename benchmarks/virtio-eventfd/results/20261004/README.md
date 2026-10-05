@@ -62,11 +62,49 @@ and is not a passing phase. Final local logs are `check-ci-final.log` and
 
 CI job is bounded30min; build/run phases10min each, focused/jail2min each;
 native unit phases5min each. Read-only token, no credential persistence,
-finite diagnostics and own logs retained7days. Publication-triggered hosted
-current-head execution is **pending**, not claimed by syntax/local checks.
+finite diagnostics and own logs retained7days. At initial publication,
+hosted current-head execution was **pending**, not claimed by syntax/local checks.
 These ordinary checks do not run active restore/lifecycle/performance
 qualification, apply `perf-qualify-virtio-eventfd`, change default or authorize
 merging. Parent-only performance workflow and all remaining blockers stand.
+
+### Actual hosted execution and durable receipts
+
+[CI37295969022](https://github.com/cataggar/hearth/actions/runs/37295969022)
+actually completes **9/9 successful jobs** on immutable code/workflow commit
+`8ad6444f17f9c3060f48193cd1e40319ced19d5e`. Job IDs:
+
+| Actual job | ID | Executed coverage |
+|---|---|---|
+| KVM ReleaseSafe |111717135557|24 dedicated (23 real KVM+1 policy),7 integration (5 guest+2 CLI/error),32 focused/skip0,4 jail (2 real enforced API+2 mocked cleanup) |
+| KVM Debug |111717135607|Same actual executed coverage, independently compiled/run |
+| Static unit Debug+Safe |111717135744|39 units **per mode**,26 actual baseline/reactor fork controls each |
+
+Both dedicated cells actually exercise24 CLI/API run-loop fatal paths with
+joined owners, including8 consumed-SIGUSR1→real KVM EINTR/RIP0x100 cases.
+Masked IRQ/unmask/reset/IRET-to-timer-free-HLT cases also execute; the gate
+rejects missing/skipped/cached/partial suite summaries. These counts are not
+borrowed from local70+3, old failed waits or peer epochs. The focused32 cases
+include the reviewed typed exec-pending retry and injected unrelated backend
+failure; neither is a full guest-active restore matrix.
+
+Actual GitHub artifact IDs11339056120 (Debug) and11338283989 (Safe) are retained
+privately with full raw job logs in `.perf/eventfd/correctness-ci/`. The
+[correctness-ci-validation.tar.gz](correctness-ci-validation.tar.gz) preserves
+16 allowlisted source/actual execution/local failure receipts, no guest
+images/ELFs/tokens/global inventory. Verified archive SHA256
+`f4e5a2d7d2500c659b46e4bcfe88a5c7f73d9c2add8ee6380c8628ab167e6edd`
+is also in [correctness-ci-SHA256SUMS](correctness-ci-SHA256SUMS).
+The first log API refusal (terminal escape protection) and subsequent command
+syntax error do not constitute test failure/pass; raw successful artifacts are
+retrieved and byte-verified before any hosted count is reported.
+
+This evidence-only follow-up leaves the exact8ad native/harness/CI workflow
+bytes unchanged. Runtime fixes7aec, reviewed helperf52 and default-policy2dcb
+remain ancestors with their independent pins. **Ordinary CI success is not
+performance/adoption/merge eligibility.** No parent perf label, performance
+workflow execution or new A/A/candidate matrix occurred; full current active
+restore/lifecycle/CPU/performance requirements remain blocked.
 
 ## Default/readiness policy separation — new correctness-only epoch
 

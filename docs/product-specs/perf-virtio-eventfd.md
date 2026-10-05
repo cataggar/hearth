@@ -101,6 +101,15 @@ lease refusals. A queued/running CI check is not a pass, and its green result
 is not active restore/lifecycle acceptance, hosted performance evidence,
 default eligibility or permission to apply the parent-only perf label.
 
+Actual [CI37295969022](https://github.com/cataggar/hearth/actions/runs/37295969022)
+on `8ad6444f17f9c3060f48193cd1e40319ced19d5e` completes all9 jobs successfully.
+Both Safe/Debug actually execute24 dedicated,7 integration,32 focused (skip0)
+and4 jail-prerequisite cases; the separate unit job executes39 per mode.
+Each KVM cell records24 fatal paths and8 consumed-signal→real KVM EINTR cases.
+The durable sanitized receipt archive pins source and actual job artifacts;
+no locally unexecuted row is backfilled. Later evidence-only publication does
+not change that tested native/harness/workflow source epoch.
+
 **Issue**: [#3](https://github.com/cataggar/hearth/issues/3)
 
 **Execution plan**: [VirtIO eventfd experiment](../exec-plans/active/perf-virtio-eventfd.md)

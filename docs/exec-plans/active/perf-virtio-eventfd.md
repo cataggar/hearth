@@ -32,7 +32,17 @@ positive/negative coverage-gate fixtures pass. Initial source-count checker
 failed before focused execution because it missed three nested KVM tests;
 the final guard includes all23 dedicated source declarations plus the imported
 policy test. That failed log is preserved. No native source/ELF changed.
-Hosted current-head results are pending publication/execution, not passed.
+At initial publication hosted current-head results were pending, not passed.
+
+Actual new hosted run37295969022 at exact8ad6444 completes9/9 successful jobs.
+Both immutable-head Safe/Debug KVM cells execute24 dedicated+7 integration,
+32 focused (skip0)+4 jail cases; separate static unit CI executes39 per mode
+including26 real policy fork controls. Each dedicated cell again observes all24
+fatal paths and8 signal-consumed-before-entry KVM EINTR/RIP0x100 cases.
+Actual allowlisted artifact bytes, source SHA and suite counts are sealed in
+the result report. Evidence-only follow-up leaves all tested code/workflow
+unchanged; it does not reclassify old refusals, repeat active restores or qualify
+performance. Parent label remains unapplied, main/default/merge untouched.
 
 ### Legacy/readiness policy separation — 2026-10-05
 
