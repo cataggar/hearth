@@ -4,6 +4,11 @@ This correctness-only baseline repair is separate from every performance
 backend, compiler experiment and adoption decision. Preserve original failed
 L0 binaries/traces; do not attribute any gain to repairing jail startup.
 
+This contract describes the bare canonical source `7dfee42`, not every
+experimental filter byte. The [eventfd experiment](perf-virtio-eventfd.md)
+preserves the common restrictions but independently adds confined eventfd2 and
+SO_ERROR queries; it must not claim its whole filter equals the bare blob.
+
 ## Contract and provenance
 
 Runtime is exactly the common repair from `f2f9ab4`, `5ee81b1`, `ced7ed7`:

@@ -4,6 +4,22 @@
 
 **Date**: 2026-10-04
 
+### Canonical prerequisite convergence — 2026-10-05
+
+Reused prerequisite-only `7dfee42` as `85e6f3b` with `-x`; no sibling
+optimization imported. Jail is exact canonical `fcda3fbf`; the experimental
+filter retains only its existing argument-filtered eventfd2/SO_ERROR additions
+to the identical common restrictions, and its compatible 39-unit file.
+Own archived bare canonical Debug/Safe each actually pass32 units+3 real
+enforced common cases; current experiment Debug/Safe each pass63+3.
+The standalone fixture's unsupported `--cmdline` token was removed without
+adding a runtime option; the supported positional string is verified in all
+four rows. Total190 Zig+12 common cases, no skips.
+Private row ELFs, commands, isolation/cleanup and selected sealed evidence
+are recorded in the result report. These default-L0 correctness cases do not
+qualify C00/performance/lifecycle; older ELF measurements remain separate.
+Same mandatory blockers remain; plan stays active and PR draft.
+
 ### Fresh post-cleanup continuation — 2026-10-05
 
 Execute new controlled baselines rather than reuse historical saturation

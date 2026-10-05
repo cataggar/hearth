@@ -17,6 +17,75 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Canonical jail prerequisite convergence — 2026-10-05
+
+Reused only canonical correctness commit
+`7dfee42ed68fe1703744d6318f4be632113034b0`, cherry-picked with provenance as
+`85e6f3b587f2820c11b8568fc2bd4f1332814bb1`. No sibling runtime, compiler,
+notification or performance-runner optimization was imported.
+The experiment already contained the common repair: the only runtime-source
+change is the canonical supplementary-group explanation. Jail is now exactly
+blob `fcda3fbf0fbdb20285a6ebed9930456751b38ae7`.
+Current seccomp remains `4f52431203a451354413fd742794861663c4d007`, **not**
+canonical `10d0c7bf65931d533d88caaaf5ac592a39f79333`: it retains the existing
+argument-filtered zero-count NONBLOCK|CLOEXEC eventfd2 and Unix SO_ERROR query.
+The common whitelist, PID0 affinity, timeout0 poll, both null epoll-mask
+pointer halves, clone restrictions and executable-mapping denial are unchanged.
+The compatible 39-unit file, including those extensions, is preserved.
+
+Actual own-worktree archived bare `7dfee42` builds have **both exact canonical
+runtime blobs**. Bare and experimental rows use the existing static
+`x86_64-linux-musl` target and compiler selection; no native override or
+dynamic-glibc/madvise workaround. Each row ran in a separate bounded exclusive
+fleet-lock phase with private caches/scratch and umask077:
+
+| Source | Optimization | Actual Zig tests | Actual enforced common cases | ELF SHA256 |
+|---|---|---:|---:|---|
+| Bare canonical 7dfee42 | Debug | 32/32 units | 3/3 | `33aaffac8ae457e463fc195b8238b25089b662351be7146832b8e65997824d16` |
+| Bare canonical 7dfee42 | ReleaseSafe | 32/32 units | 3/3 | `90d3063d0a2178e3968503c5c57f90555295fc690ece2c9db114383a531875ca` |
+| Canonical-integrated experiment 85e6f3b | Debug | 63/63 | 3/3 | `dc00d5a3af1f431d6ec20665abbcd50900c572299075e14b12a1de62a50edd98` |
+| Canonical-integrated experiment 85e6f3b | ReleaseSafe | 63/63 | 3/3 | `34d1c7335c2f011a82eb0e6263d61a7196624055cc3956cfa75ba278982976c9` |
+
+Experiment counts are 39 units +17 dedicated (16 real enforced KVM, one policy)
+and seven existing integrations (five actual guests, two CLI/errors).
+Total **190 Zig tests +12 real enforced common cases**, zero skips.
+The combined collector/trace/jail-guard selector also passes20/20. An initial
+`test_run.py`-only subset passed16/16 but the sealer rejected it as insufficient
+for the combined20 assertion; its private log is retained and the corrected
+`test_*.py` selector was actually executed. No failed guest case is hidden.
+The standalone cases exercise API receive/send, threaded API boot/epoll,
+CLI/API synchronous disk write/fsync/read/hash, root0755 device directories,
+configured-user0600 nodes and every observed VMM task's UID/GID1000,
+groups[], CapEff0, NNP1 and Seccomp2/filter1. Host `/dev/kvm` stays root:kvm0660.
+These default-L0 cases are isolation correctness, not C00 idle/liveness,
+candidate performance or lifecycle qualification.
+
+The shared fixture emitted unsupported `--cmdline`, which the actual parser
+ignored before accepting the following positional string containing `=`.
+Only that redundant token was removed; all twelve cases use the supported
+positional command line. No CLI option/runtime behavior was added.
+Reproduction: run the archived/current build steps and the standalone
+`python3 -m unittest discover -s tools/perf -p test_jail_baseline.py -v`,
+with the row ELF, verified kernel and source revision in `FLINT_JAIL_TEST_*`.
+The [receipt](canonical-jail-validation.json) and
+[selected raw evidence](canonical-jail-validation.tar.gz) retain the exact
+bounded runner, commands, source/ELF hashes, twelve isolated launch/isolation/
+cleanup sets, and a verified93-file manifest. Archive SHA256 is
+`2df844798fe2e040fa341c24e4493df3ed276374f45955beb8c50969070cc6e3`;
+24 actual isolated task observations and36 recorded owned PID/TID numbers
+are checked, with all recorded number paths absent. Images, ELFs and caches
+stay private.
+Short inspection/compiler/helper creation PIDs were not completely censused;
+recorded VMM/supervisor/TID paths are checked absent, not extrapolated.
+
+All older ELF/image pins and original L0 failures remain unchanged. The old
+five-block A/A, three-port diagnostic and halt-save failures below retain their
+old row identities; none is relabeled with these new ELF hashes. No fresh
+candidate samples, gain, default change, performance merge or completion of
+issue #3 follows. Qualification remains blocked by the same mandatory
+noise/paired inference, halt-save, compatibility, IRQ congestion and marginal
+kernel accounting gaps.
+
 ## Fresh post-cleanup validation — 2026-10-05
 
 Historical saturation, short measurement windows and candidate diagnostics

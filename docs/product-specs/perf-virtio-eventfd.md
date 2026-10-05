@@ -8,6 +8,16 @@
 
 **Execution plan**: [VirtIO eventfd experiment](../exec-plans/active/perf-virtio-eventfd.md)
 
+The [canonical jail correctness prerequisite](perf-jail-baseline.md) is reused
+from `7dfee42` (`85e6f3b` provenance). Own exact bare canonical Debug/Safe each
+pass32 units+3 actual enforced cases; this experiment each passes63+3.
+Jail matches the canonical blob exactly; the experimental filter intentionally
+retains only its existing confined eventfd2/SO_ERROR additions. The standalone
+fixture now uses the supported positional command line, not an invented
+`--cmdline` option. These are isolation/default-L0 correctness controls, not
+performance or full current-head lifecycle acceptance; the experiment remains
+blocked. New ELF identities and raw evidence are separate from older epochs.
+
 ## Goal
 
 Determine whether `KVM_IOEVENTFD` queue kicks and `KVM_IRQFD` completion

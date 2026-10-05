@@ -21,6 +21,9 @@ All open performance issues have a spec and an active execution plan. Isolated
 prototype implementation is not accepted performance evidence or adoption;
 see each experiment's actual status and results.
 
+The shared [canonical jail correctness prerequisite](perf-jail-baseline.md)
+is independent of backend performance/default adoption.
+
 | Issue | Spec | Execution plan | Status |
 |-------|------|----------------|--------|
 | [#1](https://github.com/cataggar/hearth/issues/1) | [Asynchronous VirtIO Block I/O](perf-async-block-io.md) | [Plan](../exec-plans/active/perf-async-block-io.md) | Planned |
