@@ -26,6 +26,7 @@ pub const Wake = struct {
 };
 pub const Result = struct {
     failed: bool = false,
+    read_error: bool = false,
     short_read: bool = false,
 };
 
@@ -116,6 +117,7 @@ fn run(self: *Self) void {
                         const rc = self.ops.read(self.ops.context, self.fd, self.buffer[0..self.length], self.offset);
                         if (rc < 0 or @as(usize, @intCast(rc)) > self.length) {
                             self.result.failed = true;
+                            self.result.read_error = rc < 0;
                         } else {
                             const count: usize = @intCast(rc);
                             self.result.short_read = count < self.length;

@@ -29,7 +29,7 @@ still blockers even if host CPU is quiet. No default or merge follows cleanup.
 
 Fresh canonical read-QD8 and flush profiles now complete with error0/all three
 owned TIDs/zero sample loss; exact full-window values and limitations are in
-the results. One bounded locked ten-pair unprofiled flush A/A series is running.
+the results. One bounded locked ten-pair unprofiled flush A/A series completes20/20.
 Do not use profiled points as numeric`B/N` or divide warmup-inclusive CPU by
 measured-only fio operations.
 
@@ -43,6 +43,28 @@ Original canonical A remains an external calibration, not an opportunity to
 attribute coupled run-loop/snapshot corrections to async I/O. Neither partial
 flush qualification nor favorable points waive missing mandatory cells.
 
+Actual fresh canonical IOPS`B=5023.310445`, paired95%`N=3.502016%`, CV2.858963%.
+But write/fsync p99`N=17.020706%/24.938210%` expand their margins beyond20%;
+the completed first A/A is not admissible for a default/candidate decision.
+Do not drop its outliers or loosen margins. Try a separately registered
+matched baseline with per-file copied-input fdatasync/directory fsync before
+VM launch to remove fixture-copy writeback, unchanged exact guest inputs and
+10s/60s windows. Re-profile, re-run ten pairs and freeze before any worker
+comparison. The helper must capture start times and pidfd-fence its signals;
+run focused stale-ID/failure/order tests and actual enforced worker fixtures.
+
+A later source trace finds a coupled read-fault edge corrected before a
+new candidate: an error immediately after a successful64KiB chunk within one
+larger descriptor must match the single synchronous pread's positive short
+prefix/zero-fill behavior; errors at a new descriptor boundary stay IOERR.
+The deterministic one-shot-vs-chunk comparison covers both boundaries. A
+second case preserves Linux's per-descriptor`0x7ffff000` single-read cap,
+including its bounded final4096-byte chunk and zero-filled larger suffix.
+Old19cb binaries/profiles remain. This new revision actually executes each
+Debug/Safe46units+8realKVM+7enforced-jail cases and13helper cases once, all
+passing/no skips; exact hashes/logs are in results. Use this new identical
+force-sync/worker ELF for later matched gates, not older correctness counts.
+
 The project-local integration kernel option and capability/diagnostic tooling
 are implemented and executed. Debug/safe unit suites each execute 31 tests;
 debug/safe existing integration suites each execute seven, including actual
@@ -53,11 +75,12 @@ API `recvmsg` is killed by seccomp, CLI device paths have root-only permissions
 under required umask 077. Actual stat/stack data and a saturated-host idle
 control are retained. See the results for exact counts, commands and limits.
 
-G0 is **partial/blocked**; G1 matrix, A/A noise and frozen numeric gates do not
-exist. G2–G5 must not start from these startup diagnostics. Keep the synchronous
-default. No worker/selector/force-sync implementation, performance gain, default
-promotion or merge eligibility is claimed. This plan remains active rather than
-being moved to completed.
+At that original checkpoint G0 was **partial/blocked**; G1 matrix, A/A noise
+and numeric gates did not exist, and no worker/selector/force-sync had been
+implemented. Later sections and the fresh checkpoint above supersede that
+historical implementation state, not its retained failures. The current
+experimental worker remains default-disabled; full G1–G5 qualification is
+incomplete. This plan remains active rather than being moved to completed.
 
 ### Post-provisioning checkpoint — 16:01 UTC
 

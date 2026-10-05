@@ -154,6 +154,28 @@ transfer-cap edge adds a46th unit and is still awaiting validation; these
 fixture attempt (five errors) and rejected Zig frontend cache option
 (zero tests) remain separate failed logs, not passing executions.
 
+The final descriptor-read revision subsequently executes Debug/Safe
+**46/46units +8/8real KVM +7/7enforced-jail** cases each and **13/13helper
+tests once**, with no skips. The cap case checks both an already-transferred
+prefix and the final4096-byte chunk, using a lazy2GiB virtual mapping
+(unit runner peak RSS10/9MiB), not a physical2GiB disk-read acceptance claim.
+Safe ELF`baadc7e85b83a7d5ae0b83ce6f666be8c26393d1d3c4246c878dfa841230c331`;
+Debug ELF`adc4d569350842a6bfed532da780cfa44a832f9b369c999a0897b5cdfc118173`.
+Exact commands/logs: `.perf/blk-io/quiet-1/validate-read-boundary.sh`,
+`read-boundary-{debug,safe}-3.log`,
+`read-boundary-jailed-{debug,safe}-3.log`, `read-boundary-helper-3.log`.
+The Zig frontend uses project-local`ZIG_GLOBAL_CACHE_DIR` environment and
+`--cache-dir`; its unsupported`--global-cache-dir` attempt is not repeated.
+
+Before that bounded validation, four exact successful restored-side copies
+are hash-compared with their retained originals and removed. Two identical
+inactive immutable fixture templates are hash-compared and deduplicated by
+hardlink; both full paths/bytes remain. Every actual VM still receives its
+independent copy and unchanged backing-file mode. The manifest records
+4,308,484,096named redundant allocated bytes reclaimed; it is artifact
+storage housekeeping, not a workload/image optimization or a measured gain:
+`.perf/blk-io/quiet-1/redundancy-reclaim-45.json`.
+
 ## What was implemented
 
 The original diagnostic integration suite accepts `-Dintegration-kernel=<path>` relative to

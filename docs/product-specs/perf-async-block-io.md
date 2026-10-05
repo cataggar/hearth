@@ -235,6 +235,16 @@ descriptor metadata; larger valid payloads progress in bounded chunks.
 Each write chunk is staged before its worker consumes it. This is not an
 atomic snapshot of arbitrarily large guest payloads; guest mutation cannot
 redirect captured metadata, worker memory access or completion publication.
+Read chunking must preserve **descriptor-level** `pread` behavior: a host read
+error after a positive prefix within one descriptor is exposed as that short
+prefix plus zero-filled remainder, as one synchronous `pread` would return
+its positive prefix. An error on the first chunk of a new descriptor remains
+IOERR. Distinguish actual negative read returns from invalid oversized results;
+chunk boundaries must not silently change status or used length.
+On the supported x86-64 Linux host, a [single read](https://man7.org/linux/man-pages/man2/read.2.html) caps its transfer at
+`0x7ffff000` bytes. A larger valid descriptor still completes through bounded
+staging, retaining the synchronous zero-filled suffix beyond that cap rather
+than issuing extra host reads or imposing a new guest request-size restriction.
 
 Proposed implementation interfaces are `--block-backend sync|worker`,
 pre-admission `--force-sync`, and API drive `io_backend: "sync"|"worker"`.

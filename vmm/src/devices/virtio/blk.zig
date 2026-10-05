@@ -30,6 +30,7 @@ const SECTOR_SIZE: u64 = 512;
 const REQ_HDR_SIZE: u32 = 16; // type: u32, reserved: u32, sector: u64
 
 pub const Backend = enum { sync, worker };
+pub const MAX_SINGLE_READ: usize = 0x7ffff000;
 
 fd: i32,
 capacity: u64, // in 512-byte sectors
@@ -212,7 +213,19 @@ fn submitNext(self: *Self, mem: *Memory, queue: *Queue, publish: bool) !bool {
             request.descriptor_offset = 0;
             continue;
         }
-        const length = @min(desc.len - request.descriptor_offset, Worker.CHUNK_SIZE);
+        if (request.kind == T_IN and request.descriptor_offset >= MAX_SINGLE_READ) {
+            // Linux caps one pread; staging must retain its zero-filled suffix.
+            const remaining = desc.len - request.descriptor_offset;
+            if (publish) {
+                const bytes = try mem.slice(@intCast(desc.addr + request.descriptor_offset), remaining);
+                @memset(bytes, 0);
+            }
+            request.descriptor_offset += remaining;
+            request.file_offset += remaining;
+            continue;
+        }
+        const read_limit = if (request.kind == T_IN) MAX_SINGLE_READ - request.descriptor_offset else desc.len;
+        const length = @min(desc.len - request.descriptor_offset, Worker.CHUNK_SIZE, read_limit);
         request.chunk_len = length;
         if (request.kind == T_OUT) {
             const bytes = try mem.slice(@intCast(desc.addr + request.descriptor_offset), length);
@@ -228,7 +241,20 @@ fn consumeChunk(self: *Self, mem: *Memory, queue: *Queue, publish: bool) !bool {
     const worker = self.worker.?;
     const request = &self.pending.?;
     if (worker.result.failed) {
-        request.status = S_IOERR;
+        if (worker.result.read_error and request.kind == T_IN and request.descriptor_offset > 0) {
+            // A single pread returns its positive prefix, not a later error.
+            // Preserve that descriptor-level short-read/zero-fill behavior.
+            const desc = request.descs[request.descriptor];
+            const remaining = desc.len - request.descriptor_offset;
+            if (publish) {
+                const bytes = try mem.slice(@intCast(desc.addr + request.descriptor_offset), remaining);
+                @memset(bytes, 0);
+            }
+            request.descriptor_offset += remaining;
+            request.file_offset += remaining;
+        } else {
+            request.status = S_IOERR;
+        }
     } else if (request.kind == T_IN or request.kind == T_OUT) {
         const desc = request.descs[request.descriptor];
         if (request.kind == T_IN and publish) {

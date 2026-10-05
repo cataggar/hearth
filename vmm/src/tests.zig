@@ -21,6 +21,7 @@ const BlockDisk = struct {
     write_limit: usize = BlkWorker.CHUNK_SIZE,
     fail_after: usize = std.math.maxInt(usize),
     read_error: bool = false,
+    read_fail_at: usize = std.math.maxInt(usize),
     flush_error: bool = false,
     written: usize = 0,
     calls: usize = 0,
@@ -48,7 +49,9 @@ const BlockDisk = struct {
         self.calls += 1;
         if (self.read_error) return -5;
         const start: usize = @intCast(offset);
-        const count = @min(bytes.len, self.bytes.len - start);
+        if (start >= self.read_fail_at) return -5;
+        if (start >= self.bytes.len) return 0;
+        const count = @min(bytes.len, @min(self.bytes.len - start, self.read_fail_at - start));
         @memcpy(bytes[0..count], self.bytes[start..][0..count]);
         return @intCast(count);
     }
@@ -273,6 +276,91 @@ test "async block: short read zero-fill and GET_ID match synchronous used length
     _ = try async_blk.processAsync(&async_mem, &async_queue);
     try std.testing.expectEqualSlices(u8, try sync_mem.slice(32768, 20), try async_mem.slice(32768, 20));
     try std.testing.expectEqualSlices(u8, try sync_mem.slice(12288, 20), try async_mem.slice(12288, 20));
+}
+
+test "async block: chunk-boundary read errors preserve descriptor-level short prefixes" {
+    const length = BlkWorker.CHUNK_SIZE * 2;
+    for ([_]bool{ false, true }) |separate_descriptors| {
+        var mem = try Memory.init(512 * 1024);
+        defer mem.deinit();
+        var queue = blockQueue();
+        var blk = Blk{ .fd = -1, .capacity = 4096 };
+        var disk = BlockDisk{ .read_fail_at = BlkWorker.CHUNK_SIZE };
+        @memset(&disk.bytes, 0x6b);
+        var expected: [length]u8 = @splat(0xcc);
+        if (separate_descriptors) {
+            try std.testing.expectEqual(@as(isize, BlkWorker.CHUNK_SIZE), BlockDisk.read(&disk, -1, expected[0..BlkWorker.CHUNK_SIZE], 0));
+            try std.testing.expectEqual(@as(isize, -5), BlockDisk.read(&disk, -1, expected[BlkWorker.CHUNK_SIZE..], BlkWorker.CHUNK_SIZE));
+        } else {
+            const prefix = BlockDisk.read(&disk, -1, &expected, 0);
+            try std.testing.expectEqual(@as(isize, BlkWorker.CHUNK_SIZE), prefix);
+            @memset(expected[@intCast(prefix)..], 0);
+        }
+        var flag: u8 = 0;
+        try disk.attach(&blk, &flag);
+        defer blk.stopWorker();
+        @memset(try mem.slice(32768, length), 0xcc);
+        try blockRequest(&mem, queue, 0, 0, Blk.T_IN, 0, 32768, length);
+        if (separate_descriptors) {
+            try blockDesc(&mem, queue, 1, 32768, BlkWorker.CHUNK_SIZE, 3, 2);
+            try blockDesc(&mem, queue, 2, 32768 + BlkWorker.CHUNK_SIZE, BlkWorker.CHUNK_SIZE, 3, 3);
+            try blockDesc(&mem, queue, 3, 20000, 1, 2, 0);
+        }
+        _ = try blk.processAsync(&mem, &queue);
+        _ = try blk.quiesce(&mem, &queue, true);
+        try std.testing.expectEqualSlices(u8, &expected, try mem.slice(32768, length));
+        try std.testing.expectEqual(if (separate_descriptors) Blk.S_IOERR else Blk.S_OK, (try mem.slice(20000, 1))[0]);
+        try std.testing.expectEqual(@as(u32, length + 1), std.mem.readInt(u32, (try mem.slice(12296, 4))[0..4], .little));
+    }
+}
+
+test "async block: bounded read chunks retain Linux single-read zero-filled suffix" {
+    const Disk = struct {
+        calls: usize = 0,
+        lengths: [2]usize = .{ 0, 0 },
+        fn read(context: ?*anyopaque, _: i32, bytes: []u8, _: u64) isize {
+            const self: *@This() = @ptrCast(@alignCast(context.?));
+            if (self.calls < self.lengths.len) self.lengths[self.calls] = bytes.len;
+            self.calls += 1;
+            @memset(bytes, 0x6b);
+            return @intCast(bytes.len);
+        }
+    };
+    const length = Blk.MAX_SINGLE_READ + 8192;
+    for ([_]usize{ Blk.MAX_SINGLE_READ, Blk.MAX_SINGLE_READ - BlkWorker.CHUNK_SIZE - 4096 }) |offset| {
+        var mem = try Memory.init(32768 + length);
+        defer mem.deinit();
+        var queue = blockQueue();
+        var blk = Blk{ .fd = -1, .capacity = 8 * 1024 * 1024 };
+        var disk = Disk{};
+        blk.worker = try BlkWorker.create(-1, .{ .context = &disk, .read = Disk.read });
+        defer blk.stopWorker();
+        try blockRequest(&mem, queue, 0, 0, Blk.T_IN, 0, 32768, length);
+        _ = try queue.popAvail(&mem);
+        var descs: [Queue.MAX_QUEUE_SIZE]Queue.Desc = undefined;
+        const count = try queue.collectChain(&mem, 0, &descs);
+        blk.pending = .{
+            .descs = descs,
+            .count = count,
+            .head = 0,
+            .kind = Blk.T_IN,
+            .status_addr = 20000,
+            .used_len = length + 1,
+            .generation = blk.generation,
+            .queue_state = queue,
+            .descriptor_offset = offset,
+            .file_offset = offset,
+            .chunk_len = if (offset == Blk.MAX_SINGLE_READ) 0 else BlkWorker.CHUNK_SIZE,
+        };
+        @memset(try mem.slice(32768 + Blk.MAX_SINGLE_READ, 8192), 0xcc);
+        blk.worker.?.submit(.read, blk.pending.?.chunk_len, offset);
+        _ = try blk.quiesce(&mem, &queue, true);
+        for (try mem.slice(32768 + Blk.MAX_SINGLE_READ, 8192)) |byte| try std.testing.expectEqual(@as(u8, 0), byte);
+        try std.testing.expectEqual(@as(usize, if (offset == Blk.MAX_SINGLE_READ) 1 else 2), disk.calls);
+        try std.testing.expectEqualSlices(usize, if (offset == Blk.MAX_SINGLE_READ) &.{ 0, 0 } else &.{ BlkWorker.CHUNK_SIZE, 4096 }, &disk.lengths);
+        try std.testing.expectEqual(Blk.S_OK, (try mem.slice(20000, 1))[0]);
+        try std.testing.expectEqual(@as(u32, length + 1), std.mem.readInt(u32, (try mem.slice(12296, 4))[0..4], .little));
+    }
 }
 
 test "async block: queue reconfiguration drains writes but suppresses stale publication" {
