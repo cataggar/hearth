@@ -117,6 +117,21 @@ cases each on its earlier sealed control. Do not count any of these as new
 executions of this worker or coverage of its masked IRQ-route gate.
 
 The auxiliary common-jail repair handoff is complete for that scoped contract.
+Parent-requested current-source reconciliation subsequently verifies PR8
+`175398c` and PR9 `7efea14` read-only: their common simple whitelist and all
+six common argument-check blocks match the canonical source; independent net
+and mailbox overlays remain declared. PR8 also adopts fixture-only98 and
+reports2 newly executed enforced-child ENOSPC cases, not another three-case
+suite or guest boot. PR9's new integrated Debug/Safe rows each pass63 Zig+3
+common cases; separate bare-canonical rows each pass32+3,190 Zig/12 common
+total. Its published93-payload archive hashes, uncached-success summaries and
+12 empty-live-PID cleanup receipts are verified without executing anything.
+These current correctness rows supersede stale missing-adoption warnings,
+not previous performance pins: fresh C00 A/A still uses old frozen d0beacf,
+not the new canonical-integrated ELF. No finished peer is awakened and no
+new build/test/VM/profile phase is requested. PR10 remains reconciled at
+clean39e6aaa with exact five common blobs and its own128/28/12 acceptance.
+
 This performance execution plan stays **active/blocked**. Later peer runtime
 preparation still fails locked-launch artifact creation before a VM/row;
 capacity/noise/mandatory matrix/native-size/IRQ-policy qualification remains

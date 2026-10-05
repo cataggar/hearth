@@ -177,12 +177,29 @@ are complete, independently of performance/default/merge qualification:
   already-repaired parent. Its conditional vhost device/eventfd/poll overlays
   remain independent, not a claim that its whole filter equals legacy `7dfee42`.
   It reports actual new static Debug/Safe **35 units,7 KVM,3 standalone jail
-  cases per mode**, separately from older or aborted epochs.
-- Plan#3's reconciled source contains the canonical poll-zero/null-mask guards
-  and checked group clearing, with separately confined mailbox/SO_ERROR support.
-  It reports sealed prior-control Debug/Safe **4 inherited-group jail cases
-  each**,12 controlled Linux cases and64 recorded owned IDs absent. These
-  do not validate its later common IRQ-policy change or a performance gate.
+  cases per mode**, separately from older or aborted epochs. Current published
+  head is `175398c57d6483254efa1eb89f1feff3269ab3fd`. It also adopts the
+  fixture-only `98b10c21` follow-up as `bd4eb41`; the current fixture blob
+  exactly matches that hardening. Its subsequent focused enforced-child
+  ENOSPC case executes **Debug1+Safe1=2**, without guest boots, rerunning the
+  prior three-case suite or changing VMM/runtime permissions.
+- Plan#3's current published head is
+  `7efea146094b6674ecaf783ce3c05453cdb5db6f`, canonical integration `85e6f3b`.
+  Its jail blob is exact `7dfee42`; common whitelist and all six common
+  argument-check blocks match the canonical source, with separately confined
+  mailbox/SO_ERROR support and shifted dispatch layout. The standalone
+  fixture differs only by removing unsupported `--cmdline` for this runtime's
+  actual positional CLI. This is not whole-filter/five-file byte equality.
+  New integrated static Debug/Safe rows each execute **63 Zig cases+3 common
+  enforced cases**:39 units,17 dedicated (16 enforced KVM+1 policy),7 existing
+  integrations (5 actual guests+2 CLI/errors). Separate exact-bare-canonical
+  Debug/Safe rows each execute **32 units+3 common cases**. Totals are
+  **190 Zig cases+12 common enforced cases**, not190 unit/KVM cases.
+  Read-only verification of its published `canonical-jail-validation.tar.gz`
+  checks all93 payload hashes and the four uncached-success test summaries;
+  all12 archived cleanup receipts have empty live-PID lists. Archive SHA256:
+  `2df844798fe2e040fa341c24e4493df3ed276374f45955beb8c50969070cc6e3`.
+  Prior4/4 jail/12 Linux/64-ID controls remain separately pinned, not relabeled.
 - Plan#6 acknowledges one `7dfee42` cherry-pick as
   `327f1832c26c4e98948c04e920094e6d36e956fe`. This worktree's read-only Git
   comparison verifies all five common blobs exact and only fixture/contract
@@ -192,13 +209,21 @@ are complete, independently of performance/default/merge qualification:
   inference. The12 jail cases verify077 access, CLI/API serial disk
   write/fsync/read/hash and all-task identity/empty groups; all24 recorded
   standalone PID paths and private nodes/sockets are gone. Its retained
-  `canonical-v5-final.json` and published `fe4888e`/draft PR10 preserve these
+  `canonical-v5-final.json` and current clean published
+  `39e6aaa029d14372e10d0532f6f6012c6e2ca57a`/draft PR10 preserve these
   peer executions. Different cache histories/test-build times are not speedups.
 
 These are explicitly **peer-reported execution scopes**, not additional
 executions by this worktree or native/GNU acceptance of the fourth
 `98b10c21` evidence-fault case. This worktree's own canonical and cleanup
 proof remains separately recorded above.
+
+The latest reconciliation reads only public PR metadata and Git objects in
+this worktree; it wakes no finished peer and runs no tests, VMs or profiles.
+Plan#2/3's common simple whitelist and clone/socket/mprotect/affinity/epoll/poll
+check assignments compare equal to the canonical source. Their declared
+device/mailbox overlays are not missing canonical repairs. Superseded
+group-missing/forward-bridge warnings must not trigger duplicate adoption.
 
 Later workload preparation still fails ENOSPC at locked manifest creation
 before a VM or row, and independently timed busy-core controls do not certify

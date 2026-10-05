@@ -40,6 +40,16 @@ launch and remains a failure. C00 pure-HLT1/4/8 controls are only queued at
 this receipt, with no result inferred. No candidate measurement, gain,
 threshold/default change or merge decision is reported.
 
+Later parent-requested read-only reconciliation finds current PR9 `7efea14`
+and canonical runtime integration `85e6f3b`. Its independently archived
+current Debug/Safe correctness rows pass63 Zig+3 common cases each, while
+separate bare-canonical rows pass32+3 each. These190 Zig/12 common cases are
+peer executions, not this worker's new acceptance. The current Safe correctness
+ELF is `34d1c7335c2f011a82eb0e6263d61a7196624055cc3956cfa75ba278982976c9`;
+the fresh A/A remains pinned to old frozen `d0beacfc`, not relabeled as
+new-ELF performance. The shared jail contract records current-source guards,
+93 verified public payload hashes and actual uncached-success summaries.
+
 C00's serialized-owner/mailbox platform is different from the minimal common
 jail repair and this worktree's c734 runtime, even with KVM accelerators off.
 It has not been imported or authorized as this plan's replacement baseline.
