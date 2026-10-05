@@ -62,6 +62,35 @@ borrowed fromb1c. Parent must review the exact source before applying the label.
 No hosted measurement, new active restore/lifecycle proof, default adoption,
 performance merge eligibility or auto-merge.
 
+[Actual CI37308135804](https://github.com/cataggar/hearth/actions/runs/37308135804)
+now completes **9/9 successful jobs** at immutable
+`679162e16500489df125fac6532b1abd91c2b1c1`, tree
+`2d57067732858b36e4bbec924d76e155566ba846`.
+Raw allowlisted artifacts independently verify:
+
+| Actual job | ID | Executed coverage |
+|---|---|---|
+| KVM ReleaseSafe |111756684190|25 dedicated+7 integrations,64 focused/skip0,4 jail (2 real API+2 mocked cleanup) |
+| KVM Debug |111756683966|Same actual coverage, independently compiled/run |
+| Static units |111756684114|39 per optimization,26 actual policy fork controls each |
+
+Both64-case runners execute all seven new capture/custody regressions and the
+unchanged capability136/stopped-producer guards. Both native builds reexecute
+24 fatal paths,8 real consumed-signal→pre-entry KVM EINTR/RIP unchanged and
+four-mode missing136 admission, plus masked/unmask/reset/IRET-HLT controls.
+No skipped/cached/incomplete suite is counted. This is ordinary correctness
+CI, not real hosted perf collection or new full active restore/lifecycle proof.
+
+The17-member [hosted-runner-review-validation.tar.gz](hosted-runner-review-validation.tar.gz)
+contains29,446B of selected sanitized actual/local/source/failed-guard evidence.
+SHA256 `47ce349094d7ff1a0bfad0ebe61943f90bde2cf3b4b05427d3b35152c0d3d080`
+is recorded in [hosted-runner-review-SHA256SUMS](hosted-runner-review-SHA256SUMS).
+Raw logs/ZIPs/metadata remain private. Network retrieval holds no lease;
+verification/sealing uses a separately bounded phase with the unchanged3GiB
+guard. All local phases and the source-CI metadata watcher finish/release.
+Evidence-only publication leaves tested native/harness/workflow bytes unchanged.
+The parent-only performance label remains unapplied pending bounded delta review.
+
 ## Stopped producer admission — actual source correctness, separate epoch
 
 Current `disk_running` rejects proc `T`/`t` before accepting command/identity

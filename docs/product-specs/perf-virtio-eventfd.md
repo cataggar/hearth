@@ -98,11 +98,11 @@ not performance evidence or closure of delegated harness/lifecycle gates.
 
 The existing `zig-kvm` ubuntu24 job must run both static-musl Safe and Debug
 on current PR source, not only the older integration target. Run the actual
-`eventfd-test` (currently24 cases,23 real KVM plus one policy) and existing
+`eventfd-test` (currently25 cases,24 real KVM plus one policy) and existing
 integration tests with the exact pinned kernel selected by the supported
 `integration-kernel` build option. Reject skips, cached executions, partial
 counts and missing per-suite run summaries. Add the complete focused
-`test_run.py` suite, including typed producer startup/backend failure and
+`test_*.py` suites, including typed producer startup/backend failure and
 recorded-control/restore-fixture guards; reject skipped/incomplete unittest
 execution. All phases and the job are finite and nonroot under `sg kvm`
 where KVM is required. Keep kernel/log/fixture paths project-relative.
@@ -157,6 +157,14 @@ stand-ins plus one auxiliary collector, successful-controller orphan rejection,
 changed-generation refusal and unsupported kernel pidfd admission. These are
 runner correctness tests, not actual perf measurements or eight-KVM scaling.
 Capability136 and stoppedT/t admission remain unchanged and separately proven.
+
+Exact source679162e now actually completes isolated CI37308135804,9/9 jobs.
+Safe/Debug each execute25 dedicated+7 integrations,64 focused/skip0 and4 jail;
+static39 per optimization/26 policy forks remain. Both actual64-case runs
+exercise all new capture/custody controls. A17-member sanitized archive pins
+source, raw-artifact hashes, local negative/failed-guard epochs and actual CI.
+This does not prove actual controlled perf collection, eight-KVM scaling,
+current full active restore/lifecycle or performance eligibility.
 
 Shared-host noise is not a terminal experiment result. A separate
 `ubuntu-24.04` GitHub-hosted job may collect a **new**, unpooled epoch, only

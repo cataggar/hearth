@@ -57,6 +57,16 @@ bounded recovery removes only two owned nonexecutable ET_REL cache objects
 Final phases release the lease; new-source isolated CI is pending at initial
 publication. No local performance matrix, label or adoption/merge.
 
+Source679162e/tree2d57067 subsequently completes isolated CI37308135804,9/9.
+Actual raw artifacts verify Safe/Debug each25 dedicated+7 integration,64 focused/
+skip0+4 jail (2 real API+2 mocked cleanup), plus39 static units per optimization/
+26 actual policy forks. Both runners execute all seven new window/custody cases.
+Existing24 fatal paths/8 actual pre-entry KVM EINTR/four missing136 modes and
+masked/IRET-HLT controls execute again. This is no perf/lifecycle qualification.
+The17-member29,446B archive/SHA durably seals selected actual/local/failed-guard/
+source evidence. Evidence-only follow-up changes no tested source/workflow byte.
+Parent-only label remains absent; await exact-source bounded delta review.
+
 ### Stopped producer capture admission — 2026-10-05
 
 Parent reviews frozenf52 and identifies that valid markers/PID/start-time/
