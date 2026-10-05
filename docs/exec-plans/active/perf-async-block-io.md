@@ -6,6 +6,34 @@
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
 **Actual results**: [baseline capability execution](../../product-specs/perf-async-block-io-results.md)
 
+### Owned completed-cache retention follow-up — 2026-10-05 04:44 UTC
+
+One exclusive fleet-locked,90-second-capped phase removes only five completed,
+reproducible caches in this isolated worktree: `vmm/.zig-cache`,
+`.perf/blk-io/zig-global-cache`, and the canonical prerequisite's
+`cache-debug`, `cache-debug-confirm`, `cache-safe`. It inventories and hashes
+the cache files before removal; rejects symlinks, unexpected ownership,
+multiply linked files and overlap with retained evidence; verifies every
+recorded own child generation is absent; and preserves16 explicit archived
+and installed VMM executables with identical SHA256/device/inode before/after.
+The original1238-file evidence seal is byte-identical, and none of its paths
+falls under a removal target. No baseline image/kernel/source, raw measurement,
+guest feature, compiler setting, peer/global cache or frozen input recipe changes.
+
+The five removed cache scopes contained **892,973,056 allocated bytes**.
+Instantaneous filesystem availability changes from2,552,406,016 to
+3,446,345,728bytes; the whole delta is not attributed to this operation and
+is neither reserved capacity nor proof of a quiet host. The phase has
+completed and released its lock; no next heavy phase is queued.
+Private cache file hashes, retained executable pins and before/after custody:
+`.perf/blk-io/canonical-prerequisite/cache-reclaim-20261005T044449Z.json`,
+SHA256 `5cc8dfda1a98f546cd9376e618160700e9b756978665a571dfe6af5f0f703db0`.
+The reproduction script is `reclaim-completed-cache.py` beside that manifest.
+This cleanup executes no correctness/performance cases, does not repair or
+resume the terminal failed40-run A/A extension, and changes no gate/default
+or merge decision. Later admissions must recheck their own capacity budgets
+under the common lock; removed cached test runners cannot supply new passes.
+
 ### Shared fixture cleanup follow-up — 2026-10-05 03:35 UTC
 
 The standalone canonical jail fixture has the same tightly coupled ENOSPC

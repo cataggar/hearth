@@ -12,6 +12,39 @@
 
 **Plan:** [active execution plan](../exec-plans/active/perf-async-block-io.md)
 
+## Owned completed-cache cleanup — 2026-10-05 04:44 UTC
+
+A single exclusive fleet-locked phase, capped at90seconds, removes only
+completed reproducible compiler/test caches in this worktree:
+`vmm/.zig-cache`, `.perf/blk-io/zig-global-cache`, and
+`.perf/blk-io/canonical-prerequisite/{cache-debug,cache-debug-confirm,cache-safe}`.
+These five scopes contained **892,973,056 allocated bytes**. The private
+audit inventories cache file SHA256/size/allocation before removal and checks
+ownership, no symlinks/multiple links, no overlap with retained raw evidence,
+and no matching live recorded own child generation.
+
+All16 explicitly preserved archived/installed VMM executables retain their
+SHA256 and device/inode. The original1238-file seal retains SHA256
+`7436ade146601c62e62099878e1522dcc7b8f50d84c60a54df16546d599b46d7`;
+none of its paths is inside these cache targets. Baseline binaries, source,
+kernel, full images, measurements/logs and frozen physical/cache/writeback
+recipes are untouched. No peer/global cache, security, dependency or
+guest-feature settings change.
+
+Filesystem availability immediately before/after is2,552,406,016/
+3,446,345,728bytes. These are timestamped shared-filesystem readings, not
+reserved capacity, a complete attribution of freed space, a quiet-host
+qualification or a performance improvement. The lock has been released;
+no next heavy phase is queued. The bounded command is retained in session
+output; private script/complete audit are
+`.perf/blk-io/canonical-prerequisite/reclaim-completed-cache.py` and
+`cache-reclaim-20261005T044449Z.json` (SHA256
+`5cc8dfda1a98f546cd9376e618160700e9b756978665a571dfe6af5f0f703db0`).
+
+This operation executes **zero new correctness or performance cases**.
+The failed40-run A/A extension stays terminal, all prior noise/failure epochs
+remain, and sync-default/draft/not-eligible decisions are unchanged.
+
 ## Fresh epoch after owner-approved orphan cleanup
 
 At22:13 the user authorized the parent to stop fifteen specifically revalidated
