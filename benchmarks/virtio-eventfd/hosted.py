@@ -54,6 +54,11 @@ REQUIRED_GAPS = [
     "matched mixed-device 4/8-sandbox performance and pure-HLT idle",
 ]
 KVM_CAPABILITIES = {"irqfd": 32, "ioeventfd": 36, "resample": 82, "immediate_exit": 136}
+TEST_ERROR_LABELS = frozenset({
+    "AccessDenied", "ConnectFailed", "FileNotFound", "GuestBootFailed",
+    "InitrdBuildFailed", "KernelUnavailable", "NotDir",
+    "TestExpectedEqual", "TestUnexpectedResult",
+})
 
 
 class Blocked(RuntimeError):
@@ -269,6 +274,30 @@ def host_probe():
     return record, perf
 
 
+def native_test_failure_diagnostics(text):
+    known = {
+        f"{path.stem}.test.{name}"
+        for path in (bench.ROOT / "vmm/src").rglob("*.zig")
+        for name in re.findall(r'(?m)^\s*test "([^"\r\n]+)"', path.read_text())
+    }
+    headers = list(re.finditer(r"(?m)^error: '([^'\r\n]{1,256})' failed:", text))
+    failures = []
+    unknown = 0
+    for index, header in enumerate(headers):
+        identifier = header.group(1)
+        if identifier not in known:
+            unknown += 1
+            continue
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(text)
+        labels = set(re.findall(r"\berror\.([A-Za-z][A-Za-z0-9_]*)\b", text[header.end():end]))
+        failures.append({"test": identifier, "observed_error_labels": sorted(labels & TEST_ERROR_LABELS)})
+    return {
+        "scope": "source-allowlisted test identifiers and observed error labels, not proven causes",
+        "failure_headers": len(headers), "unknown_failure_headers": unknown,
+        "failures": failures,
+    }
+
+
 def require_execution(name, argv, seconds, phases, cwd=bench.ROOT, environment=None, tests=None):
     check_space(4 * 1024**3)
     record = owned_command(argv, name, seconds, cwd, environment)
@@ -278,6 +307,7 @@ def require_execution(name, argv, seconds, phases, cwd=bench.ROOT, environment=N
         counts = [tuple(map(int, pair)) for pair in re.findall(r"(\d+)/(\d+) tests passed", text)]
         record["test_counts"] = counts
         record["skip_detected"] = bool(re.search(r"\bskip(?:ped)?\b", text, re.I))
+        record["test_failure_diagnostics"] = native_test_failure_diagnostics(text)
         if (record["skip_detected"] or sum(total for _, total in counts) < tests
                 or any(passed != total for passed, total in counts)):
             record["coverage_rejected"] = True
@@ -303,6 +333,8 @@ def build_inputs(phases, source):
     save(PUBLIC / "pins.json", pins)
     if pins["kernel_sha256"] != bench.KERNEL_SHA256:
         raise Blocked("guest kernel differs from the CI signed/hash-checked input")
+    # Integration fixtures use this parent even when Zig's local cache is redirected.
+    (bench.ROOT / "vmm/.zig-cache").mkdir(mode=0o700, exist_ok=True)
     for optimize in ("Debug", "ReleaseSafe"):
         require_execution(f"zig-{optimize}", [
             zig, "build", "install", "test", "eventfd-test", "integration-test",

@@ -4,6 +4,28 @@
 
 **Date**: 2026-10-04
 
+### First hosted prerequisite failure — bounded corrective stage
+
+Preserve parent-triggered37323212257/71bbd4a and its six allowlisted JSONs as a
+terminal independent epoch: Debug66/71, return1, skipfalse, coverage rejected,
+zero A/A/candidate rows. Setup, signed compiler, kernel and host/capability/perf
+probes succeeded; no unsupported-host/storage/quietness inference.
+
+Ordinary CI builds install+integration-test-build before running the two native
+suites, with the compiler's default local cache. Hosted selects install, units,
+eventfd and integration in one compound build with an explicitly redirected
+local cache. `run_integration` already depends on install; the concrete source
+gap is `buildInitrd` creating a child of `.zig-cache` without creating its parent.
+Prepare the private owned fixture parent in the existing hosted build entry
+point and add a clean-root regression that fails the old entry point.
+
+The receipt cannot identify the five failures. Add only source-allowlisted test
+identifiers, fixed observed error labels and aggregate diagnostics to existing
+phase receipts, with omission/nonleakage and failed-gate regressions. No raw log
+upload, new oracle, arbitrary timeout, heartbeat, gate relaxation or local heavy
+phase. Use ordinary exact-source CI on push; parent alone reviews/retriggers
+qualification. Report current proof separately from the original failed run.
+
 ### Custody exit/reap race — bounded retained-review correction
 
 Parent accepts collector fencing, capability136 and dedicated CI, but the

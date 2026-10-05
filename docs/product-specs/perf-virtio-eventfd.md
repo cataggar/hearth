@@ -2,6 +2,31 @@
 
 **Status**: Blocked qualification — four controlled modes implemented; f52's corrected80-cycle restore epoch retained separately; current producer admission tightened; original80-cycle oracle invalid; frozen performance gates unmet
 
+### Hosted prerequisite failure diagnostics
+
+Hosted run37323212257 at71bbd4a is a terminal failed epoch: Debug returned1,
+66/71 actual tests passed, no skips, coverage rejected, before any A/A or
+candidate collection. Its public receipt contains only the stderr hash, so the
+five failing identifiers and errors cannot be recovered from that artifact.
+Do not equate it with the earlier single ordinary-CI L0 boot failure.
+
+Retain private stdout/stderr and publish only aggregate counts, test identifiers
+matched against current native source declarations, and fixed allowlisted error
+labels. Unknown identifiers/labels must never leak raw text or become positive
+coverage. Labels observed in a stack are diagnostics, not proof of causation.
+Do not upload traces, paths, inventories, environment, images or credentials.
+Keep all existing success/count/skip/time/capability/noise gates.
+
+The hosted workflow redirects Zig's local cache, unlike ordinary CI. Native
+Linux integration fixtures still require the project-relative `vmm/.zig-cache`
+parent. Explicitly prepare that private owned parent before the first hosted
+build; do not depend on a compiler creating it implicitly. The compound hosted
+build already has an install dependency for integration execution; splitting or
+lengthening it is not a justified fix. Prove the missing-parent admission
+regression with a clean project-relative fixture and no compiler/VM execution.
+The source-confirmed dependency is not retrospective identification of all five
+failed tests. Only the parent may trigger another qualification after review.
+
 ### Explicit readiness policy
 
 Production seccomp selection must follow the validated `--virtio-mode` before

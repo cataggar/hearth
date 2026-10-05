@@ -20,6 +20,41 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## First parent-triggered hosted attempt — terminal prerequisite failure
+
+[Run37323212257](https://github.com/cataggar/hearth/actions/runs/37323212257)
+at reviewed71bbd4a fails before performance collection. Qualification lasted
+3m36s; the compound Debug command returned1 with **66/71 actual tests passed**,
+no skips and coverage rejected. No A/A/candidate samples, gains or merge
+eligibility. The six original allowlisted JSONs and workflow metadata are
+retained privately; their stderr SHA is
+`847b929ccb4e769a05000f430bebb26aa303c9929a38e74d2abb988a73df72f0`.
+They do not identify the five tests or preserve the raw stderr bytes.
+
+Setup, exact kernel/signed compiler and host probes succeeded. Actual nested
+Azure Standard_D4ads_v5 exposes four AMD logical CPUs, two SMT pairs0/1 and2/3;
+VM0/client2. Kernel6.17.0-1022-azure, API12/nonroot VM creation and caps32/36/82/136
+all succeed;91.8GB available. Root software/PMU/trace and netns probes succeed;
+user software/PMU return255 and trace129. These observations neither establish
+quietness nor justify an unsupported-capability/PMU/storage explanation.
+
+Source comparison identifies a concrete fixture prerequisite gap: hosted
+redirects `ZIG_LOCAL_CACHE_DIR`, whereas ordinary CI creates the default
+`vmm/.zig-cache` as a compiler side effect. Five Linux integration cases call
+`buildInitrd`, which creates only a child of that parent. The hosted entry point
+now explicitly prepares the private owned parent before compiling. The compound
+graph already orders install before integration; command splitting, increased
+timeouts and weakened gates are not corrections.
+
+This fixes a source-confirmed clean-workspace dependency, **not retrospective
+proof that it caused all five historical failures**. New phase diagnostics emit
+only native source-allowlisted test identifiers, fixed observed error labels and
+aggregate header counts; unknown text, traces, paths and credentials stay
+private. Three focused regressions cover clean redirected-cache admission,
+nonleakage and continued failed coverage rejection. Ordinary exact-source CI is
+pending at initial publication; the parent alone reviews and retriggers hosted
+qualification. The failed original epoch remains terminal and unchanged.
+
 ## Retained-review custody exit race — narrow correction
 
 Parent accepts collection fencing/CAP136/dedicated CI but identifies one

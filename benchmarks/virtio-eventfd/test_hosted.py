@@ -38,6 +38,78 @@ def matrices():
 
 
 class HostedGuards(unittest.TestCase):
+    def test_redirected_cache_prepares_native_fixture_parent_before_build(self):
+        root = hosted.bench.ROOT / ".perf/eventfd" / f"hosted-cache-test-{os.getpid()}"
+        (root / "vmm").mkdir(mode=0o700, parents=True, exist_ok=False)
+        try:
+            self.assertFalse((root / "vmm/.zig-cache").exists())
+
+            def first_build(*_args, **_kwargs):
+                self.assertTrue((root / "vmm/.zig-cache").is_dir())
+                self.assertEqual((root / "vmm/.zig-cache").stat().st_mode & 0o777, 0o700)
+                raise RuntimeError("stop before compiler execution")
+
+            with patch.object(hosted.bench, "ROOT", root), \
+                    patch.object(hosted.shutil, "which", return_value="zig"), \
+                    patch.object(hosted.subprocess, "check_output", return_value="0.17.0\n"), \
+                    patch.object(hosted.bench, "digest", return_value=hosted.bench.KERNEL_SHA256), \
+                    patch.object(hosted, "save"), \
+                    patch.object(hosted, "require_execution", side_effect=first_build) as execute, \
+                    patch.dict(os.environ, ZIG_LOCAL_CACHE_DIR=str(root / "redirected-cache")):
+                with self.assertRaisesRegex(RuntimeError, "stop before compiler"):
+                    hosted.build_inputs([], "a" * 40)
+                execute.assert_called_once()
+        finally:
+            shutil.rmtree(root)
+
+    def test_native_failure_diagnostics_never_publish_unknown_text(self):
+        text = (
+            "error: 'integration_tests.test.boot to userspace' failed:\n"
+            "/PRIVATE/trace:42: return error.GuestBootFailed;\n"
+            "environment SECRET=PRIVATE; error.PrivateCredential\n"
+            "error: 'PRIVATE.test.SECRET' failed:\n"
+            "disk image PRIVATE; error.FileNotFound\n"
+            "66/71 tests passed\n"
+        )
+        diagnostics = hosted.native_test_failure_diagnostics(text)
+        self.assertEqual(diagnostics["failure_headers"], 2)
+        self.assertEqual(diagnostics["unknown_failure_headers"], 1)
+        self.assertEqual(diagnostics["failures"], [{
+            "test": "integration_tests.test.boot to userspace",
+            "observed_error_labels": ["GuestBootFailed"],
+        }])
+        self.assertNotIn("PRIVATE", json.dumps(diagnostics))
+        self.assertNotIn("SECRET", json.dumps(diagnostics))
+
+    def test_failed_native_phase_keeps_coverage_rejection_and_safe_diagnostics(self):
+        root = hosted.bench.ROOT / ".perf/eventfd" / f"hosted-failure-test-{os.getpid()}"
+        root.mkdir(mode=0o700, parents=True, exist_ok=False)
+        try:
+            (root / "zig-Debug.stderr").write_text(
+                "error: 'integration_tests.test.API boot and VM status' failed:\n"
+                "/PRIVATE/trace: return error.FileNotFound;\n"
+                "66/71 tests passed\n"
+            )
+            phases = []
+            with patch.object(hosted, "RAW", root), \
+                    patch.object(hosted, "check_space"), \
+                    patch.object(hosted, "owned_command", return_value={"name": "zig-Debug", "returncode": 1}), \
+                    patch.object(hosted, "output", return_value=""), \
+                    patch.object(hosted, "save") as save:
+                with self.assertRaisesRegex(hosted.Blocked, "zig-Debug failed"):
+                    hosted.require_execution("zig-Debug", ["zig", "build"], 600, phases, tests=70)
+                save.assert_called_once()
+            self.assertEqual(phases[0]["test_counts"], [(66, 71)])
+            self.assertTrue(phases[0]["coverage_rejected"])
+            self.assertFalse(phases[0]["skip_detected"])
+            self.assertEqual(phases[0]["test_failure_diagnostics"]["failures"], [{
+                "test": "integration_tests.test.API boot and VM status",
+                "observed_error_labels": ["FileNotFound"],
+            }])
+            self.assertNotIn("PRIVATE", json.dumps(phases))
+        finally:
+            shutil.rmtree(root)
+
     def test_kvm_probe_records_immediate_exit_and_closes_owned_descriptors(self):
         with patch.object(hosted.os, "open", return_value=41), \
                 patch.object(hosted.os, "close") as close, \
