@@ -12,6 +12,43 @@
 
 **Plan:** [active execution plan](../exec-plans/active/perf-async-block-io.md)
 
+## Independent corrected-C00 proposal — receipt 2026-10-05 05:37 UTC
+
+Sibling [#3](https://github.com/cataggar/hearth/pull/9) reports five newly
+executed C00 A/A matrices,85 cells, on frozen `5a711449` runtime/fixtures.
+These are **peer-reported results, not this worktree's executions or an
+adopted baseline**. The fresh noise receipt is inconclusive in13 of16 nonidle
+classes. Its primary collected CPU/operation mean is375.383microseconds
+(CV17.2325%); throughput CV is13.5108% and p95 CV11.3422%.
+An example primary cell observes aggregate host load5.697–9.913 busy-core
+equivalents. The separately reported02:46:01 UTC no-owned-VM control measures
+29.98busyCPU-s/5.000087s =5.995895 busy cores, with0.01iowaitCPU-s and zero
+steal. Neither the floor nor the new matrices establish a quiet host or
+reuse the historical15-core saturation values.
+
+The new peer collector retains owned-task schedstat runtime nanoseconds,
+start generations and tick counters, rejects mixed/changed identities, and
+uses at least5seconds for nonidle cells. Its18/18 actual collector tests are
+reported separately; none is counted as this worker's correctness acceptance.
+Nanosecond precision alone does not prove complete worker/kernel/deferred-I/O
+attribution or align CPU windows with completed operations.
+
+Fresh original-L0 stat/stack controls use50pings each and an explicit10ms
+heartbeat: diagnostic coverage, not timer-free acceptance. A supported KVM
+trace succeeds; an initial unsupported scheduling CLI flag fails before VM
+launch and remains a failure. C00 pure-HLT1/4/8 controls are only queued at
+this receipt, with no result inferred. No candidate measurement, gain,
+threshold/default change or merge decision is reported.
+
+C00's serialized-owner/mailbox platform is different from the minimal common
+jail repair and this worktree's c734 runtime, even with KVM accelerators off.
+It has not been imported or authorized as this plan's replacement baseline.
+Any separately approved corrected-sync experiment must retain its own source,
+ELF/collector/fixture provenance, independently validate the actual Ubuntu
+disk-root/restored guest state, and satisfy the full workload and total-cost
+gates. This report does not resume the terminal c734 A/A extension or resolve
+this worker's masked-route/liveness/qualification gaps.
+
 ## Masked IRQ-route coverage gap — 2026-10-05 05:03 UTC
 
 Direct read-only source inspection finds the inherited

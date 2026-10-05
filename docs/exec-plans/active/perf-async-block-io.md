@@ -6,6 +6,27 @@
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
 **Actual results**: [baseline capability execution](../../product-specs/perf-async-block-io-results.md)
 
+### Independent corrected-C00 proposal — receipt 2026-10-05 05:37 UTC
+
+The results document separately records sibling#3's new five C00 A/A
+matrices/85 cells, with fresh noise inconclusive in13/16 nonidle classes.
+Its18 actual collector tests, generation-fenced schedstat runtime and
+at-least5second nonidle cells are peer evidence, not this worker's tests or
+an accepted new G0. Primary CPU/operation375.383microseconds has CV17.2325%;
+throughput/p95 CVs13.5108%/11.3422% and an example host-load range5.697–9.913
+busy cores do not supply quiet-host qualification. Original-L0 diagnostic
+stat/stacks deliberately use10ms heartbeat; pure-HLT1/4/8 controls are queued,
+not accepted. No candidate gains or changed caps/defaults are reported.
+
+No parent authorization to import the combined C00 owner/mailbox runtime or
+replace c734/L0 has been received here. Keep proposed platform provenance and
+collector versions separate from the minimal shared jail repair and our own
+terminal failed A/A extension. Any approved independent baseline must receive
+actual Ubuntu disk-root/stateful restore acceptance, complete attributable
+worker/kernel-I/O cost and the remaining mandatory matrix. This worktree
+executes no new tests/VMs/measurements and queues no heavy phase by recording
+the peer receipt; active/blocked, sync-default and draft/no-merge remain.
+
 ### Masked IRQ-route admission gap — 2026-10-05 05:03 UTC
 
 Read-only inspection of this worktree confirms `main.zig:injectIrq` always
