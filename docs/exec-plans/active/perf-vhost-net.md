@@ -52,6 +52,17 @@ SDK/CONNECT gaps. Whole softirq/network attribution and deciding paired
 confidence remain unavailable. Keep this plan active/blocked and PR8 draft;
 no default, auto-merge or performance-improvement recommendation is justified.
 
+Independent pending-emulation follow-up reads the pinned Azure KVM source and
+executes PIO-IN/MMIO-read raw KVM models twice: **2/2 cases per successful
+invocation**, FD6→6, RAX0→0x5a, no following instruction at the interruption
+barrier, then correct marker/HLT on resume. The first uninstrumented invocation
+timed out and has zero accepted cases; it is retained separately. Own current
+run loop already reenters after handling IO/MMIO and acknowledges pause only
+after Interrupted/net-quiesce, so no missing runtime repair is established.
+Only a clarifying comment and reproducible architectural fixture are added.
+The deterministic Flint API pending-exit snapshot/restore race remains unrun;
+these unjailed/no-TAP models do not waive production lifecycle or IRQ gates.
+
 **Current implementation update:** S4/common dispatcher and S5/shadow-ring
 backend/lifecycle are implemented, with the existing guest features, 12-byte
 header and format-v2 snapshot. A′ and B now have actual unjailed KVM payload,

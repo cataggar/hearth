@@ -908,6 +908,8 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
 
     var exit_count: u64 = 0;
     while (true) {
+        // Reenter after IO/MMIO even when paused: KVM must finish pending
+        // emulation before the Interrupted path can acknowledge migration.
         const exit_reason = vcpu.run() catch |err| {
             // KVM_RUN returns EINTR when interrupted by a signal. This happens
             // when: (a) immediate_exit was set, or (b) SIGUSR1 kicked us out

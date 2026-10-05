@@ -125,6 +125,15 @@ idle gates. Historical failures remain excluded. No current product TAP
 consumer, paired confidence interval or whole-network CPU attribution exists,
 and the unfavorable old-ELF pair is not pooled with corrected-ELF execution.
 
+Pending KVM userspace emulation is another pause boundary: IO/MMIO return values
+are not complete migration state until KVM_RUN is reentered. Pause must complete
+that operation without executing another guest instruction before net quiescence
+and acknowledgment. Keep the existing run-loop ordering (handle IO/MMIO,
+reenter KVM_RUN, then Interrupted/net-quiesce/ACK); do not add a pre-reentry pause
+shortcut. A minimal unjailed architectural probe does not substitute for a
+deterministic API-level pending-exit snapshot/restore regression or the pending
+network IRQ/race population.
+
 ### Reopened safe opt-in work (18:01 UTC)
 
 The coordinator independently confirms 15.961/16 busy visible cores. Quiet-host
