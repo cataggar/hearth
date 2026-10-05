@@ -209,7 +209,7 @@ are complete, independently of performance/default/merge qualification:
   inference. The12 jail cases verify077 access, CLI/API serial disk
   write/fsync/read/hash and all-task identity/empty groups; all24 recorded
   standalone PID paths and private nodes/sockets are gone. Its retained
-  `canonical-v5-final.json` and current clean published
+  `canonical-v5-final.json` and its clean v5 publication
   `39e6aaa029d14372e10d0532f6f6012c6e2ca57a`/draft PR10 preserve these
   peer executions. Different cache histories/test-build times are not speedups.
 
@@ -217,6 +217,20 @@ These are explicitly **peer-reported execution scopes**, not additional
 executions by this worktree or native/GNU acceptance of the fourth
 `98b10c21` evidence-fault case. This worktree's own canonical and cleanup
 proof remains separately recorded above.
+
+Plan#6 subsequently adopts fixture-only98 as
+`3414df47131b2116afed302fda2e3acb5ac1915d` and publishes
+`91ca9ed2ab7accaef6620702f90c36ec2bd98ec8`. Read-only Git comparison verifies
+all three VMM/runtime/unit blobs still exact7d and the fixture exact98.
+Its four frozen-ELF Debug/Safe × LLVM/native cleanup rows report **4/4 each,
+16/16 total, no skips**:8 small guest disk boots,4 ordinary API controls and4
+real API children with injected cleanup-evidence ENOSPC. All32 recorded PID
+paths/device nodes/sockets are gone;28 captured dropped-task statuses have
+UID/GID1000, empty groups, zero effective capabilities, NNP1 and Seccomp2.
+Peer raw receipt:
+`.perf-zig-native/evidence/postcleanup-summary/canonical-cleanup-enospc-v1-final.json`.
+This is a separate fixture epoch, **not renewed/pooled128/28/12 acceptance**,
+new compilation/performance, GNU acceptance or a size/guard/default waiver.
 
 The latest reconciliation reads only public PR metadata and Git objects in
 this worktree; it wakes no finished peer and runs no tests, VMs or profiles.
