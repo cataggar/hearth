@@ -62,8 +62,10 @@ flock -x -w 600 /d/hearth/.perf/fleet/host.lock timeout 180 bash -c '
 ```
 
 `--concurrent` checks eight clients
-in one VM, not four/eight-VM scaling. `--reset` performs three real guest driver
+in one VM, not four/eight-VM scaling. `--reset` defaults to three real guest driver
 unbind/rebind cycles with new payload checks and owned FD/task observations.
+`--reset-count` selects1–256 cycles; a requested100-cycle run that fails after30
+is a failed whole phase, not100 passing tests.
 `--malformed` restores deliberately patched RAM/state into real KVM for
 flags/direction/cycle/GPA/header/head/alignment rejection, including `auto`
 not silently falling back. Capability controls bind an owned regular file over
@@ -76,7 +78,9 @@ its raw failure remains retained, not reclassified as a successful rejection.
 
 New profiles attach only to the owned VMM (including its vhost worker) and
 owned peer, using root software stat/KVM events and49Hz/4KiB DWARF record,
-report and stacks. SIGINT after peer completion is an explicit normal collector
+report and stacks. The peer waits on a private pipe until perf acknowledges
+enabled capture; `--rpc-rate` applies to both ordinary and scoped RPC runs.
+SIGINT after peer completion is an explicit normal collector
 stop, with raw status retained. No new all-host process metadata/stacks are
 captured. `probe`/`quiet` historical all-host capture entrypoints are disabled.
 Work on unowned ksoftirqd CPUs is not captured/attributed; global aggregate
@@ -115,6 +119,43 @@ net mode alone permits blocking poll−1 for exactly1,2 or5 readiness descriptor
 sets, invalid counts/positive timeouts and retained eventfd/socket/clone/mprotect
 restrictions. A unit-only two-second watchdog bounds an accidentally allowed
 zero-FD test; the runtime still has no readiness timer or heartbeat.
+
+## Fresh controls and fault diagnostics
+
+`--tap-name` freezes the MAC-derived experiment identity; `--host-controls`
+records five-second no-owned-VM aggregate controls before/after join, and
+`--sample-label` distinguishes correctness, historical and fresh populations.
+`noise.py` validates only the three named fresh A/A boots, then freezes
+MAD/median gates and50%/80% RPC rates without reading candidate files.
+Global CPU/unit remains unattributed: no idle-floor subtraction or
+Flint-only reduction is a product saving.
+
+Run the following only inside a bounded exclusive fleet phase, with a fresh
+output path and root private`unshare --mount --net` supervisor:
+
+- `fault_probe.py --output <owned-path>` uses a restrictive notification filter
+  for58 real setup faults. Shadow mmap counting starts after the verified owned
+  vhost SET_MEM_TABLE marker and requires anonymous/private/fd−1; matching12KiB
+  alone also intercepts allocator/KVM_RUN mappings and is invalid coverage.
+- `lifecycle_fault.py --output <owned-path>` targets both queues' kick-unbind,
+  backend-detach and GET_VRING_BASE after checked traffic in strict/auto modes.
+  Pause/resume/snapshot must reject, workers join, no snapshot appears and
+  supervisor FD count stays unchanged.
+- `reset_diagnostic.py --boot-id <short-id> --backend userspace|vhost`
+  samples only its owned cgroup's pids/memory current/peak/events during100
+  resets. It does not relax limits or wake the guest.
+- `prepare_iperf.py --fixture-id <fixture-iperf-name> --server-console` retains
+  a separate installed-library guest closure and server diagnostics.
+  `iperf_smoke.py --boot-id <id> --backend <mode> --fixture-id <name>` attempts
+  both TCP/UDP directions at three seconds. Its idle collector holds the VM
+  open during traffic, so it is **not idle or performance acceptance**.
+
+Recipes are not completed gates. The chronological results retain every failed,
+mis-scoped and unrun population, including the first100-reset resource failure
+and guest iperf control-socket failures. Canonical common prerequisite
+`7dfee42` is reused with standalone`tools/perf/test_jail_baseline.py`; its
+three cases do not stand in for TAP/vhost/worker acceptance.
+
 The prior shared5ee jailed credentials retained supplementary group0; the
 preserved `jail_probe.py --expect inherited-groups` cases record fail-closed
 rejection, not successful network. Exact authorized shared `ced7ed7` now clears

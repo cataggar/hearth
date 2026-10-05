@@ -2,11 +2,13 @@
 """Root fixture supervisor; Flint and host traffic peers always run as UID 1000."""
 
 import argparse
+from contextlib import ExitStack
 import fcntl
 import hashlib
 import json
 import os
 import resource
+import select
 import signal
 import shutil
 import socket
@@ -33,6 +35,24 @@ def demote():
 def private_directory(path):
     path.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chown(path, UID, GID)
+
+
+def host_idle_control(directory, name, seconds=5):
+    def snapshot():
+        data = Path("/proc/stat").read_text()
+        values = [int(x) for x in data.splitlines()[0].split()[1:]]
+        return data, sum(values[i] for i in (0, 1, 2, 5, 6))
+    begin, a = snapshot()
+    started = time.monotonic()
+    time.sleep(seconds)
+    elapsed = time.monotonic() - started
+    end, b = snapshot()
+    cpu = (b - a) / os.sysconf("SC_CLK_TCK")
+    owned_file(directory / f"{name}.json", json.dumps({
+        "elapsed_seconds": elapsed, "busy_cpu_seconds": cpu, "busy_cores": cpu / elapsed,
+        "classification": "aggregate no-owned-VM control; not task attribution",
+        "begin": begin, "end": end,
+    }, indent=2) + "\n")
 
 
 def owned_file(path, data):
@@ -173,9 +193,10 @@ def sparse_copy(source, target):
 
 
 class JailedLayout:
-    def __init__(self, directory, fixture=None, backing=None):
+    def __init__(self, directory, fixture=None, backing=None, tap_name="hn2tap0"):
         private_directory(directory)
         self.directory = directory
+        self.tap_name = tap_name
         self.root = directory / "jail"
         if self.root.exists():
             raise ValueError("refusing to reuse a jail")
@@ -209,7 +230,7 @@ class JailedLayout:
         return [
             "setpriv", "--groups=0", "--", "taskset", "-c", "8", str(binary),
             "--jail", str(self.root), "--jail-uid", str(UID), "--jail-gid", str(GID),
-            "--jail-cgroup", self.cgroup.name, "--jail-memory", "1024", "--tap", "hn2tap0",
+            "--jail-cgroup", self.cgroup.name, "--jail-memory", "1024", "--tap", self.tap_name,
         ]
 
     def verify(self, pid, backend, name):
@@ -278,8 +299,11 @@ class JailedLayout:
         owned_file(self.directory / "jail-closed.json", json.dumps(result, indent=2) + "\n")
 
 
-def setup_tap(directory):
-    name = "hn2tap0"
+def setup_tap(directory, name="hn2tap0"):
+    if not name or len(name.encode()) > 15 or any(
+        c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for c in name
+    ):
+        raise ValueError("invalid owned TAP name")
     fd = os.open("/dev/net/tun", os.O_RDWR | os.O_CLOEXEC)
     try:
         fcntl.ioctl(fd, 0x400454CA, struct.pack("16sH22x", name.encode(), 0x0002 | 0x1000 | 0x4000))
@@ -342,7 +366,7 @@ def probe(directory):
     owned_file(directory / "devices.json", json.dumps(capabilities, indent=2) + "\n")
 
 
-def workload(directory, mode, name, seconds, warmup, profile=None, variant_override=None):
+def workload(directory, mode, name, seconds, warmup, profile=None, variant_override=None, rpc_rate=None):
     if mode == "idle":
         warmup = 0
     peer = [
@@ -350,6 +374,8 @@ def workload(directory, mode, name, seconds, warmup, profile=None, variant_overr
         "--mode", mode, "--warmup-seconds", str(warmup), "--seconds", str(seconds),
         "--output", str(directory / f"{name}.json"),
     ]
+    if mode == "rpc" and rpc_rate:
+        peer += ["--rpc-rate", str(rpc_rate)]
     variant_path = directory / "variant.json"
     if variant_path.exists():
         variant = variant_override or json.loads(variant_path.read_text())
@@ -403,14 +429,31 @@ def workload(directory, mode, name, seconds, warmup, profile=None, variant_overr
     return status
 
 
-def scoped_profile(directory, vmm_pid, mode, name, seconds, warmup, profile):
+def scoped_profile(directory, vmm_pid, mode, name, seconds, warmup, profile, rpc_rate=None):
+    with ExitStack() as cleanup:
+        descriptors = []
+        for _ in range(3):
+            read_fd, write_fd = os.pipe2(os.O_CLOEXEC)
+            cleanup.callback(os.close, read_fd)
+            cleanup.callback(os.close, write_fd)
+            descriptors.extend((read_fd, write_fd))
+        return _scoped_profile(directory, vmm_pid, mode, name, seconds, warmup,
+                               profile, *descriptors, rpc_rate=rpc_rate)
+
+
+def _scoped_profile(directory, vmm_pid, mode, name, seconds, warmup, profile,
+                    gate_read, gate_write, control_read, control_write, ack_read, ack_write,
+                    rpc_rate=None):
     variant = json.loads((directory / "variant.json").read_text())
     peer_argv = [
         "taskset", "-c", "9", "python3", str(directory / "source-collect.py"),
         "--mode", mode, "--seconds", str(seconds), "--warmup-seconds", str(warmup),
         "--backend", variant["effective_backend"], "--notification", variant["notification"],
         "--output", str(directory / f"{name}.json"),
+        "--start-fd", str(gate_read),
     ]
+    if mode == "rpc" and rpc_rate:
+        peer_argv += ["--rpc-rate", str(rpc_rate)]
     collector = None
     cache = directory / "perf-buildid"
     cache.mkdir(mode=0o700, exist_ok=True)
@@ -418,7 +461,7 @@ def scoped_profile(directory, vmm_pid, mode, name, seconds, warmup, profile):
                    "DEBUGINFOD_URLS": "", "PYTHONDONTWRITEBYTECODE": "1"}
     with (directory / f"{name}.peer.log").open("wb") as output:
         peer = subprocess.Popen(peer_argv, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT,
-                                preexec_fn=demote)
+                                preexec_fn=demote, pass_fds=(gate_read,))
     try:
         events = "task-clock,context-switches,cpu-migrations,page-faults,kvm:kvm_entry,kvm:kvm_exit"
         if profile == "stat":
@@ -432,9 +475,21 @@ def scoped_profile(directory, vmm_pid, mode, name, seconds, warmup, profile):
                 "-e", "cpu-clock", "-F", "49", "-g", "--call-graph", "dwarf,4096",
                 "-o", str(directory / f"{name}.perf.data"),
             ]
+        perf_argv += ["--delay=-1", "--control", f"fd:{control_read},{ack_write}"]
         with (directory / f"{name}.perf.log").open("wb") as output:
             collector = subprocess.Popen(perf_argv, cwd=ROOT, stdout=output,
-                                         stderr=subprocess.STDOUT, env=profile_env)
+                                         stderr=subprocess.STDOUT, env=profile_env,
+                                         pass_fds=(control_read, ack_write))
+        os.write(control_write, b"enable\n")
+        deadline = time.monotonic() + 5
+        acknowledgement = b""
+        while b"ack\n" not in acknowledgement:
+            remaining = deadline - time.monotonic()
+            if collector.poll() is not None or remaining <= 0:
+                raise RuntimeError("owned perf did not acknowledge enabled capture")
+            if select.select([ack_read], [], [], min(remaining, .1))[0]:
+                acknowledgement += os.read(ack_read, 64)
+        os.write(gate_write, b"R")
         peer_status = peer.wait(timeout=seconds + warmup + 30)
         stopped_by_supervisor = collector.poll() is None
         if stopped_by_supervisor:
@@ -446,6 +501,7 @@ def scoped_profile(directory, vmm_pid, mode, name, seconds, warmup, profile):
             "stopped_by_supervisor_sigint": stopped_by_supervisor,
             "scope": "owned VMM tasks (including owner vhost worker) and owned peer only",
             "private_buildid_dir": str(cache), "debuginfod_enabled": False,
+            "collector_enabled_ack": True, "peer_start_barrier": "released after perf control ack",
             "limitations": [
                 "not whole-host CPU or performance acceptance",
                 "network work on unowned ksoftirqd CPUs is not captured or attributed",
@@ -669,7 +725,8 @@ def resource_failures(args, directory):
 def boot(args, directory):
     private_directory(directory)
     freeze_tools(directory)
-    setup_tap(directory)
+    tap_name = getattr(args, "tap_name", "hn2tap0")
+    setup_tap(directory, tap_name)
     hide_vhost(directory, getattr(args, "vhost_unavailable", None))
     sock = directory / "flint.sock"
     if len(str(sock).encode()) >= 108:
@@ -679,7 +736,9 @@ def boot(args, directory):
     fixture = args.artifact_dir / getattr(args, "fixture_id", "fixture")
     backend = getattr(args, "net_backend", None)
     jailed = getattr(args, "jail", False)
-    layout = JailedLayout(directory, fixture=fixture) if jailed else None
+    if getattr(args, "host_controls", False):
+        host_idle_control(directory, "host-before")
+    layout = JailedLayout(directory, fixture=fixture, tap_name=tap_name) if jailed else None
     memory_directory = layout.root if layout else directory
     if layout:
         sock = layout.root / "api.sock"
@@ -704,7 +763,7 @@ def boot(args, directory):
         owned_file(directory / "flint-pid.txt", str(child.pid) + "\n")
         owned_file(directory / "variant.json", json.dumps({
             "requested_backend": backend or "original-userspace",
-            "classification": "correctness diagnostic, not performance qualification",
+            "classification": getattr(args, "sample_label", None) or "correctness diagnostic, not performance qualification",
             "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
             "argv": argv,
             "jailed": jailed, "memory_directory": str(memory_directory),
@@ -721,7 +780,7 @@ def boot(args, directory):
                 "initrd_path": "initrd.cpio.gz" if layout else str(fixture / "initrd.cpio.gz"),
                 "boot_args": "console=ttyS0 reboot=k panic=1 pci=off",
             }),
-            request(sock, "PUT", "/network-interfaces/eth0", {"iface_id": "eth0", "host_dev_name": "hn2tap0"}),
+            request(sock, "PUT", "/network-interfaces/eth0", {"iface_id": "eth0", "host_dev_name": tap_name}),
             request(sock, "PUT", "/actions", {"action_type": "InstanceStart"}),
         ]
         owned_file(directory / "api-configuration.txt", "\n".join(responses))
@@ -751,7 +810,8 @@ def boot(args, directory):
             for mode in args.modes:
                 name = f"{'correctness' if backend else 'aa'}-{repetition:02d}-{mode}"
                 summary.append({"name": name, "status": workload(
-                    directory, mode, name, args.seconds, getattr(args, "warmup", 10))})
+                    directory, mode, name, args.seconds, getattr(args, "warmup", 10),
+                    rpc_rate=getattr(args, "rpc_rate", None))})
         if args.profiles:
             for mode in dict.fromkeys([*args.modes, "idle"]):
                 for profile in ("stat", "record"):
@@ -759,13 +819,14 @@ def boot(args, directory):
                     summary.append({
                         "name": name,
                         "status": scoped_profile(directory, child.pid, mode, name, args.seconds,
-                                                 0 if mode == "idle" else args.warmup, profile),
+                                                 0 if mode == "idle" else args.warmup, profile,
+                                                 rpc_rate=getattr(args, "rpc_rate", None)),
                     })
         owned_file(directory / "summary.json", json.dumps(summary, indent=2) + "\n")
         owned_file(directory / "api-final-status.txt", request(sock, "GET", "/vm"))
         if args.reset:
             reset_checks = []
-            for iteration in range(3):
+            for iteration in range(getattr(args, "reset_count", 3)):
                 status = command(
                     ["taskset", "-c", "9", "python3", "-c",
                      "import socket; s=socket.create_connection(('192.0.2.2',7003),5); "
@@ -782,6 +843,8 @@ def boot(args, directory):
                 if status or payload_status:
                     raise RuntimeError("reset/rebind payload check failed")
                 inventory(directory, f"reset-{iteration}", child.pid)
+                if layout:
+                    layout.verify(child.pid, variant["effective_backend"], f"reset-{iteration}-verified")
             owned_file(directory / "reset-results.json", json.dumps(reset_checks, indent=2) + "\n")
         if args.concurrent:
             status = command(
@@ -869,7 +932,7 @@ def boot(args, directory):
                     layout = JailedLayout(directory / "restore", backing={
                         "baseline.vmstate": memory_directory / "baseline.vmstate",
                         "baseline.mem": memory_directory / "baseline.mem",
-                    })
+                    }, tap_name=tap_name)
                     sock = layout.root / "api.sock"
                     restore_argv = [*layout.argv(binary), "--restore",
                                     "--vmstate-path", "baseline.vmstate", "--mem-path", "baseline.mem",
@@ -878,7 +941,7 @@ def boot(args, directory):
                     restore_argv = [
                         "taskset", "-c", "8", str(binary), "--restore",
                         "--vmstate-path", str(memory_directory / "baseline.vmstate"),
-                        "--mem-path", str(memory_directory / "baseline.mem"), "--tap", "hn2tap0",
+                        "--mem-path", str(memory_directory / "baseline.mem"), "--tap", tap_name,
                         "--net-backend", args.restore_backend, "--api-sock", str(sock),
                     ]
                 with (directory / "restore.log").open("wb") as output:
@@ -932,6 +995,8 @@ def boot(args, directory):
         finally:
             if layout:
                 layout.close()
+        if getattr(args, "host_controls", False):
+            host_idle_control(directory, "host-after")
 
 
 def main():
@@ -944,6 +1009,10 @@ def main():
     parser.add_argument("--profiles", action="store_true")
     parser.add_argument("--net-backend", choices=("userspace", "vhost", "auto"))
     parser.add_argument("--warmup", type=float, default=10)
+    parser.add_argument("--rpc-rate", type=float)
+    parser.add_argument("--sample-label")
+    parser.add_argument("--tap-name", default="hn2tap0")
+    parser.add_argument("--host-controls", action="store_true")
     parser.add_argument("--snapshot", action="store_true")
     parser.add_argument("--traffic-snapshot", action="store_true")
     parser.add_argument("--restore-backend", choices=("userspace", "vhost"))
@@ -952,11 +1021,16 @@ def main():
     parser.add_argument("--vhost-unavailable", choices=("permission", "uapi"))
     parser.add_argument("--fixture-id", choices=("fixture", "fixture-reset"), default="fixture")
     parser.add_argument("--reset", action="store_true")
+    parser.add_argument("--reset-count", type=int, default=3)
     parser.add_argument("--jail", action="store_true")
     parser.add_argument("--control-id")
     parser.add_argument("--modes", nargs="+", choices=("rpc", "h2g", "g2h", "wake", "idle"),
                         default=["rpc", "h2g", "g2h", "wake"])
     args = parser.parse_args()
+    if not 1 <= args.reset_count <= 256:
+        parser.error("reset-count must be between1 and256")
+    if args.rpc_rate is not None and args.rpc_rate <= 0:
+        parser.error("rpc-rate must be positive")
     if args.phase == "strict" and not args.vhost_unavailable:
         parser.error("strict phase needs an owned unavailable-device control")
     if args.traffic_snapshot or args.restore_backend or args.malformed:

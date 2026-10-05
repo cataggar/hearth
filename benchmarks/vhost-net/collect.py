@@ -86,6 +86,11 @@ def run(args):
         "errors": [],
         "rtt_ms": [],
         "start_cpu": cpu_snapshot(),
+        "start_process_cpu_seconds": time.process_time(),
+        "requested_rpc_rate": getattr(args, "rpc_rate", None),
+        "warmup_successful_requests": 0,
+        "warmup_payload_bytes_one_direction": 0,
+        "late_rate_slots": 0,
     }
     start = time.monotonic()
     phase = "idle" if args.mode == "idle" else "connect"
@@ -101,14 +106,27 @@ def run(args):
                 phase = "warmup"
                 warmup_end = time.monotonic() + args.warmup_seconds
                 while time.monotonic() < warmup_end:
-                    transaction(sock, args.mode, sequence)
+                    results["warmup_payload_bytes_one_direction"] += transaction(sock, args.mode, sequence)
+                    results["warmup_successful_requests"] += 1
                     sequence += 1
                 results["active_start_cpu"] = cpu_snapshot()
+                results["active_start_process_cpu_seconds"] = time.process_time()
                 active_start = time.monotonic()
                 phase = "active"
                 while time.monotonic() - active_start < args.seconds:
                     if args.mode == "wake":
                         time.sleep(args.idle_seconds)
+                    rate = getattr(args, "rpc_rate", None)
+                    if rate:
+                        scheduled = active_start + results["attempted_active_requests"] / rate
+                        now = time.monotonic()
+                        if scheduled >= active_start + args.seconds:
+                            time.sleep(max(0, active_start + args.seconds - now))
+                            break
+                        if now < scheduled:
+                            time.sleep(scheduled - now)
+                        elif now - scheduled > 1 / rate:
+                            results["late_rate_slots"] += 1
                     begin = time.monotonic_ns()
                     results["attempted_active_requests"] += 1
                     size = transaction(sock, args.mode, sequence)
@@ -118,14 +136,21 @@ def run(args):
                     results["payload_bytes_one_direction"] += size
                     sequence += 1
                 results["active_seconds"] = time.monotonic() - active_start
+                results["active_process_cpu_seconds"] = (
+                    time.process_time() - results["active_start_process_cpu_seconds"]
+                )
                 results["active_end_cpu"] = cpu_snapshot()
     except (OSError, ValueError, ConnectionError) as error:
         results["errors"].append({"phase": phase, "type": type(error).__name__, "message": str(error)})
         if phase == "active":
             results["active_seconds"] = time.monotonic() - active_start
+            results["active_process_cpu_seconds"] = (
+                time.process_time() - results["active_start_process_cpu_seconds"]
+            )
             results["active_end_cpu"] = cpu_snapshot()
     results["whole_command_seconds"] = time.monotonic() - start
     results["end_cpu"] = cpu_snapshot()
+    results["whole_process_cpu_seconds"] = time.process_time() - results["start_process_cpu_seconds"]
     results["rtt_ms_percentiles"] = percentiles(results["rtt_ms"])
     results["percentile_population"] = (
         "successful responses only; failures are separate, not a censored timeout tail estimate"
@@ -150,6 +175,14 @@ def run(args):
     return results
 
 
+def wait_for_profile(fd):
+    try:
+        if os.read(fd, 1) != b"R":
+            raise ValueError("owned profile start barrier was not released")
+    finally:
+        os.close(fd)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=("rpc", "wake", "h2g", "g2h", "idle"), required=True)
@@ -157,6 +190,8 @@ def main():
     parser.add_argument("--warmup-seconds", type=float, default=10)
     parser.add_argument("--seconds", type=float, default=60)
     parser.add_argument("--idle-seconds", type=float, default=1)
+    parser.add_argument("--rpc-rate", type=float)
+    parser.add_argument("--start-fd", type=int)
     parser.add_argument("--timeout-seconds", type=float, default=3)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--backend", default="userspace")
@@ -164,6 +199,10 @@ def main():
     args = parser.parse_args()
     if args.seconds <= 0 or args.warmup_seconds < 0 or args.timeout_seconds <= 0 or args.idle_seconds < 0:
         parser.error("durations must be positive; warmup and idle may be zero")
+    if args.rpc_rate is not None and (args.rpc_rate <= 0 or args.mode != "rpc"):
+        parser.error("rpc-rate must be positive and is only supported for rpc")
+    if args.start_fd is not None:
+        wait_for_profile(args.start_fd)
     result = run(args)
     args.output.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({key: value for key, value in result.items() if not key.endswith("_cpu") and key != "rtt_ms"}))

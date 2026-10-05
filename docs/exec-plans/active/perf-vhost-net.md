@@ -1,6 +1,6 @@
 # Execution Plan: Evaluate Flint vhost-net
 
-**Status**: Blocked — implemented experimental shadow-ring opt-in/common adapter; full acceptance and performance qualification incomplete
+**Status**: In progress — fresh post-cleanup baselines/A/A and deterministic acceptance; no adoption qualification
 **Last updated**: 2026-10-04
 **Issue**: [#2](https://github.com/cataggar/hearth/issues/2)
 **Spec**: [Capability-gated vhost-net Evaluation](../../product-specs/perf-vhost-net.md)
@@ -68,6 +68,39 @@ cgroups absent; all new aggregate windows span0.279334–4.322714 busy cores,
 not a qualified pooled performance population. The original default and draft-only,
 no-performance-merge disposition remain unchanged. Precise commands/counts,
 profile scope, artifacts and remaining gates are in the appended results.
+
+### Post-cleanup execution restart (23:24–23:37 UTC)
+
+The parent reports explicit user authorization and verification of fifteen exact
+old orphan shell loops before stopping those specific PIDs. No other job is
+authorized for termination or movement. Its subsequent locked aggregate control
+reports8.733/16 busy cores: peer-reported, not an own measurement or a quiet-host
+assertion. Earlier near16-core controls are historical. Cleanup is not an
+optimization arm and pre/post-cleanup numbers must not be compared as vhost gains.
+
+Resume S3 with fresh original-A controls and common-A′ A/A only, before candidate
+gain analysis. Freeze the same safe ELF, guest/kernel, features/header, warm cache,
+VM/peer CPU8/9 and a single experiment-unique TAP name across this new population.
+For RPC/upload/download collect10 repeats across three fresh boots (4/3/3),
+10s warmup/60s active; split wake into18 windows across three fresh boots (6/6/6)
+to attempt at least1,000 valid1s-idle responses. Collect10 separate60s idle
+windows (4/3/3). Each boot is independently bounded by900s under the fleet lock,
+with five-second no-owned-VM controls before/after, and owned join/cgroup cleanup.
+Counts and timeout tails are actual outcomes, not presumed evidence-floor passes.
+Compute MAD/median N from these new controls; retain all frozen spec gates and
+report incomplete attribution or residual-load ambiguity as inconclusive.
+No candidate/default gain is inferred from old samples or parent cleanup.
+
+Current harness changes add explicit fixed-rate RPC/client CPU accounting,
+fixed TAP identity and per-boot controls. Validate before executing new samples;
+freeze sources while a queued/running phase may read them. Deterministic
+100-generation reset/confinement checks per backend and restrictive owned-child
+fault injection are separate correctness phases, not performance comparisons.
+The extra fault filter never broadens Flint's base filter. A seccomp notification
+listener remains in the root supervisor only, enabling selected first/second
+queue and first/second shadow-map failures; no listener/device FD survives into
+Flint around its close-range boundary. Planned fault cases are explicitly unrun
+until their actual logs/join results exist.
 
 The paragraphs below retain the earlier chronological findings, including
 the direct-ring rejection and the then-unimplemented A′/B status; they do not
@@ -712,6 +745,16 @@ full-jail isolation/lifecycle acceptance, current TAP relevance and quiet
 deciding performance qualification remain blocked; no checklist gate closes.
 
 ## Completion checklist
+
+Post-cleanup execution is reopened, not completed: fresh original`pc-l0a`
+fails3/3 normal active and6/6 active profile/client windows; its own idle
+controls measure1.219982/1.911931 busy cores. Common-userspace A/A is running
+from frozen sources. Python9/9 and SET_OWNER2/2 pass. Full setup-fault58-row
+execution fails after56 initial assertion matches; all four length-only mmap
+rows are excluded as shadow coverage after discovering KVM_RUN ambiguity.
+Corrected private-anonymous/fd−1 shadow calibration and100-reset generations
+per backend are queued only. No current N, candidate benefit or performance
+merge decision exists. See the chronological results report for raw paths.
 
 - [x] Write the product spec first and this issue-linked executable plan.
 - [x] Ground applicability, lifecycle and coverage gaps in existing source.

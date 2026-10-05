@@ -1,3 +1,4 @@
+import os
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -25,6 +26,14 @@ class FragmentedSocket:
 
 
 class CollectorTests(unittest.TestCase):
+    def test_profile_gate_eof_does_not_start_workload(self):
+        read_fd, write_fd = os.pipe2(os.O_CLOEXEC)
+        os.close(write_fd)
+        with self.assertRaisesRegex(ValueError, "barrier was not released"):
+            collect.wait_for_profile(read_fd)
+        with self.assertRaises(OSError):
+            os.fstat(read_fd)
+
     def test_partial_reads_and_early_eof(self):
         self.assertEqual(collect.receive(FragmentedSocket([b"a", b"bc", b"def"]), 6), b"abcdef")
         with self.assertRaises(ConnectionError):
@@ -77,8 +86,48 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(result["backend"], "vhost")
         self.assertEqual(result["notification"], "common blocked-poll")
 
+    def test_fixed_rate_does_not_send_beyond_active_window(self):
+        args = SimpleNamespace(
+            mode="rpc", host="192.0.2.2", timeout_seconds=3, warmup_seconds=0,
+            seconds=0.12, idle_seconds=1, rpc_rate=20,
+        )
+        clock = [0.0]
+        calls = []
+        def advance(seconds):
+            clock[0] += seconds
+        def transact(_sock, _mode, sequence):
+            calls.append((sequence, clock[0]))
+            advance(0.01)
+            return 64
+        cpu = {"busy_ticks": 0, "clock_ticks_per_second": 100}
+        with (
+            patch.object(collect.socket, "create_connection", return_value=MagicMock()),
+            patch.object(collect, "cpu_snapshot", return_value=cpu),
+            patch.object(collect.time, "monotonic", side_effect=lambda: clock[0]),
+            patch.object(collect.time, "sleep", side_effect=advance),
+            patch.object(collect, "transaction", side_effect=transact),
+        ):
+            result = collect.run(args)
+        self.assertEqual(calls, [(0, 0), (1, 0.05), (2, 0.1)])
+        self.assertAlmostEqual(result["active_seconds"], 0.12)
+        self.assertEqual(result["successful_requests"], 3)
+
 
 class RunnerTests(unittest.TestCase):
+    def test_partial_profile_pipe_setup_unwinds_all_descriptors(self):
+        before = len(list(Path("/proc/self/fd").iterdir()))
+        real_pipe = os.pipe2
+        calls = []
+        def create_pipe(flags):
+            if calls:
+                raise OSError("owned pipe limit")
+            calls.append(True)
+            return real_pipe(flags)
+        with patch.object(runner.os, "pipe2", side_effect=create_pipe):
+            with self.assertRaisesRegex(OSError, "owned pipe limit"):
+                runner.scoped_profile(Path("."), 1, "rpc", "fixture", 1, 0, "stat")
+        self.assertEqual(before, len(list(Path("/proc/self/fd").iterdir())))
+
     def test_vm_is_stopped_if_post_spawn_metadata_fails(self):
         child = MagicMock()
         child.poll.return_value = None
