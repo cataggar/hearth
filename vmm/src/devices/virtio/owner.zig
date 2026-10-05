@@ -1,9 +1,11 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const linux = std.os.linux;
 const Device = @import("mmio.zig");
 const Vsock = @import("vsock.zig");
 const Memory = @import("../../memory.zig");
 const Vm = @import("../../kvm/vm.zig");
+const Vcpu = @import("../../kvm/vcpu.zig");
 const abi = @import("../../kvm/abi.zig");
 const virtio = @import("../virtio.zig");
 const sync = @import("../../sync.zig");
@@ -40,7 +42,11 @@ const Kick = struct {
     epoch: u64 = 0,
 };
 
-const Kind = enum { read, write, pause, unpause, stop };
+const Kind = enum { read, write, pause, unpause, stop, test_failure };
+pub const FailureWait = struct {
+    mutex: *sync.Mutex,
+    condition: *sync.Condition,
+};
 const Request = struct {
     kind: Kind,
     offset: u64 = 0,
@@ -53,6 +59,8 @@ pub const Owner = struct {
     mem: *Memory,
     vm: *const Vm,
     failure: *std.atomic.Value(bool),
+    vcpu: *Vcpu,
+    failure_wait: ?FailureWait,
     vcpu_tid: i32,
     mode: Mode,
     irq: Accelerator.Irq = undefined,
@@ -139,6 +147,22 @@ pub const Owner = struct {
         _ = try self.call(.{ .kind = .unpause });
     }
 
+    pub fn failForTest(self: *Owner) !void {
+        if (!builtin.is_test) @compileError("owner failure injection is test-only");
+        _ = try self.call(.{ .kind = .test_failure });
+    }
+
+    fn publishFailure(self: *Owner) void {
+        self.failure.store(true, .seq_cst);
+        @atomicStore(u8, &self.vcpu.kvm_run.immediate_exit, 1, .seq_cst);
+        _ = linux.tkill(self.vcpu_tid, linux.SIG.USR1);
+        if (self.failure_wait) |wait| {
+            wait.mutex.lock();
+            wait.condition.broadcast();
+            wait.mutex.unlock();
+        }
+    }
+
     pub fn stop(self: *Owner) void {
         if (self.thread) |thread| {
             _ = self.call(.{ .kind = .stop }) catch {};
@@ -182,6 +206,7 @@ pub const Owner = struct {
                 self.pending |= 7;
             },
             .stop => self.stopping = true,
+            .test_failure => if (builtin.is_test) return error.InjectedOwnerFailure else unreachable,
         }
         try self.refresh();
         if (request.kind == .unpause) try self.service();
@@ -315,21 +340,20 @@ pub const Owner = struct {
         defer {
             for (0..self.kicks.len) |index| self.removeKick(index) catch |err| {
                 log.err("GSI{} queue{} cleanup failed: {}", .{ self.device.irq, index, err });
-                self.failure.store(true, .release);
+                self.publishFailure();
             };
             self.irq.deinit() catch |err| {
                 log.err("GSI{} IRQ cleanup failed: {}", .{ self.device.irq, err });
-                self.failure.store(true, .release);
+                self.publishFailure();
             };
         }
         self.run() catch |err| {
             log.err("device GSI{} owner failed: {}", .{ self.device.irq, err });
-            self.failure.store(true, .release);
+            self.publishFailure();
             self.mutex.lock();
             self.failed = true;
             self.condition.broadcast();
             self.mutex.unlock();
-            _ = linux.tkill(self.vcpu_tid, linux.SIG.USR1);
         };
     }
 
@@ -389,13 +413,25 @@ pub const Set = struct {
     owners: [virtio.MAX_DEVICES]Owner = undefined,
     count: usize = 0,
     failed: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    vcpu: ?*Vcpu = null,
+    failure_wait: ?FailureWait = null,
 
-    pub fn start(self: *Set, devices: *[virtio.MAX_DEVICES]?Device, count: usize, vm: *const Vm, mem: *Memory, mode: Mode) !void {
+    pub fn start(self: *Set, devices: *[virtio.MAX_DEVICES]?Device, count: usize, vm: *const Vm, mem: *Memory, mode: Mode, vcpu: *Vcpu) !void {
+        self.vcpu = vcpu;
         errdefer self.stop();
         for (devices[0..count]) |*optional| {
             const device = if (optional.*) |*value| value else return error.MissingDevice;
             const owner = &self.owners[self.count];
-            owner.* = .{ .device = device, .vm = vm, .mem = mem, .failure = &self.failed, .vcpu_tid = @intCast(linux.gettid()), .mode = mode };
+            owner.* = .{
+                .device = device,
+                .vm = vm,
+                .mem = mem,
+                .failure = &self.failed,
+                .vcpu = vcpu,
+                .failure_wait = self.failure_wait,
+                .vcpu_tid = @intCast(linux.gettid()),
+                .mode = mode,
+            };
             try owner.start();
             self.count += 1;
         }
@@ -411,6 +447,18 @@ pub const Set = struct {
         for (self.owners[0..self.count]) |*owner| try owner.unpause();
     }
 
+    pub fn beforeEntry(self: *Set, clear: bool) !void {
+        const vcpu = self.vcpu orelse return error.MissingVcpu;
+        // Ordered with publishFailure: a pre-clear failure is observed, or
+        // its later immediate-exit assertion persists into KVM_RUN.
+        if (clear and @atomicLoad(u8, &vcpu.kvm_run.immediate_exit, .seq_cst) != 0)
+            @atomicStore(u8, &vcpu.kvm_run.immediate_exit, 0, .seq_cst);
+        if (builtin.is_test) {
+            if (test_after_clear) |hook| try hook(self);
+        }
+        if (self.failed.load(.seq_cst)) return error.BackendOwnerFailed;
+    }
+
     pub fn stop(self: *Set) void {
         for (self.owners[0..self.count]) |*owner| owner.stop();
         self.count = 0;
@@ -421,3 +469,5 @@ pub const Set = struct {
         if (self.failed.load(.acquire)) return error.BackendOwnerFailed;
     }
 };
+
+pub var test_after_clear: ?*const fn (*Set) anyerror!void = null;

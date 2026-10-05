@@ -11,6 +11,8 @@ const seccomp = @import("seccomp.zig");
 const Owner = @import("devices/virtio/owner.zig");
 const Device = @import("devices/virtio/mmio.zig");
 const virtio = @import("devices/virtio.zig");
+const Main = @import("main.zig");
+const Serial = @import("devices/serial.zig");
 
 const Fixture = struct {
     kvm: Kvm,
@@ -124,7 +126,7 @@ test "real enforced owners start reset fence and join all four delivery modes" {
                 devices[0] = try Device.initVsock(0x8000, 5, 43, "/unused-owned-fixture");
                 defer devices[0].?.deinit();
                 var owners: Owner.Set = .{};
-                try owners.start(&devices, 1, &fixture.vm, &fixture.mem, mode);
+                try owners.start(&devices, 1, &fixture.vm, &fixture.mem, mode, &fixture.vcpu);
                 defer owners.stop();
                 const owner = &owners.owners[0];
                 const magic = try owner.read(virtio.MMIO_MAGIC_VALUE, 4);
@@ -185,7 +187,7 @@ test "real enforced partial owner setup unwinds ten failures without fd leaks" {
                     devices[1].?.queues[0].desc_addr = std.math.maxInt(u64) - 15;
                     const before = descriptors();
                     var owners: Owner.Set = .{};
-                    try std.testing.expectError(error.InvalidRestoredQueue, owners.start(&devices, 2, &fixture.vm, &fixture.mem, mode));
+                    try std.testing.expectError(error.InvalidRestoredQueue, owners.start(&devices, 2, &fixture.vm, &fixture.mem, mode, &fixture.vcpu));
                     try std.testing.expectEqual(@as(usize, 0), owners.count);
                     try std.testing.expectEqual(before, descriptors());
                 }
@@ -236,7 +238,7 @@ test "real enforced late owner failure unwinds live kick and IRQ registrations" 
                     var owners: Owner.Set = .{};
                     // GSI32 fails policy only after both owners start and the
                     // first one's live resources have reconciled successfully.
-                    try std.testing.expectError(error.BackendOwnerFailed, owners.start(&devices, 2, &fixture.vm, &fixture.mem, mode));
+                    try std.testing.expectError(error.BackendOwnerFailed, owners.start(&devices, 2, &fixture.vm, &fixture.mem, mode, &fixture.vcpu));
                     try std.testing.expect(owners.failed.load(.acquire));
                     try std.testing.expectEqual(@as(usize, 0), owners.count);
                     try std.testing.expectEqual(before, descriptors());
@@ -355,6 +357,8 @@ const IrqOptions = struct {
     reset_pending: bool = false,
     ioapic: bool = false,
     post_iret: bool = false,
+    mask_after_active: bool = false,
+    inactive_ioapic_level: bool = false,
 };
 
 test "real KVM dormant queue pause attributes deassignment without dropping fences" {
@@ -400,7 +404,7 @@ test "real KVM dormant queue pause attributes deassignment without dropping fenc
                     }
                     defer for (devices[0..3]) |*device| device.*.?.deinit();
                     var owners: Owner.Set = .{};
-                    try owners.start(&devices, 3, &fixture.vm, &fixture.mem, mode);
+                    try owners.start(&devices, 3, &fixture.vm, &fixture.mem, mode, &fixture.vcpu);
                     defer owners.stop();
                     elapsed = 0;
                     count = 0;
@@ -499,10 +503,10 @@ fn irqScenario(options: IrqOptions) !void {
     const eoi_first = options.eoi_first;
     const code = [_]u8{
         0xb0, 0x11, 0xe6, 0x20, // PIC ICW1
-        0xb0, 0x20,                                                 0xe6, 0x21, // PIC vector base
-        0xb0, 0x04,                                                 0xe6, 0x21,
-        0xb0, 0x01,                                                 0xe6, 0x21,
-        0xb0, if (options.masked or options.ioapic) 0xff else 0xdf, 0xe6, 0x21,
+        0xb0, 0x20,                                                                                  0xe6, 0x21, // PIC vector base
+        0xb0, 0x04,                                                                                  0xe6, 0x21,
+        0xb0, 0x01,                                                                                  0xe6, 0x21,
+        0xb0, if ((options.masked and !options.mask_after_active) or options.ioapic) 0xff else 0xdf, 0xe6, 0x21,
         0xba, 0xd0, 0x04, 0xb0, if (level and !options.ioapic) 0x20 else 0, 0xee, // ELCR
         0xb0, 0x11, 0xe6, 0xe9, // ready barrier
         0xfb, 0xf4, 0xeb, 0xfd, // sti; hlt loop
@@ -546,14 +550,19 @@ fn irqScenario(options: IrqOptions) !void {
         var chip = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_IOAPIC);
         const offset = c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_IOAPIC_REDIR_OFFSET + 5 * 8;
         const entry: u64 = 0x25 | (if (level) @as(u64, 1) << 15 else 0) |
-            (if (options.masked) @as(u64, 1) << 16 else 0);
+            (if (options.masked and !options.mask_after_active) @as(u64, 1) << 16 else 0);
         std.mem.writeInt(u64, chip[offset..][0..8], entry, .little);
+        try fixture.vm.setIrqChip(&chip);
+    } else if (options.inactive_ioapic_level) {
+        var chip = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_IOAPIC);
+        const offset = c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_IOAPIC_REDIR_OFFSET + 5 * 8;
+        std.mem.writeInt(u64, chip[offset..][0..8], 0x25 | (@as(u64, 1) << 15) | (@as(u64, 1) << 16), .little);
         try fixture.vm.setIrqChip(&chip);
     }
     var irq = try Accelerator.Irq.init(&fixture.vm, 5, options.accelerated);
     defer irq.deinit() catch {};
     try irq.reconcile(true, 0);
-    if (!options.ioapic or !options.masked)
+    if (!options.ioapic or !options.masked or options.mask_after_active)
         try std.testing.expectEqual(if (level) Accelerator.Trigger.level else .edge, irq.trigger);
     var action = linux.Sigaction{
         .handler = .{ .handler = &signalHandler },
@@ -573,9 +582,26 @@ fn irqScenario(options: IrqOptions) !void {
     // This host-only wait never injects guest IRQs; no PIT or heartbeat exists.
     _ = linux.nanosleep(&.{ .sec = 1, .nsec = 0 }, null);
     try expectSleeping(run.tid.load(.acquire));
+    const established_generation = irq.generation;
+    if (options.mask_after_active) {
+        try expectKvmHalt(run.tid.load(.acquire));
+        var chip = try fixture.vm.getIrqChip(if (options.ioapic) c.KVM_IRQCHIP_IOAPIC else c.KVM_IRQCHIP_PIC_MASTER);
+        if (options.ioapic) {
+            const offset = c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_IOAPIC_REDIR_OFFSET + 5 * 8;
+            const entry = std.mem.readInt(u64, chip[offset..][0..8], .little);
+            std.mem.writeInt(u64, chip[offset..][0..8], entry | (@as(u64, 1) << 16), .little);
+        } else {
+            chip[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IMR_OFFSET] |= 0x20;
+        }
+        try fixture.vm.setIrqChip(&chip);
+    }
     const index: *u16 = @ptrCast(@alignCast(fixture.mem.mem[0x702..].ptr));
     @atomicStore(u16, index, 1, .release);
     try irq.notify(1);
+    if (options.mask_after_active) {
+        try std.testing.expectEqual(if (level) Accelerator.Trigger.level else .edge, irq.trigger);
+        try std.testing.expectEqual(established_generation, irq.generation);
+    }
     var expected_index: u16 = 1;
     if (options.masked) {
         var pending = false;
@@ -661,6 +687,202 @@ test "real KVM line and irqfd return through IRET to timer-free HLT without stal
     }.run);
 }
 
+test "real KVM established trigger survives both masks and unmasks without another notify" {
+    try isolated(struct {
+        fn reconfigure(accelerated: bool) !void {
+            var fixture = try Fixture.init(&.{0xf4});
+            defer fixture.deinit();
+            var pic = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_MASTER);
+            pic[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IMR_OFFSET] |= 0x20;
+            pic[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_ELCR_OFFSET] &= ~@as(u8, 0x20);
+            try fixture.vm.setIrqChip(&pic);
+            var chip = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_IOAPIC);
+            const offset = c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_IOAPIC_REDIR_OFFSET + 5 * 8;
+            std.mem.writeInt(u64, chip[offset..][0..8], 0x25 | (@as(u64, 1) << 15) | (@as(u64, 1) << 16), .little);
+            try fixture.vm.setIrqChip(&chip);
+            var irq = try Accelerator.Irq.init(&fixture.vm, 5, accelerated);
+            defer irq.deinit() catch {};
+            try irq.reconcile(true, 0);
+            try std.testing.expectEqual(Accelerator.Trigger.level, irq.trigger);
+            std.mem.writeInt(u64, chip[offset..][0..8], 0x25 | (@as(u64, 1) << 16), .little);
+            try fixture.vm.setIrqChip(&chip);
+            try irq.reconcile(true, 0);
+            try std.testing.expectEqual(Accelerator.Trigger.edge, irq.trigger);
+        }
+
+        fn run() !void {
+            for ([_]Owner.Mode{ .C00, .C10, .C01, .C11 }) |mode| {
+                const accelerated = mode == .C01 or mode == .C11;
+                std.debug.print("mask_transition mode={s} IOAPIC-level/PIC-edge paths\n", .{@tagName(mode)});
+                try irqScenario(.{
+                    .accelerated = accelerated,
+                    .level = true,
+                    .ioapic = true,
+                    .masked = true,
+                    .mask_after_active = true,
+                    .eoi_first = true,
+                    .post_iret = true,
+                });
+                try reconfigure(accelerated);
+                try irqScenario(.{
+                    .accelerated = accelerated,
+                    .masked = true,
+                    .mask_after_active = true,
+                    .inactive_ioapic_level = true,
+                    .post_iret = true,
+                });
+            }
+        }
+    }.run);
+}
+
+const FatalStage = enum { before_run, after_clear, while_paused, resume_clear };
+const FatalCase = struct {
+    var stage: FatalStage = undefined;
+    var hook_calls: usize = 0;
+    var driver: PauseDriver = undefined;
+    var driver_thread: ?std.Thread = null;
+
+    const PauseDriver = struct {
+        runtime: *Main.VmRuntime,
+        owner: *Owner.Owner,
+        resume_request: bool,
+        failed: bool = false,
+
+        fn entry(self: *PauseDriver) void {
+            self.runtime.mutex.lock();
+            while (!self.runtime.ack_paused.load(.acquire) and !self.runtime.exited.load(.acquire))
+                self.runtime.condition.wait(&self.runtime.mutex);
+            if (self.resume_request) {
+                self.runtime.paused.store(false, .seq_cst);
+                self.runtime.condition.broadcast();
+                self.runtime.mutex.unlock();
+            } else {
+                self.runtime.mutex.unlock();
+                self.owner.failForTest() catch |err| {
+                    self.failed = err == error.BackendOwnerFailed;
+                    return;
+                };
+            }
+        }
+    };
+
+    fn fail(owners: *Owner.Set) !void {
+        hook_calls += 1;
+        try std.testing.expectError(error.BackendOwnerFailed, owners.owners[0].failForTest());
+        try std.testing.expect(owners.failed.load(.acquire));
+    }
+
+    fn beforeRun(owners: *Owner.Set, vcpu: *Vcpu, runtime: ?*Main.VmRuntime) !void {
+        Main.test_before_run = null;
+        const received = Main.test_kicks_received.load(.acquire);
+        try fail(owners);
+        for (0..1000) |_| {
+            if (Main.test_kicks_received.load(.acquire) != received) break;
+            _ = linux.nanosleep(&.{ .sec = 0, .nsec = 1_000_000 }, null);
+        }
+        try std.testing.expect(Main.test_kicks_received.load(.acquire) != received);
+        try std.testing.expectEqual(@as(u8, 1), @atomicLoad(u8, &vcpu.kvm_run.immediate_exit, .acquire));
+        std.debug.print("fatal_exact_before_entry API={} signal already consumed; immediate_exit=1\n", .{runtime != null});
+    }
+
+    fn afterClear(owners: *Owner.Set) !void {
+        Owner.test_after_clear = null;
+        try fail(owners);
+    }
+
+    fn ownersReady(owners: *Owner.Set, runtime: ?*Main.VmRuntime) !void {
+        if (stage != .while_paused and stage != .resume_clear) return;
+        driver = .{ .runtime = runtime.?, .owner = &owners.owners[0], .resume_request = stage == .resume_clear };
+        driver_thread = try std.Thread.spawn(.{}, PauseDriver.entry, .{&driver});
+    }
+
+    fn run(selected: FatalStage) !void {
+        stage = selected;
+        for ([_]Owner.Mode{ .C00, .C10, .C01, .C11 }) |mode| {
+            for ([_]bool{ false, true }) |api_path| {
+                if (!api_path and (stage == .while_paused or stage == .resume_clear)) continue;
+                var fixture = try Fixture.init(&.{ 0xfb, 0xf4 });
+                defer fixture.deinit();
+                var devices: [virtio.MAX_DEVICES]?Device = @splat(null);
+                devices[0] = try Device.initVsock(0x8000, 5, 43, "/unused-owned-fixture");
+                devices[0].?.status = virtio.STATUS_DRIVER_OK;
+                defer devices[0].?.deinit();
+                var serial = Serial.init(2);
+                var runtime: Main.VmRuntime = .{
+                    .vcpu = &fixture.vcpu,
+                    .vm = &fixture.vm,
+                    .mem = &fixture.mem,
+                    .serial = &serial,
+                    .devices = &devices,
+                    .device_count = 1,
+                    .snap_opts = .{},
+                };
+                if (stage == .while_paused or stage == .resume_clear) runtime.paused.store(true, .seq_cst);
+                if (stage != .before_run)
+                    @atomicStore(u8, &fixture.vcpu.kvm_run.immediate_exit, 1, .seq_cst);
+                hook_calls = 0;
+                driver_thread = null;
+                Main.test_before_run = if (stage == .before_run) &beforeRun else null;
+                Main.test_owners_ready = &ownersReady;
+                Owner.test_after_clear = if (stage == .after_clear or stage == .resume_clear) &afterClear else null;
+                defer {
+                    Main.test_before_run = null;
+                    Main.test_owners_ready = null;
+                    Owner.test_after_clear = null;
+                    if (driver_thread) |thread| thread.join();
+                }
+                try std.testing.expectError(error.BackendOwnerFailed, Main.testRunLoop(
+                    &fixture.vcpu,
+                    &serial,
+                    &fixture.vm,
+                    &fixture.mem,
+                    &devices,
+                    mode,
+                    if (api_path) &runtime else null,
+                ));
+                if (driver_thread) |thread| {
+                    thread.join();
+                    driver_thread = null;
+                    if (stage == .while_paused) try std.testing.expect(driver.failed);
+                }
+                if (stage != .while_paused) try std.testing.expectEqual(@as(usize, 1), hook_calls);
+                if (api_path) {
+                    try std.testing.expect(runtime.run_failed.load(.acquire));
+                    try std.testing.expect(runtime.exited.load(.acquire));
+                }
+                const regs = try fixture.vcpu.getRegs();
+                try std.testing.expectEqual(@as(u64, 0x100), regs.rip);
+                std.debug.print("fatal_joined mode={s} API={} stage={s} RIP=0x100\n", .{ @tagName(mode), api_path, @tagName(stage) });
+            }
+        }
+    }
+};
+
+test "real enforced CLI and API owner failure exactly before KVM entry cannot sleep" {
+    try isolated(struct {
+        fn run() !void {
+            try FatalCase.run(.before_run);
+        }
+    }.run);
+}
+
+test "real enforced CLI and API fatal publication survives immediate-exit clearing" {
+    try isolated(struct {
+        fn run() !void {
+            try FatalCase.run(.after_clear);
+        }
+    }.run);
+}
+
+test "real enforced API owner failure wakes pause and survives resume admission" {
+    try isolated(struct {
+        fn run() !void {
+            try FatalCase.run(.while_paused);
+            try FatalCase.run(.resume_clear);
+        }
+    }.run);
+}
 test "real KVM masked level reset remains quiet after IRET for both interrupt chips" {
     try isolated(struct {
         fn run() !void {

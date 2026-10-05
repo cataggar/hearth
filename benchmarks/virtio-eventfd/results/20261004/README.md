@@ -9,13 +9,80 @@ blocking readiness owners, selected-queue validation/publication barriers,
 full-window vsock buffering and a whole-VM pause fence. Initial real enforced
 timer-free integrity, active-I/O snapshot/resume and v2 new-process restore
 checks pass. C10/C01/C11 are now implemented and pass actual four-mode integrity
-and lifecycle checks, including80 actual active mixed captures/fresh restores.
+and separately scoped lifecycle checks. Historical80 mixed capture/restore
+receipts exist, but their active disk oracle is invalid: a trailing shell
+`printf` can report RUNNING after the producer test fails. They do not prove
+active disk acceptance; corrected harness reruns are required.
 Historical pre-cleanup C00 controls (85 cells) froze numeric gates
 before three candidate matrices (51 cells). That historical whole-matrix noise
 qualification failed. Historical longer primary windows showed exploratory
 CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
+
+## Independent runtime-review fixes — actually validated
+
+Frozen6c's masked-level fallback was already corrected in the subsequent
+mask epoch. The current fix additionally preserves established trigger
+semantics through mask-only changes, including pause/rearm, without ignoring
+actual masked trigger-bit changes. Pending IOAPIC level completion delivers
+after unmask without another backend notify and returns through IRET to
+verified `kvm_vcpu_block`; PIC edge with an inactive masked-level IOAPIC route
+also retains its established trigger/generation.
+
+Owner failure now publishes ordered persistent failure + mapped immediate-exit
+before SIGUSR1 and broadcasts the API pause condition. Clear precedes the
+final ordered failure check and never follows it; resume acknowledgement
+follows admission, and exited API transitions cannot report success.
+No successful-path timers, new syscalls/filter permissions, snapshot-format
+change or deassignment shortcut was introduced.
+
+Final same-source Debug/ReleaseSafe each execute **70/70 Zig+3/3 full-jail
+cases**:39 units,24 dedicated (23 actual KVM+1 policy),7 integrations
+(5 actual guests+2 CLI/error cases),3 standalone enforced CLI/API cases.
+Each optimization adds eight active→masked guest scenarios, four actual
+masked trigger reconfiguration VMs and24 deterministic fatal paths:
+8 CLI/API exactly pre-entry,8 clear,4 paused,4 resume. A test-only signal
+counter confirms SIGUSR1 was consumed before the real pre-entry KVM_RUN;
+all8 return EINTR, unchanged RIP0x100 and bounded fatal reporting/join.
+The native API cases exercise the actual run-loop/reporting path, not HTTP
+transport fault injection. Standalone cases separately retain normal HTTP/
+CLI jail/identity/disk traffic. All test hooks/counters are absent from both
+production ELF symbol lists. **36/36 Python guards** and formatting pass.
+
+Exact commands: from `vmm/`, `zig build install test eventfd-test integration-test
+-Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe
+-Dintegration-kernel=../.perf/eventfd/fixtures/bzImage --summary all --color off`,
+then the identical command with `-Doptimize=Debug`; each under bounded exclusive
+fleet lock, private cache/umask077 and unchanged3GiB entry guard.
+`FLINT_JAIL_TEST_BINARY=<corresponding frozen ELF>
+FLINT_JAIL_TEST_KERNEL=<own pinned kernel>
+python3 -m unittest discover -s tools/perf -p test_jail_baseline.py -v`
+executes3 actual cases per optimization.
+
+Final production ELF SHA256:
+
+```
+Safe  8871882a4bae37b08250afce4da623d83873798e7616f29ef07395b40334fca8
+Debug 7adde824f8af80eee48fecbb6ef065fef45d789a909d2b062dcf72b161b77a13
+```
+
+Private raw evidence/ELFs/final identical source diffs:
+`.perf/eventfd/review-fixes/`. Earlier intermediate Safe and formatter failures
+are retained separately. Capacity recovery compressed exactly the owned
+`w4/trace2048-C11/kvm-ioctl.{stdout,data}` leaves; all1,184,071,756 original bytes
+were SHA/length-verified before unlink, retained in private `.gz` files and
+`trace-retention.json`. No frozen input, executed ELF, old archive or unowned
+resource was removed. No benchmark, label trigger, default or merge occurred.
+Historical80 active-disk acceptance remains invalid pending the isolated
+harness fixes and actual corrected reruns; all previous raw receipts remain.
+
+Durable [runtime-review-validation.tar.gz](runtime-review-validation.tar.gz)
+contains20 verified selected log/source/receipt members, including preserved
+failed/intermediate phases, but no ELF, guest image, private perf bytes or
+foreign inventory. Archive SHA256:
+`00daf177b2987378f1dea73d8f80dad832d875187d34ee1bd04405d5ee170757`;
+[runtime-review-SHA256SUMS](runtime-review-SHA256SUMS) authenticates it.
 
 ## New hosted alternative: source ready, execution pending
 
@@ -805,9 +872,12 @@ are publishable. No foreign next-task names or memory/disk images are uploaded.
 
 ## Final mixed restore, connection and native scaling stress
 
-**80/80** real active mixed-device captures and fresh-process API restores
-pass:20 each C00/C10/C01/C11. Each source actually has a running raw disk
-producer and two outstanding16×64KiB slow-reader streams. Whole-VM pause
+**Historical80/80 reported receipts, NOT valid active-disk acceptance**:
+20 each C00/C10/C01/C11. Independent review found the source-running shell
+oracle can emit RUNNING after a failed producer test. A running raw disk
+producer therefore was not proven in these captures; do not count them as
+active disk correctness passes pending the isolated harness fixes/reruns.
+Other originally reported observations below remain historical. Whole-VM pause
 observes all-task CPU0, saves coherent v2 rings/memory/IRQchip, resumes and
 checks every source message. A new jailed process loads that actual snapshot
 and disk; the unchanged agent reconnects, fixture-native apps are explicitly

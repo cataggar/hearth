@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Kvm = @import("kvm/system.zig");
 const Vm = @import("kvm/vm.zig");
 const Vcpu = @import("kvm/vcpu.zig");
@@ -19,6 +20,21 @@ const sync = @import("sync.zig");
 
 const log = std.log.scoped(.flint);
 var virtio_mode: VirtioOwner.Mode = .L0;
+pub var test_before_run: ?*const fn (*VirtioOwner.Set, *Vcpu, ?*VmRuntime) anyerror!void = null;
+pub var test_owners_ready: ?*const fn (*VirtioOwner.Set, ?*VmRuntime) anyerror!void = null;
+pub var test_kicks_received: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
+
+pub fn testRunLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *DeviceArray, mode: VirtioOwner.Mode, runtime: ?*VmRuntime) !void {
+    if (!builtin.is_test) @compileError("run-loop injection is test-only");
+    virtio_mode = mode;
+    defer virtio_mode = .L0;
+    if (runtime) |rt| {
+        runLoopThread(rt);
+        if (rt.run_failed.load(.acquire)) return error.BackendOwnerFailed;
+    } else {
+        try runLoop(vcpu, serial, vm, mem, devices, 1, .{}, null);
+    }
+}
 
 const SnapshotOpts = struct {
     vmstate_path: ?[*:0]const u8 = null,
@@ -60,11 +76,11 @@ pub const VmRuntime = struct {
 
     pub fn requestExit(self: *VmRuntime) void {
         self.mutex.lock();
-        self.exited.store(true, .release);
+        self.exited.store(true, .seq_cst);
         self.paused.store(false, .release);
         self.condition.broadcast();
         self.mutex.unlock();
-        @atomicStore(u8, &self.vcpu.kvm_run.immediate_exit, 1, .release);
+        @atomicStore(u8, &self.vcpu.kvm_run.immediate_exit, 1, .seq_cst);
         self.kickVcpu();
     }
 
@@ -820,7 +836,9 @@ fn initDevices(
 
 /// No-op signal handler for SIGUSR1. The signal's only purpose is to
 /// interrupt KVM_RUN with -EINTR so the run loop can check the pause flag.
-fn sigusr1Handler(_: std.os.linux.SIG) callconv(.c) void {}
+fn sigusr1Handler(_: std.os.linux.SIG) callconv(.c) void {
+    if (builtin.is_test) _ = test_kicks_received.fetchAdd(1, .release);
+}
 
 /// Install a no-op SIGUSR1 handler so the signal interrupts KVM_RUN
 /// without killing the process (default disposition for SIGUSR1 is Term).
@@ -860,9 +878,14 @@ fn runLoopThread(runtime: *VmRuntime) void {
 fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *DeviceArray, device_count: u32, snap_opts: SnapshotOpts, runtime: ?*VmRuntime) !void {
     const linux = std.os.linux;
     installKickSignal();
-    var owners: VirtioOwner.Set = .{};
-    if (virtio_mode != .L0) try owners.start(devices, device_count, vm, mem, virtio_mode);
+    var owners: VirtioOwner.Set = .{
+        .failure_wait = if (runtime) |rt| .{ .mutex = &rt.mutex, .condition = &rt.condition } else null,
+    };
+    if (virtio_mode != .L0) try owners.start(devices, device_count, vm, mem, virtio_mode, vcpu);
     defer owners.stop();
+    if (builtin.is_test) {
+        if (test_owners_ready) |hook| try hook(&owners, runtime);
+    }
 
     // Set up epoll for efficient device fd polling. Instead of blind-polling
     // every device fd after each KVM exit, we use epoll_wait(timeout=0) to
@@ -894,6 +917,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
     var exit_count: u64 = 0;
     var pending_io = false;
     while (true) {
+        var resumed = false;
         if (owners.failed.load(.acquire)) return error.BackendOwnerFailed;
         if (runtime) |rt| {
             if (rt.exited.load(.acquire)) return owners.finish();
@@ -906,29 +930,59 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
                 rt.mutex.lock();
                 rt.ack_paused.store(true, .release);
                 rt.condition.broadcast();
-                while (rt.paused.load(.acquire) and !rt.exited.load(.acquire)) rt.condition.wait(&rt.mutex);
+                while (rt.paused.load(.acquire) and !rt.exited.load(.acquire) and !owners.failed.load(.acquire))
+                    rt.condition.wait(&rt.mutex);
+                if (owners.failed.load(.acquire)) {
+                    rt.mutex.unlock();
+                    return error.BackendOwnerFailed;
+                }
                 if (rt.exited.load(.acquire)) {
                     rt.mutex.unlock();
                     return owners.finish();
                 }
                 rt.mutex.unlock();
                 try owners.unpause();
-                @atomicStore(u8, &vcpu.kvm_run.immediate_exit, 0, .release);
-                rt.mutex.lock();
-                rt.ack_paused.store(false, .release);
-                rt.condition.broadcast();
-                rt.mutex.unlock();
+                if (virtio_mode == .L0) {
+                    @atomicStore(u8, &vcpu.kvm_run.immediate_exit, 0, .release);
+                    rt.mutex.lock();
+                    rt.ack_paused.store(false, .release);
+                    rt.condition.broadcast();
+                    rt.mutex.unlock();
+                } else resumed = true;
             }
+        }
+        if (virtio_mode != .L0) {
+            const keep_exit = if (runtime) |rt| rt.paused.load(.seq_cst) or rt.exited.load(.seq_cst) else false;
+            try owners.beforeEntry(!keep_exit);
+            if (runtime) |rt| {
+                if (resumed) {
+                    rt.mutex.lock();
+                    rt.ack_paused.store(false, .release);
+                    rt.condition.broadcast();
+                    rt.mutex.unlock();
+                }
+                if (rt.exited.load(.seq_cst)) return owners.finish();
+                if (rt.paused.load(.seq_cst)) {
+                    if (!pending_io) continue;
+                    @atomicStore(u8, &vcpu.kvm_run.immediate_exit, 1, .seq_cst);
+                }
+            }
+        }
+        if (builtin.is_test) {
+            if (test_before_run) |hook| try hook(&owners, vcpu, runtime);
         }
         const exit_reason = vcpu.run() catch |err| {
             // KVM_RUN returns EINTR when interrupted by a signal. This happens
             // when: (a) immediate_exit was set, or (b) SIGUSR1 kicked us out
             // of a blocking HLT. Check if this was a pause request.
             if (err == error.Interrupted) {
+                if (builtin.is_test and owners.failed.load(.acquire))
+                    std.debug.print("fatal_entry KVM_RUN=EINTR API={}\n", .{runtime != null});
                 pending_io = false;
                 // Pause/failure/exit admission is checked before re-entering.
                 continue;
             }
+
             log.err("KVM_RUN failed: {}", .{err});
             return err;
         };

@@ -130,6 +130,7 @@ pub const Irq = struct {
     assigned: bool = false,
     active: bool = false,
     trigger: Trigger = .edge,
+    last_policy: ?Policy = null,
     high: bool = false,
     generation: u64 = 0,
 
@@ -185,7 +186,15 @@ pub const Irq = struct {
     pub fn reconcile(self: *Irq, ready: bool, status: u32) !void {
         if (!ready) return self.quiesce();
         const current = try policy(self.vm, self.gsi);
-        const selected = try current.trigger();
+        const masks_only = if (self.last_policy) |previous|
+            previous.pic_level == current.pic_level and previous.ioapic_level == current.ioapic_level
+        else
+            false;
+        const selected = if (masks_only and current.pic_masked and current.ioapic_masked)
+            self.trigger
+        else
+            try current.trigger();
+        self.last_policy = current;
         if (!self.active or selected != self.trigger) {
             try self.quiesce();
             self.trigger = selected;

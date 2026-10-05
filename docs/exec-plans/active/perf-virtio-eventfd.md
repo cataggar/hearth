@@ -4,6 +4,43 @@
 
 **Date**: 2026-10-04
 
+### Independent runtime-review fixes — 2026-10-05
+
+Todo `fix-eventfd-runtime-review` owns established IRQ trigger preservation
+through simultaneous masks and a persistent fatal entry fence coordinated
+with immediate-exit clear/API resume. Current source already has the masked
+level fallback absent in frozen6c; strengthen it to preserve established
+trigger semantics and add the active→masked real KVM transition.
+Publish fatal→immediate-exit→signal in ordered form; clear before the final
+failure check only, wake paused API waiters, and deterministically exercise
+the exact signal-consumed-before-entry race plus clear/resume cases.
+Validate actual Debug/Safe KVM and enforced CLI/API jail coverage, no skips.
+
+Do not edit `matrix.py`, `restore_stress.py` or `performance.py` until the
+parent relays the isolated harness-fix commit. Downgrade historical80 active
+disk restore acceptance now; preserve original receipts/archives. No hosted
+label/qualification, default adoption or merge before both runtime/harness
+fixes and corrected acceptance are available. All local execution retains
+the bounded fleet lock/private artifacts and unchanged capacity guards.
+
+Executed on final identical source: Debug/ReleaseSafe each70/70 actual Zig
+tests (39 units,24 dedicated:23 actual KVM+1 policy,7 integrations) plus3/3
+standalone enforced jail cases. Each build exercises eight active→both-masked
+IRQ delivery/IRET/HLT scenarios, four masked trigger-bit reconfigurations and
+24 fatal cases (8 CLI/API pre-entry,8 clear,4 paused,4 resume). The pre-entry
+hook waits for actual test-only SIGUSR1 handler receipt before real KVM_RUN;
+all8 return EINTR with RIP unchanged. API failure/exit reporting and joins pass.
+Production ELF symbols omit all test hooks/counters; filter/default/v2 stay
+unchanged. Python36/36 and formatting pass; no performance phase executes.
+
+Private final raw logs/ELFs/source diff/receipt: `.perf/eventfd/review-fixes/`.
+Two historical owned C11 trace leaves were gzip-compressed and full-SHA/length
+verified before unlinking originals; every byte remains private. The first
+retention attempt completed stdout then refused root-created perf data; scoped
+own-file ownership normalization and a recorded resume preserved both leaves.
+Pre-execution formatter errors and the earlier intermediate Safe epoch remain
+separate, not passing final repetitions. No delegated harness file changed.
+
 ### Parent-directed ephemeral Azure alternative — 2026-10-05
 
 Assigned todo `measure-eventfd-ephemeral-azure`. Add a minimal, separate
@@ -420,8 +457,11 @@ and four simultaneous block/TAP/vsock active snapshots pass. Each mode executes
 owner failure FD-leak checks per optimization.
 Longer primary diagnostic CPU means improve19–24%, but frozen whole-matrix noise,
 incomplete paired inference and C10/C11 severe pause costs prevent acceptance.
-All80 active mixed fresh-process restore cycles, four64-connection/reuse cases,
-twelve native1/4/8-VM cells and the reliable CLI restore fixture actually pass.
+Historical80 mixed fresh-process receipts do not establish active disk
+acceptance after independent review found the producer oracle can falsely
+report RUNNING; corrected harness reruns are required. Four64-connection/reuse
+cases, twelve native1/4/8-VM cells and the scoped CLI restore observations
+remain separately identified.
 Full paired performance/kernel scheduling attribution, mixed-device scaling,
 old↔new legacy, active IOAPIC masks/congestion and actual save-on-halt remain nonacceptance.
 The plan stays active,

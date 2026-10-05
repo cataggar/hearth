@@ -19,7 +19,7 @@ software/PMU/trace probes and private network namespace availability are
 recorded. Missing identity, resources or tools is blocked, never skipped.
 
 The signed Zig0.17 install and hash-checked5.10.245 kernel match existing CI.
-Both Debug/Safe must actually execute66 current Zig tests and three full-jail
+Both Debug/Safe must actually execute70 current Zig tests and three full-jail
 cases each; no cached/skipped subset satisfies the counts. All measurements
 then use **one** Safe static-musl binary, fixed deterministic combined/native
 fixtures, default compiler choice and private caches. No sibling backend,

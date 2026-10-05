@@ -285,7 +285,7 @@ def build_inputs(phases, source):
             zig, "build", "install", "test", "eventfd-test", "integration-test",
             "-Dtarget=x86_64-linux-musl", f"-Doptimize={optimize}",
             f"-Dintegration-kernel={HOME / 'bzImage'}", "--summary", "all", "--color", "off",
-        ], 600, phases, bench.ROOT / "vmm", tests=66)
+        ], 600, phases, bench.ROOT / "vmm", tests=70)
         binary = HOME / f"flint-{optimize}"
         shutil.copyfile(bench.ROOT / "vmm/zig-out/bin/flint", binary)
         binary.chmod(0o700)

@@ -617,14 +617,14 @@ fn handleVmPatch(
 
     if (std.mem.eql(u8, parsed.value.state, "Paused")) {
         // Atomically transition false→true; rejects concurrent pause requests
-        if (runtime.paused.cmpxchgStrong(false, true, .acq_rel, .acquire) != null) {
+        if (runtime.paused.cmpxchgStrong(false, true, .seq_cst, .seq_cst) != null) {
             respondError(request, .bad_request, "VM is already paused");
             return;
         }
 
         // Set immediate_exit AFTER winning the cmpxchg to avoid racing with
         // a concurrent pause request that could clear it.
-        @atomicStore(u8, &runtime.vcpu.kvm_run.immediate_exit, 1, .release);
+        @atomicStore(u8, &runtime.vcpu.kvm_run.immediate_exit, 1, .seq_cst);
 
         // Kick the vCPU thread out of a blocking KVM_RUN (e.g., guest in HLT).
         // immediate_exit only takes effect on the *next* KVM_RUN call, so if
@@ -645,6 +645,10 @@ fn handleVmPatch(
                 return;
             };
         }
+        if (runtime.exited.load(.acquire)) {
+            respondError(request, .bad_request, "VM has exited");
+            return;
+        }
         log.info("VM paused", .{});
         respondOk(request);
     } else if (std.mem.eql(u8, parsed.value.state, "Resumed")) {
@@ -653,7 +657,7 @@ fn handleVmPatch(
             return;
         }
         // Atomically transition true→false; rejects if not paused
-        if (runtime.paused.cmpxchgStrong(true, false, .acq_rel, .acquire) != null) {
+        if (runtime.paused.cmpxchgStrong(true, false, .seq_cst, .seq_cst) != null) {
             respondError(request, .bad_request, "VM is not paused");
             return;
         }
@@ -665,6 +669,10 @@ fn handleVmPatch(
                 respondError(request, .service_unavailable, "backend resume is still pending");
                 return;
             };
+        }
+        if (runtime.exited.load(.acquire)) {
+            respondError(request, .bad_request, "VM has exited");
+            return;
         }
         log.info("VM resumed", .{});
         respondOk(request);

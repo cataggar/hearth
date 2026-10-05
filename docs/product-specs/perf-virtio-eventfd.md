@@ -1,6 +1,35 @@
 # Product Spec: VirtIO ioeventfd/irqfd Performance Experiment
 
-**Status**: Blocked qualification — four controlled modes implemented; timer-free integrity,80 active mixed fresh restores and cross-mode v2 restores pass; frozen performance gates unmet
+**Status**: Blocked qualification — four controlled modes implemented; timer-free integrity and separately scoped v2 restore evidence retained; historical80-cycle active disk oracle invalid pending corrected reruns; frozen performance gates unmet
+
+### Independent runtime-review acceptance
+
+Masking PIC/IOAPIC alone must not change an established route's edge/level
+semantics. An actual trigger-bit reconfiguration must still reconcile while
+masked; preservation is restricted to mask-only changes. Pending level completion must remain asserted across simultaneous
+masks and deliver on IOAPIC unmask without another backend/MMIO wake. Test
+the active→masked transition on real KVM for all controlled modes, including
+used-before-IRQ, ACK/EOI and return to actual timer-free HLT.
+
+Owner fatal publication must persist in the mapped KVM immediate-exit byte,
+not rely on a transient SIGUSR1. Clear only before the final ordered failure
+check; never clear afterwards, including API resume. Failure also wakes an
+API-paused run loop. Deterministically inject a real owner error immediately
+after admission/before KVM entry and during clear/resume for CLI/API paths;
+require bounded fatal reporting and joined owners before memory teardown.
+
+Historical80-cycle receipts remain intact but no longer prove an active disk
+producer: the reviewed shell oracle can report RUNNING after a failed test.
+The isolated harness fixes and actual corrected reruns are prerequisites,
+not a relabeling of prior captures.
+
+Final local review-fix acceptance: Debug/Safe each70 actual Zig+3 enforced
+standalone cases, including eight active→masked guest IRQ scenarios, four
+masked configuration changes and24 deterministic fatal paths per build.
+All8 exact pre-entry paths observe consumed SIGUSR1 then actual KVM EINTR
+with guest RIP unchanged; API pause/resume failure reporting and owner joins
+complete. Hooks compile out of production. These are correctness repairs,
+not performance evidence or closure of delegated harness/lifecycle gates.
 
 **Last updated**: 2026-10-05
 
@@ -114,8 +143,10 @@ slow-reader messages also stall with a separately labelled heartbeat.
 All four modes pass native-vsock/TAP/disk/agent/PTY, active-I/O acknowledged pause,
 snapshot/resume, paused shutdown and sixteen actual cross-mode new-process v2
 restores. Combined block/TAP/vsock outstanding-I/O snapshots also pass in all
-four modes;80 repeated active mixed fresh-process restores,64-connection/reuse
-and twelve native1/4/8-VM cells also pass. Full mixed-sandbox/performance
+four modes, subject to the reviewed active-disk oracle limitation above.
+The80 repeated mixed fresh-process receipts no longer establish active disk
+acceptance;64-connection/reuse and twelve native1/4/8-VM observations remain
+separately scoped. Full mixed-sandbox/performance
 qualification remains outstanding; these repairs are not eventfd acceleration. No
 performance merge or default adoption is eligible.
 
