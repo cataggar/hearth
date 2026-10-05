@@ -59,6 +59,7 @@ TEST_ERROR_LABELS = frozenset({
     "InitrdBuildFailed", "KernelUnavailable", "NotDir",
     "TestExpectedEqual", "TestUnexpectedResult",
 })
+PERF_ACK_FRAME = b"ack\n\0"
 
 
 class Blocked(RuntimeError):
@@ -271,6 +272,19 @@ def host_probe():
         raise Blocked("scoped software perf or owned network namespace unavailable")
     if record["runner_environment"] != "github-hosted":
         raise Blocked("ephemeral hosted isolation provenance unverified")
+    probe = owned_command([
+        "sudo", "-n", sys.executable, str(Path(__file__)), "control-probe",
+        "--perf", perf, "--out", str(HOME / "control-probe"),
+    ], "probe-perf-control", 65)
+    record["perf_control_probe"] = probe
+    save(PUBLIC / "host.json", record)
+    if probe["returncode"]:
+        raise Blocked("actual scoped perf control protocol admission failed before A/A")
+    protocol = json.loads((HOME / "control-probe/protocol.json").read_text())
+    if protocol["status"] != "passed" or protocol["supervision"]["status"] != "passed":
+        raise Blocked("actual perf protocol/custody receipt failed")
+    record["perf_control_probe"]["protocol"] = protocol
+    save(PUBLIC / "host.json", record)
     return record, perf
 
 
@@ -511,6 +525,9 @@ class PerfCapture:
         self.created = []
         self.process = None
         self.deadline = time.monotonic() + 30
+        self.command_lock = threading.Lock()
+        self.command_epoch = 0
+        self.ack_failed = False
         self.ready = path / "recording-ready"
         self.paths = [path / name for name in ("perf-control", "perf-ack", "perf-release")]
         try:
@@ -546,27 +563,48 @@ class PerfCapture:
             raise Blocked("finite scoped collection budget exhausted")
 
     def command(self, name):
-        self.check_alive()
-        if select.select([self.fds[1]], [], [], 0)[0]:
-            if os.read(self.fds[1], 4096):
-                raise Blocked("unsolicited scoped collector acknowledgement")
-        sent_ns = time.monotonic_ns()
-        os.write(self.fds[0], (name + "\n").encode())
-        limit = min(self.deadline, time.monotonic() + 5)
-        response = b""
-        while b"\n" not in response:
+        if not self.command_lock.acquire(blocking=False):
+            raise Blocked("scoped collector command already pending")
+        try:
+            if self.ack_failed:
+                raise Blocked("failed scoped collector acknowledgement epoch cannot be reused")
+            if name not in ("enable", "disable"):
+                raise Blocked("unknown scoped collector command")
             self.check_alive()
-            remaining = limit - time.monotonic()
-            if remaining <= 0:
-                raise Blocked(f"scoped collector {name} acknowledgement unavailable")
-            if select.select([self.fds[1]], [], [], min(.05, remaining))[0]:
-                response += os.read(self.fds[1], 4096)
-                if len(response) > 4:
-                    raise Blocked("malformed scoped collector acknowledgement")
-        if response != b"ack\n":
-            raise Blocked("malformed scoped collector acknowledgement")
-        self.check_alive()
-        return {"sent_ns": sent_ns, "ack_ns": time.monotonic_ns()}
+            if select.select([self.fds[1]], [], [], 0)[0]:
+                if os.read(self.fds[1], 4096):
+                    raise Blocked("unsolicited scoped collector acknowledgement")
+            self.command_epoch += 1
+            sent_ns = time.monotonic_ns()
+            command = (name + "\n").encode()
+            if os.write(self.fds[0], command) != len(command):
+                raise Blocked("incomplete scoped collector command write")
+            limit = min(self.deadline, time.monotonic() + 5)
+            response = b""
+            while response != PERF_ACK_FRAME:
+                self.check_alive()
+                remaining = limit - time.monotonic()
+                if remaining <= 0:
+                    raise Blocked(f"scoped collector {name} acknowledgement unavailable")
+                if select.select([self.fds[1]], [], [], min(.05, remaining))[0]:
+                    chunk = os.read(self.fds[1], 4096)
+                    if not chunk:
+                        raise Blocked("scoped collector acknowledgement channel closed")
+                    response += chunk
+                    if not PERF_ACK_FRAME.startswith(response):
+                        raise Blocked("malformed scoped collector acknowledgement")
+            self.check_alive()
+            if select.select([self.fds[1]], [], [], 0)[0]:
+                if os.read(self.fds[1], 4096):
+                    raise Blocked("unsolicited scoped collector acknowledgement after completed frame")
+            return {"command": name, "epoch": self.command_epoch,
+                    "sent_ns": sent_ns, "ack_ns": time.monotonic_ns(),
+                    "ack_frame_hex": response.hex()}
+        except (Blocked, OSError, subprocess.SubprocessError):
+            self.ack_failed = True
+            raise
+        finally:
+            self.command_lock.release()
 
     def release(self):
         self.check_alive()
@@ -589,6 +627,54 @@ class PerfCapture:
             for path in self.created:
                 path.unlink(missing_ok=True)
             self.created = []
+
+
+def control_child(args):
+    out = bench.artifact_path(args.out)
+    with (out / "perf.stderr").open("wb") as errors:
+        capture = PerfCapture(out, [args.perf, "stat", "-e", "task-clock",
+                                    "-o", out / "stat.txt"], errors)
+        try:
+            commands = [capture.command(name) for name in ("disable", "enable", "disable")]
+            capture.release()
+        finally:
+            capture.close()
+    save(out / "protocol.json", {
+        "status": "passed", "actual_perf": True, "commands": commands,
+        "collector_budget_seconds": 30,
+        "perf_version": subprocess.check_output([args.perf, "--version"], text=True, timeout=5).strip(),
+        "perf_binary_sha256": bench.digest(Path(args.perf)),
+    })
+    return 0
+
+
+def control_probe(args):
+    uid, gid = int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"])
+    if os.geteuid() != 0 or uid <= 0 or gid <= 0:
+        raise Blocked("scoped perf control probe requires existing nonroot sudo admission")
+    out = bench.artifact_path(args.out)
+    out.mkdir(mode=0o700)
+    supervisor = custody.Supervisor()
+    try:
+        code, record = supervisor.run([
+            sys.executable, str(Path(__file__)), "control-child",
+            "--out", str(out), "--perf", args.perf,
+        ], work_seconds=30, cleanup_seconds=30, cwd=bench.ROOT)
+        protocol = json.loads((out / "protocol.json").read_text()) if code == 0 else {"status": "failed"}
+        protocol["supervision"] = {
+            key: record[key] for key in (
+                "status", "termination_reason", "controller_returncode",
+                "surviving_generations", "cleanup_errors", "unsafe_registrations")
+        }
+        if code or record["status"] != "passed":
+            protocol["status"] = "failed"
+        save(out / "protocol.json", protocol)
+        os.chown(out / "protocol.json", uid, gid)
+        os.chown(out, uid, gid)
+        print(json.dumps(protocol))
+        return 0 if protocol["status"] == "passed" else 1
+    finally:
+        supervisor.close()
 
 
 def profile_batches(guest, capture):
@@ -1224,7 +1310,8 @@ def main():
     os.umask(0o077)
     signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(Blocked("bounded owned phase interrupted")))
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("phase", choices=("qualify", "namespace", "cell", "receipt"))
+    parser.add_argument("phase", choices=("qualify", "namespace", "cell", "receipt",
+                                          "control-probe", "control-child"))
     parser.add_argument("--expected-sha")
     parser.add_argument("--out")
     parser.add_argument("--mode", choices=MODES)
@@ -1238,6 +1325,10 @@ def main():
     if args.phase == "receipt":
         receipt(args.expected_sha)
         return 0
+    if args.phase == "control-probe":
+        return control_probe(args)
+    if args.phase == "control-child":
+        return control_child(args)
     return namespace(args) if args.phase == "namespace" else cell(args)
 
 

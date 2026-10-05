@@ -187,6 +187,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential libc6-dev linux-libc-dev acl curl python3 \
             libarchive-tools cpio gzip busybox-static
+          if ! perf --version >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends linux-tools-common linux-tools-generic
+          fi
           sudo usermod --append --groups kvm "$(id -un)"
       - name: Verify accessible and functional KVM
         shell: sg kvm -c "bash --noprofile --norc -e -o pipefail {0}"
@@ -315,13 +318,36 @@ jobs:
           runpy.run_path("benchmarks/virtio-eventfd/verify_custody_review.py", run_name="__main__")
           suite = unittest.defaultTestLoader.discover("benchmarks/virtio-eventfd", pattern="test_*.py")
           expected = suite.countTestCases()
-          if expected < 69:
-              raise SystemExit(f"Required focused regression coverage missing: {expected} < 69")
+          if expected < 72:
+              raise SystemExit(f"Required focused regression coverage missing: {expected} < 72")
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           if (not result.wasSuccessful() or result.testsRun != expected or result.skipped
                   or result.expectedFailures or result.unexpectedSuccesses):
               raise SystemExit("Focused eventfd harness failed, skipped or incompletely executed")
           print(json.dumps({"focused_eventfd_tests_executed": result.testsRun, "skipped": len(result.skipped)}))
+          PY
+      - name: Verify actual supported perf control framing before hosted admission
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p .perf/eventfd-hosted
+          timeout --kill-after=5s 65s python3 - <<'PY' 2>&1 | tee .ci-logs/perf-control-probe.log
+          import json
+          import pathlib
+          import sys
+          sys.path.insert(0, "benchmarks/virtio-eventfd")
+          import hosted
+          perf, _ = hosted.perf_binary()
+          phase = hosted.owned_command([
+              "sudo", "-n", sys.executable, str(pathlib.Path(hosted.__file__)),
+              "control-probe", "--perf", perf, "--out", str(hosted.HOME / "control-probe"),
+          ], "probe-perf-control", 65)
+          if phase["returncode"]:
+              raise SystemExit("Actual supported perf control/owned cleanup failed")
+          protocol = json.loads((hosted.HOME / "control-probe/protocol.json").read_text())
+          if protocol["status"] != "passed" or protocol["supervision"]["status"] != "passed":
+              raise SystemExit("Actual perf protocol/custody receipt failed")
+          print(json.dumps(protocol))
           PY
       - name: Verify private-umask jail ownership and enforced API traffic
         run: |

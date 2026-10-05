@@ -154,6 +154,31 @@ not change that tested native/harness/workflow source epoch.
 
 ### Ephemeral hosted qualification alternative
 
+Perf control framing is byte-exact, not a whitespace-normalized line protocol.
+Linux perf6.17.13 `evlist.h` defines `EVLIST_CTL_CMD_ACK_TAG` as `"ack\n"`;
+`evlist__ctlfd_ack` writes `sizeof(EVLIST_CTL_CMD_ACK_TAG)`, including the
+trailing NUL: five bytes `61 63 6b 0a 00`. Require that entire frame across
+partial reads, including a separately delivered terminator. Reject malformed
+prefixes, extra/coalesced acknowledgements, unsolicited/stale data and unknown
+commands. One serialized pending command/epoch owns each acknowledgement;
+poison a failed epoch rather than reuse its late ACK. Preserve enabled/disabled
+fences, collector survival, complete batches and the30-second budget.
+
+Use the existing disabled-start PerfCapture, root software-perf admission,
+owned-command wrapper and generation-pinned Supervisor for a bounded real
+disable→enable→disable/release probe BEFORE builds/A/A. Record actual selected
+perf version/hash, accepted frame bytes/epochs and failed custody explicitly;
+never call a synthetic pipe test actual perf proof. Ordinary isolated CI must
+execute this supported probe, with root-owned descendants joined/reaped.
+No raw trace or unexpected bytes are uploaded.
+
+Hosted37327822801/5cdb is a terminal separate failed epoch: Debug/Safe71/71,
+all five A/A complete/provisionally noise-acceptable across17 classes, then
+profile-stat-C00 fails malformed acknowledgement before any candidate/paired
+gain. Source establishes the framing mismatch; historical raw ACK bytes are
+not present in its allowlisted artifact. Its Intel D4ds host is not the prior
+AMD D4ads host. Neither its controls nor caps may be reused on corrected source.
+
 Hosted profiles must start disabled and acknowledge explicit enable/disable
 commands. Every counted batch must start after enable acknowledgement and
 complete before disable is sent; the collector must remain alive across both

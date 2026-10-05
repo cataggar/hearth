@@ -363,6 +363,79 @@ class ObserverCleanup(unittest.TestCase):
 
 
 class ProfileBoundaries(unittest.TestCase):
+    def capture(self):
+        from unittest.mock import Mock
+        capture = hosted.PerfCapture.__new__(hosted.PerfCapture)
+        capture.process = SimpleNamespace(poll=Mock(return_value=None))
+        capture.fds = [101, 102]
+        capture.deadline = hosted.time.monotonic() + 2
+        capture.command_lock = threading.Lock()
+        capture.command_epoch = 0
+        capture.ack_failed = False
+        return capture
+
+    def test_exact_perf_frame_completes_across_partial_reads_including_nul(self):
+        for fragments in ((b"ack\n\0",), (b"a", b"ck", b"\n", b"\0")):
+            with self.subTest(fragments=fragments):
+                capture = self.capture()
+                ready = [([], [], []), *[([102], [], []) for _ in fragments], ([], [], [])]
+                with patch.object(hosted.select, "select", side_effect=ready), \
+                        patch.object(hosted.os, "read", side_effect=fragments) as read, \
+                        patch.object(hosted.os, "write", return_value=7):
+                    fence = capture.command("enable")
+                self.assertEqual(read.call_count, len(fragments))
+                self.assertEqual(fence["ack_frame_hex"], "61636b0a00")
+                self.assertEqual(fence["epoch"], 1)
+                self.assertFalse(capture.ack_failed)
+
+    def test_extra_coalesced_unknown_and_stale_frames_poison_epoch(self):
+        for response in (b"ack\n\0ack\n\0", b"ack\nX", b"bad\n\0"):
+            with self.subTest(response=response):
+                capture = self.capture()
+                with patch.object(hosted.select, "select", side_effect=[([], [], []), ([102], [], [])]), \
+                        patch.object(hosted.os, "read", return_value=response), \
+                        patch.object(hosted.os, "write", return_value=7):
+                    with self.assertRaisesRegex(hosted.Blocked, "malformed"):
+                        capture.command("enable")
+                with self.assertRaisesRegex(hosted.Blocked, "cannot be reused"):
+                    capture.command("disable")
+        capture = self.capture()
+        with patch.object(hosted.select, "select", return_value=([102], [], [])), \
+                patch.object(hosted.os, "read", return_value=b"ack\n\0"), \
+                patch.object(hosted.os, "write") as write:
+            with self.assertRaisesRegex(hosted.Blocked, "unsolicited"):
+                capture.command("disable")
+            write.assert_not_called()
+        capture = self.capture()
+        with patch.object(hosted.select, "select", side_effect=[
+                ([], [], []), ([102], [], []), ([102], [], [])]), \
+                patch.object(hosted.os, "read", side_effect=[b"ack\n\0", b"ack\n\0"]), \
+                patch.object(hosted.os, "write", return_value=7):
+            with self.assertRaisesRegex(hosted.Blocked, "after completed frame"):
+                capture.command("enable")
+        capture = self.capture()
+        with self.assertRaisesRegex(hosted.Blocked, "unknown.*command"):
+            capture.command("snapshot")
+
+    def test_one_pending_epoch_and_missing_terminator_never_succeed(self):
+        capture = self.capture()
+        capture.command_lock.acquire()
+        try:
+            with patch.object(hosted.os, "write") as write:
+                with self.assertRaisesRegex(hosted.Blocked, "already pending"):
+                    capture.command("disable")
+                write.assert_not_called()
+        finally:
+            capture.command_lock.release()
+        capture = self.capture()
+        with patch.object(hosted.select, "select", side_effect=[([], [], []), ([102], [], [])]), \
+                patch.object(hosted.os, "read", return_value=b"ack\n"), \
+                patch.object(hosted.os, "write", return_value=7), \
+                patch.object(capture, "check_alive", side_effect=[None, None, hosted.Blocked("finite scoped collection budget exhausted")]):
+            with self.assertRaisesRegex(hosted.Blocked, "budget exhausted"):
+                capture.command("enable")
+        self.assertTrue(capture.ack_failed)
+
     def exercise(self, premature=False):
         clock = SimpleNamespace(ns=0)
 
@@ -404,7 +477,7 @@ class ProfileBoundaries(unittest.TestCase):
 
     def test_acknowledgement_is_required_and_malformed_response_rejected(self):
         from unittest.mock import Mock
-        for response in (b"ack\n", b"bad\n"):
+        for response in (b"ack\n\0", b"bad\n"):
             with self.subTest(response=response):
                 control_read, control_write = os.pipe()
                 ack_read, ack_write = os.pipe()
@@ -412,6 +485,9 @@ class ProfileBoundaries(unittest.TestCase):
                 capture.process = SimpleNamespace(poll=Mock(return_value=None))
                 capture.fds = [control_write, ack_read]
                 capture.deadline = hosted.time.monotonic() + 2
+                capture.command_lock = threading.Lock()
+                capture.command_epoch = 0
+                capture.ack_failed = False
 
                 def acknowledge():
                     self.assertEqual(os.read(control_read, 4096), b"enable\n")
@@ -420,12 +496,13 @@ class ProfileBoundaries(unittest.TestCase):
                 worker = threading.Thread(target=acknowledge)
                 worker.start()
                 try:
-                    if response == b"ack\n":
+                    if response == b"ack\n\0":
                         fence = capture.command("enable")
                         self.assertLessEqual(fence["sent_ns"], fence["ack_ns"])
                     else:
                         with self.assertRaisesRegex(hosted.Blocked, "malformed"):
                             capture.command("enable")
+                    capture.ack_failed = False
                     capture.process.poll.return_value = 0
                     with self.assertRaisesRegex(hosted.Blocked, "terminated"):
                         capture.command("disable")

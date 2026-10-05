@@ -4,6 +4,30 @@
 
 **Date**: 2026-10-04
 
+### Second hosted epoch — exact perf ACK correction
+
+Preserve20 original allowlisted JSONs from37327822801/5cdb as terminal.
+Debug/Safe71/71 and all other builds/jail pass; five A/A/17 classes are
+provisionally noise-acceptable, but profile-stat-C00 fails malformed ACK with
+zero rows/candidates/gains. Custody passes with no survivor/error/unsafe.
+Actual Intel/vmx D4ds/perf6.17.13 differs from the earlier AMD D4ads epoch.
+Do not top up/reuse these controls, reset caps or explain this as noise/PMU.
+
+Verified exact upstream tagv6.17.13: evlist.h's `"ack\n"` is written with
+`sizeof` by evlist__ctlfd_ack, including NUL. The existing four-byte/newline
+parser rejects the valid five-byte frame or leaves its terminator stale after
+a split read. Fix exact prefix/terminator completion with one pending epoch,
+unknown/extra/stale rejection and failed-session poisoning; no strip/ignore.
+Add focused partial/coalesced/unsolicited/overlapping-command controls.
+
+Before future A/A, reuse current PerfCapture/owned-command/Supervisor for a
+small actual software-perf disable/enable/disable/release admission. Execute
+that probe in ordinary isolated CI; keep raw errors private and public output
+allowlisted. All existing30s/fence/denominator/gates stay unchanged.
+Local storage2,917,900,288B remains below3GiB: no local heavy/test/probe/matrix,
+root/global changes, new agents, label or measurement rerun. Parent reviews
+the one bounded correction before any fresh hosted source/host/gates epoch.
+
 ### First hosted prerequisite failure — bounded corrective stage
 
 Preserve parent-triggered37323212257/71bbd4a and its six allowlisted JSONs as a

@@ -20,6 +20,52 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Second hosted epoch — exact control ACK defect, no candidate gain
+
+[37327822801](https://github.com/cataggar/hearth/actions/runs/37327822801)
+at5cdb is terminal FAILURE after18m50s. Debug/Safe each execute71/71, skipfalse;
+jail, agent, native/disk probes and IRQFD observer builds pass. Five A/A
+matrices complete all17 classes; unchanged gates are provisionally
+noise-acceptable, exceeds_noise_caps[], candidate_performance_observedfalse.
+Those controls are not reusable on another source/host or an extended epoch.
+
+The actual host is nested Intel/vmx Azure Standard_D4ds_v5, four visible logical
+CPUs/two SMT pairs, not the first attempt's AMD D4ads. Root software/PMU/trace
+and caps32/36/82/136 pass. Perf reports6.17.13, binarySHA
+`2d0953085bf720a25efbe24f853e97d27b1f12f18a398255ff82cbafde254dad`.
+`profile-stat-C00` fails with zero rows and Blocked malformed ACK, messageSHA
+`5cd4030f82831e88c411056da657462afb33c3e64c58397f39e6822d67f7fe10`.
+Background controls report .0254898273/.0274505913 busy-core equivalents.
+IRQFD function detail is available; supervision passes/controller1, cleanup
+.001023978s, no survivor/error/unsafe. No candidate/paired gain or merge.
+The original20 JSONs and their checksums remain private; selected facts are
+preserved in [the committed receipt](hosted-ack-failure-receipt.json).
+
+Authoritative exact source explains the framing discrepancy:
+[v6.17.13 evlist.h](https://github.com/gregkh/linux/blob/v6.17.13/tools/perf/util/evlist.h)
+defines `"ack\n"` and
+[evlist__ctlfd_ack](https://github.com/gregkh/linux/blob/v6.17.13/tools/perf/util/evlist.c)
+writes `sizeof` that string, **including NUL**: `61 63 6b 0a 00`.
+The help's line-oriented example omits that byte-level detail. The prior
+four-byte/newline parser rejects five coalesced bytes, or accepts four split
+bytes and leaves the terminator stale. Historical actual raw ACK bytes are
+not uploaded, so no claim reconstructs them from the failure hash.
+
+The corrected parser requires the exact five-byte frame across partial reads,
+one pending epoch, and no extra/unsolicited/coalesced response. Malformed,
+unknown, missing-terminator and failed-session retries fail closed; no strip.
+Delayed complete batches, explicit enable/disable fences and30s remain.
+Three additional guards cover framing and boundaries; synthetic pipes are
+not actual perf proof. Future host admission and ordinary CI use existing
+PerfCapture/owned-command/generation-pinned Supervisor for a real bounded
+disable→enable→disable/release probe before A/A, with allowlisted frame/epoch/
+binary/custody receipt only. No new VM/workload or raw trace upload.
+
+Current exact-source CI is pending at initial publication. Local capacity
+2,917,900,288B remains below3GiB; no local heavy/test/probe/matrix executed.
+No gate/budget/cap/heartbeat change, label mutation, qualification rerun or
+peer-result borrowing. Parent alone reviews and starts any fresh epoch.
+
 ## First parent-triggered hosted attempt — terminal prerequisite failure
 
 [Run37323212257](https://github.com/cataggar/hearth/actions/runs/37323212257)
