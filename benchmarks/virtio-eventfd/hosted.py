@@ -9,6 +9,7 @@ import math
 import os
 from pathlib import Path
 import re
+import select
 import shutil
 import signal
 import socket
@@ -22,6 +23,7 @@ from types import SimpleNamespace
 
 import analyze_trace
 import control
+import custody
 import matrix
 import performance
 import restore_stress
@@ -361,6 +363,7 @@ def build_inputs(phases, source):
                                                        ("matrix", matrix), ("performance", performance), ("run", bench))}
     pins["runner_files_sha256"]["visible_cpu"] = bench.digest(Path(visible_cpu.__file__))
     pins["runner_files_sha256"]["restore_stress"] = bench.digest(Path(restore_stress.__file__))
+    pins["runner_files_sha256"]["custody"] = bench.digest(Path(custody.__file__))
     save(PUBLIC / "pins.json", pins)
     return pins
 
@@ -469,6 +472,122 @@ def sample(guest, tcp, name, visible_cores):
     return row_projection(result)
 
 
+class PerfCapture:
+    def __init__(self, path, command, errors):
+        self.path = path
+        self.fds = []
+        self.created = []
+        self.process = None
+        self.deadline = time.monotonic() + 30
+        self.ready = path / "recording-ready"
+        self.paths = [path / name for name in ("perf-control", "perf-ack", "perf-release")]
+        try:
+            for fifo in self.paths:
+                os.mkfifo(fifo, 0o600)
+                self.created.append(fifo)
+                self.fds.append(os.open(fifo, os.O_RDWR | os.O_NONBLOCK | os.O_CLOEXEC))
+            self.process = subprocess.Popen([
+                "sudo", "-n", "env", f"PERF_BUILDID_DIR={HOME / 'perf-buildids'}",
+                "timeout", "--kill-after=5s", "30", *map(str, command),
+                "--delay=-1", f"--control=fifo:{self.paths[0]},{self.paths[1]}",
+                "--", sys.executable, "-c",
+                "from pathlib import Path; import sys; "
+                "Path(sys.argv[1]).touch(); "
+                "f=open(sys.argv[2],'rb',buffering=0); "
+                "sys.exit(0 if f.read(1)==b'S' else 1)",
+                str(self.ready), str(self.paths[2]),
+            ], stderr=errors)
+            limit = min(self.deadline, time.monotonic() + 5)
+            while not self.ready.exists():
+                self.check_alive()
+                if time.monotonic() >= limit:
+                    raise Blocked("scoped collector did not reach disabled readiness")
+                time.sleep(.01)
+        except BaseException:
+            self.close()
+            raise
+
+    def check_alive(self):
+        if self.process.poll() is not None:
+            raise Blocked("scoped collector terminated before the completed-operation disable fence")
+        if time.monotonic() >= self.deadline:
+            raise Blocked("finite scoped collection budget exhausted")
+
+    def command(self, name):
+        self.check_alive()
+        if select.select([self.fds[1]], [], [], 0)[0]:
+            if os.read(self.fds[1], 4096):
+                raise Blocked("unsolicited scoped collector acknowledgement")
+        sent_ns = time.monotonic_ns()
+        os.write(self.fds[0], (name + "\n").encode())
+        limit = min(self.deadline, time.monotonic() + 5)
+        response = b""
+        while b"\n" not in response:
+            self.check_alive()
+            remaining = limit - time.monotonic()
+            if remaining <= 0:
+                raise Blocked(f"scoped collector {name} acknowledgement unavailable")
+            if select.select([self.fds[1]], [], [], min(.05, remaining))[0]:
+                response += os.read(self.fds[1], 4096)
+                if len(response) > 4:
+                    raise Blocked("malformed scoped collector acknowledgement")
+        if response != b"ack\n":
+            raise Blocked("malformed scoped collector acknowledgement")
+        self.check_alive()
+        return {"sent_ns": sent_ns, "ack_ns": time.monotonic_ns()}
+
+    def release(self):
+        self.check_alive()
+        os.write(self.fds[2], b"S")
+        if self.process.wait(timeout=max(.001, self.deadline - time.monotonic())) != 0:
+            raise Blocked("actual scoped profile collection unavailable")
+
+    def close(self):
+        try:
+            if self.process is not None and self.process.poll() is None:
+                # Popen retains the unreaped wrapper identity; namespace custody
+                # additionally pins and joins its perf/sentinel descendants.
+                subprocess.run(["sudo", "-n", "kill", "-TERM", str(self.process.pid)],
+                               check=False, timeout=5)
+                self.process.wait(timeout=10)
+        finally:
+            for fd in self.fds:
+                os.close(fd)
+            self.fds = []
+            for path in self.created:
+                path.unlink(missing_ok=True)
+            self.created = []
+
+
+def profile_batches(guest, capture):
+    enabled = capture.command("enable")
+    batches = []
+    began = time.monotonic()
+    while time.monotonic() - began < 12:
+        capture.check_alive()
+        # Reserve disable/ack/release time within the unchanged30-second budget.
+        timeout = min(20, math.floor(capture.deadline - time.monotonic() - 5))
+        if timeout <= 0:
+            raise Blocked("no complete-batch reserve within the finite collection budget")
+        started_ns = time.monotonic_ns()
+        data = json.loads(matrix.rpc_exec(guest, "/disk-probe flush 4096 128", timeout))
+        completed_ns = time.monotonic_ns()
+        capture.check_alive()
+        if type(data.get("operations")) is not int or data["operations"] != 128:
+            raise ValueError("profile operation integrity/count changed")
+        batches.append({"started_ns": started_ns, "completed_ns": completed_ns, "operations": 128})
+    disabled = capture.command("disable")
+    if not batches or any(not enabled["ack_ns"] <= row["started_ns"] <= row["completed_ns"]
+                          <= disabled["sent_ns"] for row in batches):
+        raise Blocked("counted operations are not bracketed by acknowledged perf fences")
+    capture.release()
+    return {"operations": sum(row["operations"] for row in batches),
+            "capture_boundaries": {"enable": enabled, "disable": disabled, "batches": batches,
+                                   "collector_budget_seconds": 30,
+                                   "completed_operation_seconds": (batches[-1]["completed_ns"]
+                                                                  - batches[0]["started_ns"]) / 1e9}}
+
+
 def profile(guest, observer, args, result):
     perf = args.perf
     roster = bench.thread_roster(guest.pid)
@@ -486,34 +605,17 @@ def profile(guest, observer, args, result):
         command += (["-e", "cpu-clock", "-F", "99", "-g", "--call-graph", "dwarf,8192"]
                     if args.profile == "stacks" else [item for event in events for item in ("-e", event)])
     errors = (path / "perf.stderr").open("wb")
-    ready = path / "recording-ready"
-    process = subprocess.Popen(["sudo", "-n", "env", f"PERF_BUILDID_DIR={HOME / 'perf-buildids'}",
-                                "timeout", "--kill-after=5s", "30",
-                                *map(str, command), "--", sys.executable, "-c",
-                                "from pathlib import Path; import sys,time; "
-                                "Path(sys.argv[1]).touch(); time.sleep(15)", str(ready)], stderr=errors)
-    before = observer_detail(observer, result, "before")
-    operations = 0
+    capture = None
     try:
-        limit = time.monotonic() + 5
-        while not ready.exists():
-            if process.poll() is not None or time.monotonic() > limit:
-                raise Blocked("scoped collector did not enable counters before the workload")
-            time.sleep(.01)
-        began = time.monotonic()
-        while time.monotonic() - began < 12:
-            data = json.loads(matrix.rpc_exec(guest, "/disk-probe flush 4096 128", 20))
-            if data["operations"] != 128:
-                raise ValueError("profile operation integrity/count changed")
-            operations += 128
-        if process.wait(timeout=20) != 0:
-            raise Blocked("actual scoped profile collection unavailable")
+        capture = PerfCapture(path, command, errors)
+        before = observer_detail(observer, result, "before")
+        result.update(profile_batches(guest, capture))
     finally:
-        if process.poll() is None:
-            subprocess.run(["sudo", "-n", "kill", "-TERM", str(process.pid)], check=False, timeout=5)
-            process.wait(timeout=10)
-        errors.close()
-    result["operations"] = operations
+        try:
+            if capture is not None:
+                capture.close()
+        finally:
+            errors.close()
     after = bench.thread_roster(guest.pid)
     result["profiled_owned_all_task_cpu_seconds"] = bench.cpu_delta(roster, after)
     result["threads_before"] = roster
@@ -760,6 +862,7 @@ def native_scale(args, host):
 
 
 def namespace(args):
+    deadline = time.monotonic() + 360
     tap_probe.require_private_namespace()
     uid, gid = int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"])
     if uid <= 0 or gid <= 0:
@@ -779,21 +882,23 @@ def namespace(args):
         argv += ["--scale-count", str(args.scale_count)]
     if args.lifecycle:
         argv += ["--lifecycle"]
-    process = subprocess.Popen(argv, cwd=bench.ROOT, preexec_fn=demote)
+    supervisor = custody.Supervisor()
     try:
-        return process.wait(timeout=330)
+        work_budget = min(330, deadline - time.monotonic() - 30)
+        if work_budget <= 0:
+            raise Blocked("namespace bootstrap exhausted the reserved descendant cleanup budget")
+        code, record = supervisor.run(argv, work_seconds=work_budget, cleanup_seconds=30,
+                                      cwd=bench.ROOT, preexec_fn=demote)
+        path = out / "custody.json"
+        save(path, record)
+        os.chown(path, uid, gid)
+        return code
     finally:
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=25)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)
+        supervisor.close()
 
 
 def run_cell(name, mode, phases, deadline, profile_kind=None, perf=None, scale_count=None, lifecycle=False):
-    if time.monotonic() + 360 > deadline:
+    if time.monotonic() + 395 > deadline:
         raise Blocked("bounded hosted time reserve exhausted before a complete cell")
     check_space(3 * 1024**3)
     out = RAW / name
@@ -811,8 +916,16 @@ def run_cell(name, mode, phases, deadline, profile_kind=None, perf=None, scale_c
     result = json.loads((out / "result.json").read_text()) if (out / "result.json").exists() else {
         "status": "blocked", "mode": mode, "reason": "cell did not produce an actual receipt",
         "performance_merge_eligible": False}
+    supervision = json.loads((out / "custody.json").read_text()) if (out / "custody.json").exists() else {}
+    result["supervision"] = {key: supervision[key] for key in (
+        "status", "termination_reason", "controller_returncode", "work_budget_seconds",
+        "cleanup_budget_seconds", "cleanup_seconds", "subreaper", "surviving_generations",
+        "alive_before_controller_kill") if key in supervision}
     save(PUBLIC / f"{name}.json", result)
-    if record["returncode"] or result["status"] != "passed":
+    if (record["returncode"] or result["status"] != "passed"
+            or supervision.get("status") != "passed"
+            or supervision.get("termination_reason") != "completed"
+            or supervision.get("controller_returncode") != 0):
         raise Blocked(f"{name} failed; no zero CPU or skipped-as-pass replacement")
     return result
 

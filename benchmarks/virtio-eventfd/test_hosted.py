@@ -6,11 +6,16 @@ import math
 import os
 from pathlib import Path
 import shutil
+import signal
+import subprocess
+import sys
+import threading
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 import hosted
+import custody
 import matrix
 import performance
 import visible_cpu
@@ -283,6 +288,177 @@ class ObserverCleanup(unittest.TestCase):
             process.wait.assert_called_once_with(timeout=8)
         finally:
             shutil.rmtree(root)
+
+
+class ProfileBoundaries(unittest.TestCase):
+    def exercise(self, premature=False):
+        clock = SimpleNamespace(ns=0)
+
+        class Capture:
+            deadline = 30
+
+            def check_alive(self):
+                if premature and clock.ns >= 15_000_000_000:
+                    raise hosted.Blocked("scoped collector terminated")
+
+            def command(self, name):
+                self.check_alive()
+                return {"sent_ns": clock.ns, "ack_ns": clock.ns}
+
+            def release(self):
+                self.check_alive()
+
+        def batch(*_args):
+            clock.ns += 3_900_000_000
+            return b'{"operations":128}'
+
+        with patch.object(hosted.time, "monotonic", side_effect=lambda: clock.ns / 1e9), \
+                patch.object(hosted.time, "monotonic_ns", side_effect=lambda: clock.ns), \
+                patch.object(matrix, "rpc_exec", side_effect=batch):
+            return hosted.profile_batches(None, Capture())
+
+    def test_delayed_final_batch_is_fully_inside_disable_fence(self):
+        result = self.exercise()
+        self.assertEqual(result["operations"], 512)
+        bounds = result["capture_boundaries"]
+        self.assertEqual(len(bounds["batches"]), 4)
+        self.assertEqual(bounds["completed_operation_seconds"], 15.6)
+        self.assertEqual(bounds["disable"]["sent_ns"], 15_600_000_000)
+        self.assertLessEqual(bounds["batches"][-1]["completed_ns"], bounds["disable"]["sent_ns"])
+
+    def test_zero_exit_at_old_fifteen_second_boundary_rejects_whole_sample(self):
+        with self.assertRaisesRegex(hosted.Blocked, "collector terminated"):
+            self.exercise(premature=True)
+
+    def test_acknowledgement_is_required_and_malformed_response_rejected(self):
+        from unittest.mock import Mock
+        for response in (b"ack\n", b"bad\n"):
+            with self.subTest(response=response):
+                control_read, control_write = os.pipe()
+                ack_read, ack_write = os.pipe()
+                capture = hosted.PerfCapture.__new__(hosted.PerfCapture)
+                capture.process = SimpleNamespace(poll=Mock(return_value=None))
+                capture.fds = [control_write, ack_read]
+                capture.deadline = hosted.time.monotonic() + 2
+
+                def acknowledge():
+                    self.assertEqual(os.read(control_read, 4096), b"enable\n")
+                    os.write(ack_write, response)
+
+                worker = threading.Thread(target=acknowledge)
+                worker.start()
+                try:
+                    if response == b"ack\n":
+                        fence = capture.command("enable")
+                        self.assertLessEqual(fence["sent_ns"], fence["ack_ns"])
+                    else:
+                        with self.assertRaisesRegex(hosted.Blocked, "malformed"):
+                            capture.command("enable")
+                    capture.process.poll.return_value = 0
+                    with self.assertRaisesRegex(hosted.Blocked, "terminated"):
+                        capture.command("disable")
+                finally:
+                    worker.join(timeout=2)
+                    for fd in (control_read, control_write, ack_read, ack_write):
+                        os.close(fd)
+                self.assertFalse(worker.is_alive())
+
+
+class DescendantCustody(unittest.TestCase):
+    def test_unsupported_kernel_pidfd_is_rejected_before_controller_launch(self):
+        with patch.object(custody.os, "pidfd_open", side_effect=OSError(38, "injected ENOSYS")), \
+                patch.object(custody.subprocess, "Popen") as launch:
+            with self.assertRaisesRegex(custody.CustodyError, "before controller launch"):
+                custody.Supervisor()
+            launch.assert_not_called()
+
+    def exercise(self, orphan):
+        root = hosted.bench.ROOT / ".perf/eventfd" / f"custody-test-{os.getpid()}-{int(orphan)}"
+        root.mkdir(mode=0o700, parents=True, exist_ok=False)
+        child = ("import os,signal,time; from pathlib import Path; "
+                 "signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+                 "Path(__import__('sys').argv[1]).touch(); time.sleep(60)")
+        controller = (
+            "import json,signal,subprocess,sys,time; from pathlib import Path; import custody; "
+            "root=Path(sys.argv[1]); signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+            f"children=[subprocess.Popen([sys.executable,'-c',{child!r},str(root/f'ready-{{n}}')],"
+            f"start_new_session=True) for n in range({1 if orphan else 9})]; "
+            "(root/'children.json').write_text(json.dumps([custody.identity(p.pid) for p in children])); "
+            "deadline=time.monotonic()+5\n"
+            "while not all((root/f'ready-{n}').exists() for n in range(len(children))):\n"
+            " if time.monotonic()>deadline: raise RuntimeError('child startup failed')\n"
+            " time.sleep(.01)\n"
+            + ("sys.exit(0)" if orphan else "time.sleep(60)")
+        )
+        program = (
+            "import json,sys; from pathlib import Path; import custody; "
+            "supervisor=custody.Supervisor()\n"
+            "try:\n"
+            f" code,receipt=supervisor.run([sys.executable,'-c',{controller!r},sys.argv[1]],"
+            "work_seconds=2,cleanup_seconds=3,term_grace=.1)\n"
+            " Path(sys.argv[1],'receipt.json').write_text(json.dumps({'code':code,**receipt}))\n"
+            "finally: supervisor.close()\n"
+        )
+        process = None
+        try:
+            process = subprocess.Popen([sys.executable, "-c", program, str(root)],
+                                       cwd=Path(hosted.__file__).parent,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, errors = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 0, (output, errors))
+            receipt = json.loads((root / "receipt.json").read_text())
+            self.assertEqual(receipt["status"], "passed")
+            self.assertEqual(receipt["surviving_generations"], [])
+            self.assertEqual(receipt["alive_before_controller_kill"], [])
+            self.assertLess(receipt["cleanup_seconds"], 3)
+            children = json.loads((root / "children.json").read_text())
+            self.assertEqual(len(children), 1 if orphan else 9)
+            for child_identity in children:
+                self.assertIsNone(custody.identity(child_identity["pid"]))
+                registration = next(row for row in receipt["registrations"]
+                                    if (row["pid"], row["start_ticks"]) ==
+                                    (child_identity["pid"], child_identity["start_ticks"]))
+                self.assertTrue(registration["reaped"])
+            return receipt
+        finally:
+            # Only the recorded synthetic generations may be signalled on failure.
+            if (root / "children.json").exists():
+                for child_identity in json.loads((root / "children.json").read_text()):
+                    actual = custody.identity(child_identity["pid"])
+                    if actual is not None and actual["start_ticks"] == child_identity["start_ticks"]:
+                        fd = os.pidfd_open(actual["pid"])
+                        try:
+                            if custody.identity(actual["pid"]) == actual:
+                                signal.pidfd_send_signal(fd, signal.SIGKILL)
+                        finally:
+                            os.close(fd)
+            if process is not None and process.poll() is None:
+                process.kill()
+                process.communicate(timeout=5)
+            shutil.rmtree(root)
+
+    def test_timeout_reaps_eight_separate_session_vms_and_auxiliary_collector(self):
+        receipt = self.exercise(orphan=False)
+        self.assertEqual(receipt["code"], 124)
+        self.assertEqual(receipt["termination_reason"], "timeout")
+        self.assertEqual(receipt["controller_returncode"], -signal.SIGKILL)
+
+    def test_successful_controller_cannot_leave_separate_session_orphan(self):
+        receipt = self.exercise(orphan=True)
+        self.assertEqual(receipt["code"], 1)
+        self.assertEqual(receipt["controller_returncode"], 0)
+        self.assertEqual(receipt["termination_reason"], "completed")
+
+    def test_changed_generation_cannot_be_signalled(self):
+        from unittest.mock import Mock
+        supervisor = custody.Supervisor.__new__(custody.Supervisor)
+        supervisor.alive = Mock(return_value=True)
+        record = {"pid": 123, "start_ticks": 456, "pidfd": 7, "signals": []}
+        with patch.object(custody, "identity", return_value={"pid": 123, "start_ticks": 457}), \
+                patch.object(custody.signal, "pidfd_send_signal") as send:
+            with self.assertRaisesRegex(custody.CustodyError, "changed owned PID generation"):
+                supervisor.send(record, signal.SIGKILL)
+            send.assert_not_called()
 
 
 class VisibleBusyAccounting(unittest.TestCase):

@@ -4,6 +4,59 @@
 
 **Date**: 2026-10-04
 
+### Hosted collection boundaries and descendant custody — corrective stage
+
+Parent review identifies two current runner blockers: the15-second collector
+can end before a final128-op batch finishes, and controller-only timeout
+cleanup misses VMMs in separate sessions. Correct these existing entry points;
+do not extend measurements or substitute another producer/provenance oracle.
+Capability136 and stoppedT/t admission already have separate actual CI proof.
+
+Use supported perf control/acknowledgement with initially disabled counters
+and a release-blocked sentinel, retaining the30-second finite collector bound.
+Record enable, each complete batch and disable fences; reject premature exit,
+invalid/missing acknowledgements and incomplete windows. Add delayed-final-
+batch and zero-exit premature-collector regressions.
+
+Make the namespace supervisor a subreaper with retained generation-checked
+pidfd custody of its explicitly traversed descendants, including collectors
+and separate-session VMMs. Reserve parallel bounded cleanup within the existing
+360-second cell envelope, stop new admission and reap escaped children before
+the controller's final kill. Add actual owned separate-session timeout/orphan
+regressions and stale-generation refusal. Test under bounded fleet leases and
+ordinary isolated correctness CI only; no local performance matrices, label,
+default change or old epoch relabeling. Publish exact source/results for the
+parent's bounded delta review before any hosted measurement.
+
+Implemented acknowledged disabled-start perf control with a blocking release
+sentinel, complete-batch fences and premature exit0 rejection. Existing30s
+collection and20s maximum RPC bounds remain; each RPC reserves disable/release
+time. The final batch is never truncated or removed from the denominator.
+The immutableb1c old function, run under a deterministic clock/collector model,
+incorrectly accepts512 ops ending15.6s with collection ending15s. This modeled
+negative control is not an actual perf workload.
+
+Implemented `custody.Supervisor`: functional kernel pidfd probe and subreaper
+admission before launch; own task-tree-only PID/start/parent registration;
+pidfd-only signals; parallel TERM/KILL and acknowledged controller stop;
+explicit adoption/reaping. Namespace bootstrap consumes the existing360s
+envelope before reserving30s cleanup. The caller now reserves the existing
+outer360+35s wait bound accurately. Forced orphan cleanup cannot qualify an
+otherwise successful cell; missing/failed custody receipts are rejected.
+Nested dead children still parented by a frozen controller are adopted/reaped
+after its final exit; no living recorded descendant precedes that final kill
+in the passing tests. Persistent survivors cause an explicit failed receipt.
+
+Local actual7 new regressions and full64/64, skip0, plus10 workflow coverage
+fixtures pass. Real process fixtures cover eight separate-session stand-ins
+and one auxiliary, plus an early successful-controller orphan; all are
+generation-checked gone/reaped. This is not eight actual KVM VMs or real perf
+acceptance. An initial unchanged3GiB guard refuses before testing. A separately
+bounded recovery removes only two owned nonexecutable ET_REL cache objects
+(13,033,472 allocated bytes); executed ELFs, raw data and failed epochs remain.
+Final phases release the lease; new-source isolated CI is pending at initial
+publication. No local performance matrix, label or adoption/merge.
+
 ### Stopped producer capture admission — 2026-10-05
 
 Parent reviews frozenf52 and identifies that valid markers/PID/start-time/

@@ -129,6 +129,35 @@ not change that tested native/harness/workflow source epoch.
 
 ### Ephemeral hosted qualification alternative
 
+Hosted profiles must start disabled and acknowledge explicit enable/disable
+commands. Every counted batch must start after enable acknowledgement and
+complete before disable is sent; the collector must remain alive across both
+boundaries. A delayed final batch is included in full, never trimmed after
+observation. Preserve the existing finite30-second collection budget and
+reject early exit (including exit0), missing/malformed acknowledgement or
+budget exhaustion. Record the fences, completed batches and actual denominator.
+
+The private-network namespace supervisor must be a child subreaper before
+launching its controller. Retain pidfds and verified PID/start-generation/
+parent registrations by traversing only its own descendants, including
+separate-session VMMs and auxiliary collectors. On timeout/interruption,
+parallel bounded cleanup covers the full eight-VM population, not eight
+sequential controller closes. Stop admission, terminate owned descendants
+before the controller's final kill and reap adopted children. A dead direct
+child still parented by an uncooperative controller can only be reaped after
+that controller exits; reconcile and reap these final adoptions too. Preserve
+an explicit failed cleanup receipt if any owned generation survives; never
+qualify that cell or rely on eventual runner destruction. No global scan or
+PID-only/foreign signalling is permitted. Parent review/label remains required.
+
+Current focused local execution passes64/64, skipped0, plus10 workflow coverage
+guards. New controls include a15.6-second four-batch deterministic window,
+premature exit0/malformed ACK rejection, eight separate-session synthetic VMM
+stand-ins plus one auxiliary collector, successful-controller orphan rejection,
+changed-generation refusal and unsupported kernel pidfd admission. These are
+runner correctness tests, not actual perf measurements or eight-KVM scaling.
+Capability136 and stoppedT/t admission remain unchanged and separately proven.
+
 Shared-host noise is not a terminal experiment result. A separate
 `ubuntu-24.04` GitHub-hosted job may collect a **new**, unpooled epoch, only
 when the parent applies `perf-qualify-virtio-eventfd` to same-repository PR9

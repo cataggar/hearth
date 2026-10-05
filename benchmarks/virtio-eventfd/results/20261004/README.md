@@ -20,6 +20,48 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Hosted runner corrections — bounded correctness stage
+
+The current profile uses initially disabled perf events with explicit
+enable/disable ACKs and a release-blocked sentinel, not a15-second sleep.
+Each counted128-op batch completes inside the acknowledged capture window;
+premature collector exit0, malformed/missing ACKs and budget exhaustion reject
+the whole sample. The30-second collection budget is unchanged. Fence/batch
+timestamps and the complete denominator are recorded.
+
+The namespace controller now has a functional-pidfd-admitted child subreaper.
+Only explicit own descendant task trees are traversed; PID/start/parent
+registrations and pidfds remain in custody across new sessions/adoption.
+Timeout cleanup signals all owned descendants in parallel, acknowledges
+controller admission stop, terminates descendants before final controller kill
+and explicitly reaps adopted children. Dead direct children still parented by
+an uncooperative controller are reaped after its exit. A full30-second cleanup
+reserve, within the existing360-second namespace envelope, replaces reliance
+on eight sequential closes fitting25s. The existing outer360+35s bound is now
+reserved accurately. Failed/missing custody, surviving generations and forced
+cleanup after a successful controller cannot produce a qualifying cell.
+
+Local `python3 .perf/eventfd/immediate-exit-admission/check_ci.py` executes the
+workflow's complete **64/64**, skip0, and10 coverage/YAML/shell/Python fixtures.
+Seven new regressions cover delayed15.6s final completion, old15s premature
+zero exit, ACK protocol, real owned separate-session eight stand-ins+one
+auxiliary, successful-controller orphan rejection, generation safety and
+unsupported kernel pidfd rejection before launch. The real process fixtures
+are **not eight KVM guests**; these tests do not measure perf or qualify scaling.
+An immutableb1c deterministic old-function model accepts512 operations despite
+the final.6s being uncaptured; the new window rejects premature collection.
+No new producer/provenance oracle, native source or default is introduced.
+
+Initial local3GiB guard refuses before tests. Bounded own recovery removes only
+two nonexecutable ET_REL cache objects,13,033,472 allocated bytes; failed logs/
+old epochs, executed ELFs and raw images remain. Actual new7 focused tests
+(within64 total) and all64 then pass under separate bounded fleet leases;
+private logs are `.perf/eventfd/hosted-runner-review/`.
+At initial source publication isolated current-source CI is pending, not
+borrowed fromb1c. Parent must review the exact source before applying the label.
+No hosted measurement, new active restore/lifecycle proof, default adoption,
+performance merge eligibility or auto-merge.
+
 ## Stopped producer admission — actual source correctness, separate epoch
 
 Current `disk_running` rejects proc `T`/`t` before accepting command/identity

@@ -311,8 +311,8 @@ jobs:
 
           suite = unittest.defaultTestLoader.discover("benchmarks/virtio-eventfd", pattern="test_*.py")
           expected = suite.countTestCases()
-          if expected < 57:
-              raise SystemExit(f"Required focused regression coverage missing: {expected} < 57")
+          if expected < 64:
+              raise SystemExit(f"Required focused regression coverage missing: {expected} < 64")
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           if (not result.wasSuccessful() or result.testsRun != expected or result.skipped
                   or result.expectedFailures or result.unexpectedSuccesses):
