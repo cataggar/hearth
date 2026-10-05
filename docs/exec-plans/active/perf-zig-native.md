@@ -115,10 +115,19 @@ Canonical convergence is now verified against supplied `7dfee42`: own
 cherry-pick `327f183` adds only the standalone fixture/contract, because the
 three runtime/unit blobs already match byte-for-byte. No async/notification,
 codegen, dependency or device option changes are imported. All five canonical
-files match, and the kernel is the same verified5.10.245 input. Four standalone
-three-case Debug/safe×LLVM/native runs and renewed forced32+7 executions are
-queued under the fleet lock; record actual outcomes before declaring them
-passed. Canonical correctness convergence is not optimization adoption.
+files match, and the kernel is the same verified5.10.245 input. Attempted
+standalone three-case Debug/safe×LLVM/native and renewed forced32+7 phases
+fail actual Err28 at output-directory creation before any command/VM launch.
+A tiny retry aborts its512MiB capacity check; a third passes a1GiB pre-queue
+check but again fails Err28 at locked launch. Zero new rows execute. This is
+storage failure, not missing canonical repair or backend/permission rejection.
+Independent free-space fluctuations are not attributed; pre-queue checks are
+not reservations. All owned phases end, with no fixture/VM/helper/socket/lock.
+The remaining named own compiler intermediates total only16,666,624 allocated
+bytes; no active cache/frozen input is discarded. Resume with durable artifact
+capacity, retaining4GiB/3GiB guards. Failure records are
+`postcleanup-summary/canonical-bridge-storage-attempt{1,2,3}.json`.
+Canonical correctness convergence is not optimization adoption.
 Retained deny cases are BPF-evaluator assertions in the32-unit suite, not
 real-kernel negative child executions. The separate three-case fixture supplies
 actual enforced API/CLI permissions/disk/all-task-identity acceptance.

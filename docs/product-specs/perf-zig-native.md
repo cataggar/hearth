@@ -194,9 +194,27 @@ blobs already match exactly (`fcda3fbf0fbdb20285a6ebed9930456751b38ae7`,
 `10d0c7bf65931d533d88caaaf5ac592a39f79333`,
 `060c876e4680f15586662401dbaf8f2723229b2c`). All five canonical files match;
 no compiler/device optimization is imported. Kernel5.10.245 retains the frozen
-`4da53980…` SHA. Independent three-case fixture execution is scheduled for
-each named Debug/safe×LLVM/native ELF, alongside fresh forced32+7 execution.
-These controls do not waive size, performance, noise or hardware gates.
+`4da53980…` SHA. Independent three-case fixture execution and renewed
+forced32+7 execution are attempted for each named Debug/safe×LLVM/native ELF.
+Both first phases fail actual **Err28 ENOSPC at output-directory creation,
+before any compiler/test/VM**. A bounded tiny-fixture retry fails its512MiB
+capacity check before launch. A third attempt observes more than1GiB before
+queuing, but again fails actual Err28 at output-directory creation when the
+fleet lock becomes available. **Zero new standalone or renewed forced-test
+rows execute**; these are storage-launch failures, not missing jail repairs,
+backend/permission failures or accepted tests.
+
+Independent filesystem observations subsequently fluctuate from824MB to2.744GB,
+524MB,794MB and1.662GB; no other owner's resource or cause is inspected or
+attributed. A pre-queue capacity observation is not an artifact reservation.
+All three attempts end, the owned socket directory is empty, and no canonical
+fixture directory/VM/helper or held lock remains. The only remaining named
+own compiler intermediates total16,666,624 allocated bytes; discarding those
+cannot provide the missing multi-GiB measurement capacity. No further frozen
+inputs/active caches are removed. Actual phase failures are indexed in
+`postcleanup-summary/canonical-bridge-storage-attempt{1,2,3}.json`.
+Resume these correctness cases with durable capacity at locked launch; the
+4GiB build/3GiB runtime guards and all eligibility gates remain unchanged.
 The denied-syscall/argument cases in the32-unit suite are **BPF-evaluator unit
 assertions**, not real-kernel negative child executions. Actual enforced-filter
 API/CLI permission, disk and all-task identity acceptance comes separately from
