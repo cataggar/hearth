@@ -94,9 +94,25 @@ Fresh GNU/native-CPU safe LLVM/native each execute32+7, but common enforced-jail
 tests remain2/3 because guest boot exits SIGSYS; fresh GNU native binary is
 15,260,974B, LLVM6,001,096B. Debug no-heartbeat controls initially connect6/6,
 then all6/6 post-five-second execs time out within the two-second deadline.
+Safe repeats the same result:6/6 initial connections,0/6 post-idle completions.
 They are baseline failures, not successful production idle or latency samples.
-Full runtime minima and safe/explicit build comparisons remain underway; TAP,
-SDK CONNECT, independent agent performance/native AArch64 and complete
+Four refreshed fixed-LLVM-safe-VMM agent controls also pass actual jailed
+guest/snapshot restoration with cleared supplementary groups; their old
+mechanical POSIX/build rows are not relabelled fresh performance measurements.
+
+A practical independent TAP recipe creates only an owned network namespace
+and TAP, leaving host addresses/routes/NAT unchanged. All four primary cells
+boot under the enforced jail and complete **100/100 ICMP packets each** with
+inherited software/KVM counters. Namespace deletion and owned-node teardown
+are verified. The first attempt reached guest networking but its helper failed
+to remove the newly needed private `dev/net/tun` before `rmdir(dev)`;
+that retained harness error is not a backend failure/pass. The exact recorded
+owned node is cleaned and the corrected recipe repeated. These four basic
+network controls do not constitute ten-session throughput/tail qualification,
+TCP/UDP workload acceptance or complete asynchronous network CPU attribution.
+
+Full runtime minima and safe/explicit build comparisons remain underway;
+SDK CONNECT, repeated TAP performance, independent agent performance/native AArch64 and complete
 asynchronous kernel CPU remain unqualified.
 
 Private post-cleanup records use `evidence/postcleanup-*`; measurements,
@@ -107,6 +123,11 @@ own support/cache directories may likewise be byte/link-verified into private
 archives outside measured regions; active measurement caches, canonical
 fixtures and other tasks' resources are excluded. Shared storage failure and
 4GiB build/3GiB runtime guards are not silently weakened.
+After a second capacity interruption, nine completed own cache trees preserve
+6,434,137,320 logical bytes in1,433,691,060 archive bytes, verified file/hardlink
+contents and symlink targets before original deletion. The5,000,446,260 logical
+byte difference is this task's recovery, not the whole filesystem's fluctuating
+free-space delta. Safe A/A resumes only its two complete same-manifest pairs.
 
 This is an experiment specification, not a benchmark result
 or decision to change defaults. The compiler migration in

@@ -70,6 +70,17 @@ exec within the fixed two-second host deadline. These baseline gaps are not
 production idle/performance passes. Only completed own snapshots/caches are
 compacted after exact-byte/link verification; the shared storage incident and
 capacity guards remain documented, with no other task's resources removed.
+Safe no-heartbeat likewise connects6/6 then completes0/6 post-idle execs.
+Four renewed fixed-VMM agent guest/snapshot controls pass with empty groups.
+The owned-network-namespace TAP recipe passes100/100 packets in each primary
+cell with actual inherited software/KVM counters and verified namespace/node
+teardown; this is basic ICMP acceptance, not TCP/UDP performance/sample minima.
+Initial TUN-node cleanup failure is preserved separately and its exact owned
+node cleaned before successful repetition. Nine completed own cache trees are
+retained in exact-byte/link-verified archives, reducing logical storage by
+5,000,446,260B without touching active caches/fixtures/other tasks. A second
+capacity guard halts safe A/A after two pairs; verified same-manifest resume
+does not automatically qualify pooling or noise.
 
 ## Evidence and fixed scope
 
