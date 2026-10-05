@@ -302,6 +302,8 @@ jobs:
           print(f"Verified actual KVM execution: {expected}, total {passed}, pinned kernel")
           PY
       - name: Run complete focused eventfd harness regressions without skips
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           umask 077
@@ -309,10 +311,12 @@ jobs:
           import json
           import unittest
 
+          import runpy
+          runpy.run_path("benchmarks/virtio-eventfd/verify_custody_review.py", run_name="__main__")
           suite = unittest.defaultTestLoader.discover("benchmarks/virtio-eventfd", pattern="test_*.py")
           expected = suite.countTestCases()
-          if expected < 64:
-              raise SystemExit(f"Required focused regression coverage missing: {expected} < 64")
+          if expected < 66:
+              raise SystemExit(f"Required focused regression coverage missing: {expected} < 66")
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           if (not result.wasSuccessful() or result.testsRun != expected or result.skipped
                   or result.expectedFailures or result.unexpectedSuccesses):

@@ -365,6 +365,43 @@ class ProfileBoundaries(unittest.TestCase):
 
 
 class DescendantCustody(unittest.TestCase):
+    def test_exit_reaped_between_liveness_and_lookup_is_normal_no_signal(self):
+        process = subprocess.Popen(
+            [sys.executable, "-c", "import sys; print('READY',flush=True); sys.stdin.read()"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True)
+        fd = None
+        try:
+            self.assertTrue(hosted.select.select([process.stdout], [], [], 5)[0])
+            self.assertEqual(process.stdout.readline(), b"READY\n")
+            before = custody.identity(process.pid)
+            fd = os.pidfd_open(process.pid)
+            record = {**before, "pidfd": fd, "signals": []}
+            supervisor = custody.Supervisor.__new__(custody.Supervisor)
+            original = custody.identity
+
+            def exited(pid):
+                self.assertEqual(pid, process.pid)
+                self.assertTrue(supervisor.alive(record))
+                process.kill()
+                process.wait(timeout=5)
+                self.assertIsNone(original(pid))
+                return None
+
+            with patch.object(custody, "identity", side_effect=exited), \
+                    patch.object(custody.signal, "pidfd_send_signal") as send:
+                supervisor.send(record, signal.SIGTERM)
+                send.assert_not_called()
+            self.assertFalse(supervisor.alive(record))
+            self.assertEqual(record["signals"], [])
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+            process.stdin.close()
+            process.stdout.close()
+            if fd is not None:
+                os.close(fd)
+
     def test_unsupported_kernel_pidfd_is_rejected_before_controller_launch(self):
         with patch.object(custody.os, "pidfd_open", side_effect=OSError(38, "injected ENOSYS")), \
                 patch.object(custody.subprocess, "Popen") as launch:
@@ -372,8 +409,8 @@ class DescendantCustody(unittest.TestCase):
                 custody.Supervisor()
             launch.assert_not_called()
 
-    def exercise(self, orphan):
-        root = hosted.bench.ROOT / ".perf/eventfd" / f"custody-test-{os.getpid()}-{int(orphan)}"
+    def exercise(self, orphan, refused=False):
+        root = hosted.bench.ROOT / ".perf/eventfd" / f"custody-test-{os.getpid()}-{int(orphan)}-{int(refused)}"
         root.mkdir(mode=0o700, parents=True, exist_ok=False)
         child = ("import os,signal,time; from pathlib import Path; "
                  "signal.signal(signal.SIGTERM,signal.SIG_IGN); "
@@ -390,14 +427,41 @@ class DescendantCustody(unittest.TestCase):
             " time.sleep(.01)\n"
             + ("sys.exit(0)" if orphan else "time.sleep(60)")
         )
+        refusal = (
+            "class Refusal(custody.Supervisor):\n"
+            " def __init__(self):\n"
+            "  super().__init__(); self.refused=None; self.inject=True\n"
+            " def send(self,row,signum):\n"
+            "  if row is not self.controller:\n"
+            "   if self.refused is None: self.refused=(row['pid'],row['start_ticks'])\n"
+            "   if self.inject and (row['pid'],row['start_ticks'])==self.refused:\n"
+            "    raise custody.CustodyError('injected per-registration verification refusal')\n"
+            "  return super().send(row,signum)\n"
+        ) if refused else ""
+        fixture_cleanup = (
+            " supervisor.inject=False\n"
+            " for row in supervisor.records.values(): supervisor.send(row,signal.SIGKILL)\n"
+            " deadline=time.monotonic()+3\n"
+            " while time.monotonic()<deadline:\n"
+            "  supervisor.reap()\n"
+            "  try: os.waitpid(supervisor.controller['pid'],os.WNOHANG)\n"
+            "  except ChildProcessError: pass\n"
+            "  if all(custody.identity(row['pid']) is None for row in supervisor.records.values()): break\n"
+            "  time.sleep(.01)\n"
+            " assert all(custody.identity(row['pid']) is None for row in supervisor.records.values())\n"
+            " Path(sys.argv[1],'fixture-cleanup.json').write_text(json.dumps({'injection_removed':True,'all_reaped':True}))\n"
+        ) if refused else ""
         program = (
-            "import json,sys; from pathlib import Path; import custody; "
-            "supervisor=custody.Supervisor()\n"
+            "import json,os,signal,sys,time; from pathlib import Path; import custody\n"
+            + refusal
+            + f"supervisor={'Refusal' if refused else 'custody.Supervisor'}()\n"
             "try:\n"
             f" code,receipt=supervisor.run([sys.executable,'-c',{controller!r},sys.argv[1]],"
             "work_seconds=2,cleanup_seconds=3,term_grace=.1)\n"
             " Path(sys.argv[1],'receipt.json').write_text(json.dumps({'code':code,**receipt}))\n"
-            "finally: supervisor.close()\n"
+            "finally:\n"
+            + fixture_cleanup
+            + " supervisor.close()\n"
         )
         process = None
         try:
@@ -407,10 +471,11 @@ class DescendantCustody(unittest.TestCase):
             output, errors = process.communicate(timeout=10)
             self.assertEqual(process.returncode, 0, (output, errors))
             receipt = json.loads((root / "receipt.json").read_text())
-            self.assertEqual(receipt["status"], "passed")
-            self.assertEqual(receipt["surviving_generations"], [])
-            self.assertEqual(receipt["alive_before_controller_kill"], [])
-            self.assertLess(receipt["cleanup_seconds"], 3)
+            self.assertEqual(receipt["status"], "failed" if refused else "passed")
+            if not refused:
+                self.assertEqual(receipt["surviving_generations"], [])
+                self.assertEqual(receipt["alive_before_controller_kill"], [])
+            self.assertLess(receipt["cleanup_seconds"], 3.2 if refused else 3)
             children = json.loads((root / "children.json").read_text())
             self.assertEqual(len(children), 1 if orphan else 9)
             for child_identity in children:
@@ -418,7 +483,14 @@ class DescendantCustody(unittest.TestCase):
                 registration = next(row for row in receipt["registrations"]
                                     if (row["pid"], row["start_ticks"]) ==
                                     (child_identity["pid"], child_identity["start_ticks"]))
-                self.assertTrue(registration["reaped"])
+                if refused and [registration["pid"], registration["start_ticks"]] in receipt["unsafe_registrations"]:
+                    self.assertFalse(registration["reaped"])
+                    self.assertEqual(registration["signals"], [])
+                else:
+                    self.assertTrue(registration["reaped"])
+            if refused:
+                self.assertEqual(json.loads((root / "fixture-cleanup.json").read_text()),
+                                 {"injection_removed": True, "all_reaped": True})
             return receipt
         finally:
             # Only the recorded synthetic generations may be signalled on failure.
@@ -448,6 +520,23 @@ class DescendantCustody(unittest.TestCase):
         self.assertEqual(receipt["code"], 1)
         self.assertEqual(receipt["controller_returncode"], 0)
         self.assertEqual(receipt["termination_reason"], "completed")
+
+    def test_registration_error_preserves_failed_receipt_and_cleans_other_children(self):
+        receipt = self.exercise(orphan=False, refused=True)
+        self.assertEqual(receipt["code"], 1)
+        self.assertEqual(len(receipt["unsafe_registrations"]), 1)
+        self.assertEqual(receipt["surviving_generations"], receipt["unsafe_registrations"])
+        self.assertEqual(receipt["alive_before_controller_kill"], receipt["unsafe_registrations"])
+        self.assertTrue(receipt["cleanup_errors"])
+        for error in receipt["cleanup_errors"]:
+            self.assertEqual(error["type"], "CustodyError")
+            self.assertEqual(error["error"], "injected per-registration verification refusal")
+            self.assertEqual([error["pid"], error["start_ticks"]], receipt["unsafe_registrations"][0])
+        self.assertEqual(sum(row["reaped"] for row in receipt["registrations"]), 8)
+        print(json.dumps({"expected_failed_custody_receipt": {
+            key: receipt[key] for key in ("status", "code", "cleanup_errors",
+                                         "unsafe_registrations", "surviving_generations")},
+                          "other_owned_children_reaped": 8, "fixture_injection_removed_and_reaped": True}))
 
     def test_changed_generation_cannot_be_signalled(self):
         from unittest.mock import Mock

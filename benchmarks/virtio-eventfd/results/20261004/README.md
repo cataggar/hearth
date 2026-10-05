@@ -20,6 +20,37 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Retained-review custody exit race — narrow correction
+
+Parent accepts collection fencing/CAP136/dedicated CI but identifies one
+remaining9ee9 cleanup defect: process exit/reap between pidfd liveness and
+identity lookup is mistaken for a changed live generation, aborting the sweep.
+Current `send` rechecks the SAME pidfd on missing/changed identity. Confirmed
+death returns without signalling; a still-live unverifiable generation remains
+refused. Per-registration typed errors are retained/deduplicated while other
+known descendants still terminate/reap. Errors or remaining unsafe generations
+force an explicit FAILED receipt, including the public supervision projection.
+No silent success fallback, PID-only signal, global scan or deadline increase.
+
+Two new guards perform real exit/reap at that exact boundary, and a persistent
+one-registration refusal while eight other stand-ins terminate/reap. The failed
+receipt preserves its unsafe survivor/errors; the fixture removes only its
+artificial refusal and safely reaps that last known generation afterwards.
+This remains synthetic owned process custody, **not eight KVM guests**.
+Collector fencing, native/capability136, producerT/t and all earlier epochs are
+unchanged; their successful old tests are not proof of this new correction.
+
+The first smallest local2-case command hits the unchanged3GiB guard before
+tests:3,198,894,080B available. No owned unexecuted object/archive cache candidate
+remains. No guard lowering or removal of raw/frozen/executed evidence.
+Existing ordinary isolated CI now requires66 current focused guards and runs
+the same two controls against the verified immutable9ee9 Git blob first.
+Old expected error/failure are explicit negative controls, never positive passes.
+The bounded API retrieval uses only a read-only token, fixed same-repository
+HTTPS/no redirects/proxy, verified bytes and private project fixture cleanup.
+At initial source publication actual new-source CI remains pending.
+No local performance matrix, label, measurement, default change or merge.
+
 ## Hosted runner corrections — bounded correctness stage
 
 The current profile uses initially disabled perf events with explicit

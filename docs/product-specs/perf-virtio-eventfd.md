@@ -150,6 +150,15 @@ an explicit failed cleanup receipt if any owned generation survives; never
 qualify that cell or rely on eventual runner destruction. No global scan or
 PID-only/foreign signalling is permitted. Parent review/label remains required.
 
+If a registered process exits/reaps between initial pidfd liveness and `/proc`
+identity lookup, recheck that same pinned pidfd. Confirmed termination is a
+normal no-signal outcome, including PID reuse after the pinned generation dies.
+A missing/changed identity with a still-live pidfd remains a refusal. Individual
+registration failures must not abandon other owned cleanup/reaping. Record
+typed errors and remaining unsafe generations in a FAILED receipt, even if
+later safe reconciliation removes every survivor. Keep existing finite budgets;
+do not silently downgrade errors, signal an unverified PID or scan globally.
+
 Current focused local execution passes64/64, skipped0, plus10 workflow coverage
 guards. New controls include a15.6-second four-batch deterministic window,
 premature exit0/malformed ACK rejection, eight separate-session synthetic VMM

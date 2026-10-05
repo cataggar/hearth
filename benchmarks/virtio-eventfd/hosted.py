@@ -920,7 +920,7 @@ def run_cell(name, mode, phases, deadline, profile_kind=None, perf=None, scale_c
     result["supervision"] = {key: supervision[key] for key in (
         "status", "termination_reason", "controller_returncode", "work_budget_seconds",
         "cleanup_budget_seconds", "cleanup_seconds", "subreaper", "surviving_generations",
-        "alive_before_controller_kill") if key in supervision}
+        "alive_before_controller_kill", "cleanup_errors", "unsafe_registrations") if key in supervision}
     save(PUBLIC / f"{name}.json", result)
     if (record["returncode"] or result["status"] != "passed"
             or supervision.get("status") != "passed"

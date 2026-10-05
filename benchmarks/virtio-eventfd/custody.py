@@ -45,6 +45,9 @@ class Supervisor:
         self.controller = None
         self.interrupted = None
         self.handlers = {}
+        self.cleanup_errors = []
+        self.cleanup_unsafe = set()
+        self.error_keys = set()
 
     def alive(self, record):
         return not select.select([record["pidfd"]], [], [], 0)[0]
@@ -112,6 +115,9 @@ class Supervisor:
             return
         actual = identity(record["pid"])
         if actual is None or actual["start_ticks"] != record["start_ticks"]:
+            # Exit/reap (and subsequent PID reuse) can race the first poll.
+            if not self.alive(record):
+                return
             raise CustodyError("refusing changed owned PID generation")
         if signum in record["signals"]:
             return
@@ -121,68 +127,113 @@ class Supervisor:
             return
         record["signals"].append(signum)
 
+    def note_error(self, phase, record, error, signum=None):
+        entry = {
+            "phase": phase, "pid": record["pid"] if record is not None else None,
+            "start_ticks": record["start_ticks"] if record is not None else None,
+            "type": type(error).__name__, "error": str(error),
+            "errno": error.errno if isinstance(error, OSError) else None, "signal": signum,
+        }
+        key = tuple(entry.values())
+        if key not in self.error_keys:
+            self.error_keys.add(key)
+            self.cleanup_errors.append(entry)
+        if record is not None:
+            self.cleanup_unsafe.add((record["pid"], record["start_ticks"]))
+
+    def known_alive(self, record):
+        try:
+            return self.alive(record)
+        except (CustodyError, OSError, ValueError) as error:
+            self.note_error("liveness", record, error)
+            return True
+
+    def cleanup_send(self, record, signum):
+        try:
+            self.send(record, signum)
+        except (CustodyError, OSError, ValueError) as error:
+            self.note_error("signal", record, error, signum)
+
+    def cleanup_discover(self):
+        try:
+            self.discover()
+        except (CustodyError, OSError, ValueError) as error:
+            self.note_error("discovery", None, error)
+
     def reap(self):
         for record in self.records.values():
             if record is self.controller or record["reaped"]:
                 continue
-            actual = identity(record["pid"])
-            if actual is None or actual["start_ticks"] != record["start_ticks"]:
-                continue
             try:
+                actual = identity(record["pid"])
+                if actual is None or actual["start_ticks"] != record["start_ticks"]:
+                    if self.known_alive(record):
+                        raise CustodyError("refusing unverified owned reap generation")
+                    continue
                 pid, status = os.waitpid(record["pid"], os.WNOHANG)
             except ChildProcessError:
+                continue
+            except (CustodyError, OSError, ValueError) as error:
+                self.note_error("reap", record, error)
                 continue
             if pid:
                 record.update(reaped=True, wait_status=status)
 
     def descendants(self):
         return [row for row in self.records.values()
-                if row is not self.controller and self.alive(row)]
+                if row is not self.controller and self.known_alive(row)]
 
     def cleanup(self, process, seconds, term_grace):
         began = time.monotonic()
         deadline = began + seconds
         descendants_deadline = deadline - min(5, seconds / 3)
-        self.discover()
-        self.send(self.controller, signal.SIGTERM)
+        self.cleanup_discover()
+        self.cleanup_send(self.controller, signal.SIGTERM)
         while time.monotonic() < descendants_deadline:
-            self.discover()
+            self.cleanup_discover()
             self.reap()
             for row in self.descendants():
-                self.send(row, signal.SIGTERM if time.monotonic() < began + term_grace else signal.SIGKILL)
+                self.cleanup_send(row, signal.SIGTERM if time.monotonic() < began + term_grace else signal.SIGKILL)
             if time.monotonic() >= began + term_grace:
                 # Freeze controller admission before the final descendant sweep.
-                self.send(self.controller, signal.SIGSTOP)
+                self.cleanup_send(self.controller, signal.SIGSTOP)
             process.poll()
             if not self.descendants():
-                actual = identity(self.controller["pid"])
+                try:
+                    actual = identity(self.controller["pid"])
+                except (CustodyError, OSError, ValueError) as error:
+                    self.note_error("controller-state", self.controller, error)
+                    actual = None
                 stopped = (actual is not None and actual["start_ticks"] == self.controller["start_ticks"]
                            and actual["state"] in ("T", "t"))
-                if not self.alive(self.controller) or stopped:
+                if not self.known_alive(self.controller) or stopped:
                     break
             time.sleep(.01)
-        self.discover()
+        self.cleanup_discover()
         self.reap()
         before_kill = [(row["pid"], row["start_ticks"]) for row in self.descendants()]
-        self.send(self.controller, signal.SIGKILL)
+        self.cleanup_send(self.controller, signal.SIGKILL)
         try:
             process.wait(timeout=max(.001, deadline - time.monotonic()))
-        except subprocess.TimeoutExpired:
-            pass
+        except (subprocess.TimeoutExpired, OSError, ValueError) as error:
+            self.note_error("controller-wait", self.controller, error)
         # Controller death adopts any last fork; the same generation checks apply.
         while time.monotonic() < deadline:
-            self.discover()
+            self.cleanup_discover()
             self.reap()
             for row in self.descendants():
-                self.send(row, signal.SIGKILL)
+                self.cleanup_send(row, signal.SIGKILL)
             if not self.descendants() and process.poll() is not None:
                 self.reap()
                 break
             time.sleep(.01)
-        survivors = [row for row in self.records.values() if self.alive(row)]
+        survivors = [row for row in self.records.values() if self.known_alive(row)]
+        unsafe = [list(key) for key in sorted(self.cleanup_unsafe)
+                  if key in self.records and self.known_alive(self.records[key])]
         return {"cleanup_seconds": time.monotonic() - began,
                 "alive_before_controller_kill": before_kill,
-                "surviving_generations": [[row["pid"], row["start_ticks"]] for row in survivors]}
+                "surviving_generations": [[row["pid"], row["start_ticks"]] for row in survivors],
+                "cleanup_errors": self.cleanup_errors, "unsafe_registrations": unsafe}
 
     def run(self, argv, work_seconds, cleanup_seconds=30, term_grace=5, **kwargs):
         def interrupted(signum, _frame):
@@ -203,6 +254,9 @@ class Supervisor:
             while True:
                 self.discover()
                 self.reap()
+                if self.cleanup_errors:
+                    reason = "custody-error"
+                    break
                 if process.poll() is not None:
                     break
                 if self.interrupted is not None:
@@ -214,12 +268,14 @@ class Supervisor:
                 time.sleep(.02)
         except (OSError, ValueError, RuntimeError) as error:
             reason, failure = "custody-error", type(error).__name__
+            self.note_error("supervision", None, error)
         orphaned = bool(self.descendants())
         cleanup = self.cleanup(process, cleanup_seconds, term_grace)
         rows = [{key: value for key, value in row.items() if key != "pidfd"}
                 for row in self.records.values()]
         receipt = {
-            "status": "failed" if cleanup["surviving_generations"] or cleanup["alive_before_controller_kill"] else "passed",
+            "status": "failed" if (cleanup["surviving_generations"] or cleanup["alive_before_controller_kill"]
+                                   or cleanup["cleanup_errors"] or failure is not None) else "passed",
             "termination_reason": reason, "controller_returncode": process.returncode,
             "work_budget_seconds": work_seconds, "cleanup_budget_seconds": cleanup_seconds,
             "subreaper": True, "registrations": rows, **cleanup,

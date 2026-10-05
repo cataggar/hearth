@@ -4,6 +4,43 @@
 
 **Date**: 2026-10-04
 
+### Custody exit/reap race — bounded retained-review correction
+
+Parent accepts collector fencing, capability136 and dedicated CI, but the
+retained9ee9 review finds cleanup can abort when a live pinned pidfd's process
+exits/reaps before identity lookup. Recheck the SAME pidfd on missing/changed
+identity; accept only confirmed death as normal. Keep refusing changed live
+generations and never signal through an unverified/reused numeric PID.
+
+Isolate typed per-registration cleanup failures so other retained owned
+registrations still terminate/reap. Preserve errors/remaining unsafe generations
+in an explicitly FAILED receipt; no broad silent catch or success fallback.
+Keep existing finite30s/360s/395s budgets, collector/native/producer source,
+parent-only label/HOLD and historical source/test epochs unchanged.
+Add a real exit/reap exactly between liveness and lookup regression, plus a
+per-registration refusal proving other owned children still terminate/reap
+with a failed receipt. Demonstrate immutable9ee9 fails the same controls.
+Run smallest focused guards and current exact-source ordinary CI only; publish
+one precise correction outcome for parent delta review, no performance matrix.
+
+Implemented same-pidfd death reconciliation and typed, deduplicated error
+ledger/remaining-unsafe receipt fields. Signal, liveness, discovery and per-row
+reap errors retain FAILED status and do not bypass other known cleanup. The
+hosted public supervision projection retains these fields. No collector,
+native, producer, capability, default or deadline change.
+
+Initial smallest local2-case command refuses at the unchanged3GiB guard:
+3,198,894,080B available, before test execution. No owned unexecuted object/
+archive cache candidates remain; do not lower the guard or delete frozen
+evidence. Use existing isolated correctness CI instead, requiring66 current
+focused cases. Its same2m bounded guard phase first runs both regressions
+against the exact retained9ee9 Git blob41561cad864b4dce2ed8d019a1768ee49fabe34f:
+read-only API token, fixed same-repository HTTPS endpoint, no redirect/proxy,
+byte/Git-blob verification and project-private fixture cleanup. Expected old
+failure/error are explicitly checked, never included in current pass counts.
+This is a negative test runner, not another capture/producer/provenance oracle.
+Current exact-source CI results are pending at initial publication.
+
 ### Hosted collection boundaries and descendant custody — corrective stage
 
 Parent review identifies two current runner blockers: the15-second collector
