@@ -166,3 +166,44 @@ fixture blob rather than blindly applying a modify/delete conflict or
 importing block/backend patches. The private verified bundle is
 `jail-fixture-enospc.bundle`, with source/log/custody hashes in
 `cleanup-acceptance-manifest.json`.
+
+## Acknowledged shared reuse and scoped acceptance — 2026-10-05
+
+The common jail repair's delivery/source convergence and controlled acceptance
+are complete, independently of performance/default/merge qualification:
+
+- Plan#2 acknowledges `7dfee42` as `a72b0a1`. Read-only Git verification finds
+  only the standalone fixture/contract added, with no VMM change from its
+  already-repaired parent. Its conditional vhost device/eventfd/poll overlays
+  remain independent, not a claim that its whole filter equals legacy `7dfee42`.
+  It reports actual new static Debug/Safe **35 units,7 KVM,3 standalone jail
+  cases per mode**, separately from older or aborted epochs.
+- Plan#3's reconciled source contains the canonical poll-zero/null-mask guards
+  and checked group clearing, with separately confined mailbox/SO_ERROR support.
+  It reports sealed prior-control Debug/Safe **4 inherited-group jail cases
+  each**,12 controlled Linux cases and64 recorded owned IDs absent. These
+  do not validate its later common IRQ-policy change or a performance gate.
+- Plan#6 acknowledges one `7dfee42` cherry-pick as
+  `327f1832c26c4e98948c04e920094e6d36e956fe`. This worktree's read-only Git
+  comparison verifies all five common blobs exact and only fixture/contract
+  added to its already-exact runtime. It subsequently reports actual forced
+  acceptance on **all four static Debug/Safe × LLVM/native cells:32 unit,
+  7 real KVM,3 standalone cases each;128/28/12 total**, no skips/cached-run
+  inference. The12 jail cases verify077 access, CLI/API serial disk
+  write/fsync/read/hash and all-task identity/empty groups; all24 recorded
+  standalone PID paths and private nodes/sockets are gone. Its retained
+  `canonical-v5-final.json` and published `fe4888e`/draft PR10 preserve these
+  peer executions. Different cache histories/test-build times are not speedups.
+
+These are explicitly **peer-reported execution scopes**, not additional
+executions by this worktree or native/GNU acceptance of the fourth
+`98b10c21` evidence-fault case. This worktree's own canonical and cleanup
+proof remains separately recorded above.
+
+Later workload preparation still fails ENOSPC at locked manifest creation
+before a VM or row, and independently timed busy-core controls do not certify
+a quiet host. Native size rejection, mandatory workload/IRQ/lifecycle/SDK/
+total-cost qualification and all default/merge decisions remain separate.
+Canonical delivery is not the remaining blocker; do not duplicate the repair,
+relax guards, borrow runtime prototypes or attribute these correctness gains
+to a performance backend.

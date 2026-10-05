@@ -82,6 +82,26 @@ That follow-up is now `98b10c21f7769e36799d0994f231d7e881953ac3`, exact parent
 The private bundle and `cleanup-acceptance-manifest.json` preserve reproduction
 and nine-launch resource custody. This does not unblock performance gates.
 
+### Scoped shared jail convergence complete — 2026-10-05 05:09 UTC
+
+Canonical repair receipt/source convergence and controlled peer acceptance
+are now acknowledged, not a remaining delivery/code blocker. The shared
+contract records this worktree's own proof separately from peer execution.
+Plan#6's exact five-blob reuse subsequently executes all four static
+Debug/Safe × LLVM/native cells with32 forced units,7 real KVM and3 standalone
+jail cases each:128/28/12 total, no skips/cached acceptance,24 standalone PID
+paths/private nodes/sockets gone. Plan#2 separately reports new static
+Debug/Safe35unit/7KVM/3jail cases each; plan#3 reports seeded Debug/Safe4jail
+cases each on its earlier sealed control. Do not count any of these as new
+executions of this worker or coverage of its masked IRQ-route gate.
+
+The auxiliary common-jail repair handoff is complete for that scoped contract.
+This performance execution plan stays **active/blocked**. Later peer runtime
+preparation still fails locked-launch artifact creation before a VM/row;
+capacity/noise/mandatory matrix/native-size/IRQ-policy qualification remains
+independent. No worker/notification/compiler runtime is imported and no
+performance gate/default/merge decision changes.
+
 ## Execution checkpoint — 2026-10-04
 
 ### Fresh qualification continuation — 22:13 UTC
