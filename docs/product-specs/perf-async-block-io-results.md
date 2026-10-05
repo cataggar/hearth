@@ -1,6 +1,6 @@
 # Async block I/O: baseline capabilities and opt-in worker experiment
 
-**Date:** 2026-10-04
+**Date:** 2026-10-04–05
 
 **Issue:** #1
 
@@ -148,8 +148,8 @@ the guest or a measured workload window.
 The helper revision executes **13/13** focused tests, including real owned
 pidfd delivery and stale-start-time refusal. The intermediate read-fault
 revision executes Debug/Safe **45/45units +8/8real KVM +7/7enforced-jail**
-cases each, with explicit frozen kernel selection. A later Linux per-read
-transfer-cap edge adds a46th unit and is still awaiting validation; these
+cases each, with explicit frozen kernel selection. At that checkpoint a
+later Linux per-read transfer-cap edge added a46th unit awaiting validation; these
 45-case results do not attest that newer source. The initial missing-kernel
 fixture attempt (five errors) and rejected Zig frontend cache option
 (zero tests) remain separate failed logs, not passing executions.
@@ -175,6 +175,40 @@ independent copy and unchanged backing-file mode. The manifest records
 4,308,484,096named redundant allocated bytes reclaimed; it is artifact
 storage housekeeping, not a workload/image optimization or a measured gain:
 `.perf/blk-io/quiet-1/redundancy-reclaim-45.json`.
+
+### Matched current-ELF fenced baseline profile
+
+Source`c734b8ec9e53671b31827b4548aba8eb7c44cfab`, the Safe ELF above,
+`--block-backend worker --force-sync`, executes an additional real enforced
+profile on2026-10-05. Effective backend is checked`sync`; all three actual
+owned TIDs are attached. Exact e2kernel/initrd/guest-job/dataset bytes, CPU8/
+clientCPU1,10s ramp/60s measured, one vCPU/512MiB and guest-direct/host-buffered
+flags remain. Only its copied run image/directory are fdatasync/fsync-fenced
+before launch (observed605,648ns); no global cache drop occurs.
+
+This **profiled n=1** returns error0,303,361measured writes and
+**5,055.932401IOPS**. Guest write p50/p95/p99 are60,160/80,384/115,200ns;
+separate fsync p50/p95/p99 are123,392/168,960/238,592ns, N303,360. Warmup-
+inclusive80s stat records50.968212137ownedCPU-s,353,236context switches,
+zero migrations/faults,5,128,865KVM entries/exits,1pread,352,890pwrite and
+352,852fdatasync. Record has10,064CPU-clock samples/zero lost; inclusive
+fdatasync/pwrite stacks are about6.99%/2.09%. Active owned TID schedstat
+records51.160567010runtime seconds,18.330360ms runqueue wait and352,901slices
+over72.442190843s; the other two TIDs have zero runtime in that window.
+
+No variance, aligned CPU/completion, total kernel-writeback attribution,
+force-sync-versus-worker gain or gate is inferred from this point. All
+recorded identities are gone; private device nodes are removed. Four newly
+verified exact successful restored-side duplicates are also removed after
+hash comparison with retained originals (2,147,483,648allocated bytes), with
+their own separate manifest. A newly registered ten-pair forced-sync A/A
+series remains pending; no fresh worker outcome has been collected.
+
+Raw executed drivers/source manifests/stat/stacks/distributions/custody:
+`.perf/blk-io/quiet-1/e3/flush/profile-baseline-1/`,
+`e3/flush/matched-source.json`, `matched-profile-baseline.log`,
+`redundancy-reclaim-46.json`. This separate matched regime cannot erase or
+replace the completed inadmissible canonical e2epoch.
 
 ## What was implemented
 

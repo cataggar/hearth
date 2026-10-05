@@ -1,7 +1,7 @@
 # Product Spec: Evaluate Asynchronous VirtIO Block I/O
 
 **Status**: Default-disabled ordered-worker correctness experiment implemented; performance qualification blocked; synchronous default unchanged
-**Last updated**: 2026-10-04
+**Last updated**: 2026-10-05
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Execution plan**: [perf-async-block-io](../exec-plans/active/perf-async-block-io.md)
 **Execution evidence**: [baseline capability results](perf-async-block-io-results.md)
@@ -52,13 +52,13 @@ The next traced stage proves the existing vsock loop needs nonblocking `poll`
 declares that bit unused/ignored; recognizing it does not permit another
 active clone capability. All namespace/process-escape flags stay denied.
 
-### Repaired synchronous execution status
+### Historical repaired synchronous execution checkpoints
 
 The identical repaired configuration `5ee81b1` now verifies real guest fio3.40
 libaio loading, fully written1GiB, and achieved QD8/QD32. Short warm-read
 diagnostic repeats plus actual all-listed-TID software stat/stack records
 exist, but are not the complete G1 matrix or frozen numeric gates.
-Current own controls find99.799875%whole-host busy under the shared lock;
+At that checkpoint own controls find99.799875%whole-host busy under the shared lock;
 no-heartbeat agent exec times out3/3 after five seconds idle. Original jail
 repairs are complete; mandatory baseline idle progress and controlled total
 CPU attribution remain blocked. The detailed results preserve both successful
@@ -72,7 +72,8 @@ restored-agent checks block3/3 within30s. A single full-window flush profile
 retains actual syscall wall-duration outliers, not qualified paired confidence.
 Matched host controls98.824118%/99.849962%busy and shared ENOSPC/owned-image cleanup expose
 additional environmental limits, not optimization gains. The separate jail
-prerequisite todo is done; the implementation todo remains in progress.
+local prerequisite implementation is complete; peer convergence and the
+implementation todo remain in progress.
 See the results before treating any mandatory row or gate as accepted.
 
 Collector tooling now explicitly scopes build-ID cache/scratch after sudo and
@@ -246,9 +247,10 @@ On the supported x86-64 Linux host, a [single read](https://man7.org/linux/man-p
 staging, retaining the synchronous zero-filled suffix beyond that cap rather
 than issuing extra host reads or imposing a new guest request-size restriction.
 
-Proposed implementation interfaces are `--block-backend sync|worker`,
+Implemented and correctness-validated experimental interfaces are `--block-backend sync|worker`,
 pre-admission `--force-sync`, and API drive `io_backend: "sync"|"worker"`.
-They are not existing until implemented and validated. Default remains sync;
+Their passing counts/source hashes are recorded in the results; they are not
+performance-qualified. Default remains sync;
 no io_uring or notification optimization. A ready-state publication and
 KVM immediate-exit byte use sequentially consistent ordering: owner clears
 the byte before checking ready/pause state, never after that check; worker
@@ -266,6 +268,15 @@ repaired-sync capabilities/profiles and A/A must establish new numeric gates
 before any new candidate comparison. Actual ENOSPC also requires a capacity
 recheck. Defaults/merge eligibility do not change from host cleanup alone;
 mandatory liveness, lifecycle, workload and attribution requirements remain.
+
+The fresh canonical ten-pair flush A/A executes20/20 and freezes numeric
+gates before a new candidate: IOPS`B=5023.310445`, SD143.614571/CV2.858963%,
+paired95%`N=3.502016%`. Write/fsync p99 noise expands margins to34.041412%/
+49.876421%, beyond the20% cap, so those gates are inadmissible. Keep all
+outliers. Re-profile/re-freeze a separately registered identical-current-ELF
+forced-sync baseline with an owned copied-input writeback fence before any
+fresh worker comparison. This changes preparation control, not guest inputs,
+compiler, runtime storage settings or the synchronous default.
 
 Run host-side `perf stat`, `perf record` with call stacks and `perf report` on
 the baseline **before selecting a prototype**, and repeat on each candidate.

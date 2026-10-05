@@ -1,7 +1,7 @@
 # Execution Plan: Profile and Evaluate Async VirtIO Block I/O
 
 **Status**: Default-disabled worker implemented; fresh qualification resumed after owner-approved host cleanup; no default/merge eligibility
-**Last updated**: 2026-10-04
+**Last updated**: 2026-10-05
 **Issue**: [#1](https://github.com/cataggar/hearth/issues/1)
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
 **Actual results**: [baseline capability execution](../../product-specs/perf-async-block-io-results.md)
@@ -64,6 +64,14 @@ Old19cb binaries/profiles remain. This new revision actually executes each
 Debug/Safe46units+8realKVM+7enforced-jail cases and13helper cases once, all
 passing/no skips; exact hashes/logs are in results. Use this new identical
 force-sync/worker ELF for later matched gates, not older correctness counts.
+
+The c734Safe identical-ELF forced-sync profile now actually passes with
+5,055.932401IOPS/error0, all three owned TIDs and10,064samples/zero lost.
+It uses the new per-owned-image copy fence and unchanged exact guest inputs;
+it remains a profiled n=1 with warmup-inclusive CPU and no gain/gate. All
+recorded identities are gone. The separate ten-pair matched A/A is queued
+under the common lock; do not collect a qualifying worker until it completes
+and its newly frozen noise is admissible.
 
 The project-local integration kernel option and capability/diagnostic tooling
 are implemented and executed. Debug/safe unit suites each execute 31 tests;
