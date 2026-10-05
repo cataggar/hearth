@@ -44,16 +44,84 @@ Keep the explicit existing `setgroups(0,NULL)` before credential drop; upstream
 are disclosed, and #1 was asked to consolidate this additional isolation
 prerequisite rather than weakening #3 to match an uncleared group policy.
 
-**Actual follow-up outcome: validation blocked, not passing.** The new filter
-could not acquire the shared fleet lock: full-suite wait300s, rebuilt full
-phase wait180s, longer retry wait900s, and a smaller nonblocking Safe-only
-phase all exited1 before the redirected build logs were created. No compiler,
-test or VM executed in these requests; no new ELF/hash exists. All own requests
-ended without holding a lock. Parent coordination of an available bounded
-lock window is required before this reconciled source is accepted. Do not
-bypass the lock, inspect/kill unowned holders, relax gates or count these as
-skipped/passing tests. Earlier e2f3f69 fourteen-test suites remain independently
-valid historical executions.
+#1 subsequently published exact shared `ced7ed72b5b2f80286e37ba8c9d5eada0cb90236`:
+its checked `setgroups(0,NULL)` matches #3's existing runtime semantics. Reuse
+its deterministic `sudo setpriv --groups=0` regression in the hermetic #3
+helper, without the sibling block diagnostic import. Verify empty groups
+after enforced drop and API traffic using new binaries once the lock window
+is available. Do not relabel earlier nonseeded cases as this new execution.
+
+**Original follow-up publication: validation blocked, not passing.** Full-suite
+wait300s, rebuilt phase wait180s, retry wait900s and a smaller nonblocking
+Safe-only request all exited1 before redirected build logs were created.
+No compiler/test/VM executed in those requests; their immutable pending
+receipt remains valid for that historical boundary.
+
+**Subsequent execution,2026-10-05:** the resumed bounded exclusive ReleaseSafe
+phase actually passes **39 unit +14 dedicated tests (53/53)**, then builds and
+installs a new static-musl ELF:
+`4c3bd1bd56cd4c58aa1c581658a473e640a0e759c41057459dd1dd1fd3fad5de`.
+Its raw log is `.perf/eventfd/w5/shared-filter/resume-safe.log`; final phase
+timestamp00:20:12 UTC. Debug then passes60/60 and installs
+`5b9f7201168d1b0b614d3d31d69da6813385c006aeb800999c989146f60dc84d`;
+ReleaseSafe separately passes7/7 existing integration. Hermetic jail4/4
+per optimization, benchmark17/17 and12/12 fresh four-mode no-heartbeat Linux
+native/agent/disk/TAP cells actually pass.136 selective raw files are hashed
+and archived;64 recorded owned PID/TID numbers are absent at seal.
+These tests are the reconciled b8a9 runtime, not the subsequent IOAPIC fix.
+Do not bypass the fleet
+lock, inspect/kill unowned holders, relax gates or count missing runs as passes.
+Old build19/e2f3f69 and all performance pins remain historical and unchanged.
+
+### Completed focused IOAPIC mask continuation
+
+Exercise an actual LAPIC/IOAPIC route, with both PICs masked and no guest
+timer/heartbeat. Check masked edge/level pending completion, unmask wake,
+ACK/EOI ordering and level reset/deassignment for IRQ_LINE and IRQFD.
+In particular, test a level IOAPIC route while the masked PIC is edge:
+the masked-route policy must not turn a logically pending level completion
+into a transient pulse that disappears before unmask. First retain the
+actual failure, if any; change common policy only if that real oracle fails.
+This is a correctness continuation, not a new performance series or gate.
+
+The corrected C-offset oracle actually executes on2026-10-05: unchanged
+common policy passes15/16 dedicated tests but fails the masked IOAPIC level
+case. The first case uses ordinary IRQ_LINE with both PICs masked/edge and
+IOAPIC masked/level: choosing the PIC edge fallback pulses away the IOAPIC's
+pending assertion. Keep the failure and fix only this common masked-route
+selection to retain level whenever either masked route is level. Unmasked
+selection and incompatible-active-route rejection stay unchanged. Rebuild
+both optimizations and check line/IRQFD pending/unmask/reset before acceptance;
+do not label this common correctness change an eventfd gain.
+
+The narrow correction actually passes55/55 per static-musl Debug/ReleaseSafe
+(39 units+16 dedicated;15 real enforced KVM+one policy unit). Each optimization
+executes eight new IOAPIC scenarios: unmasked edge/level and masked level
+unmask/reset across line/IRQFD. Both corrected binaries pass4/4 hermetic jail
+cases with seeded-root-group clearing. Fresh ReleaseSafe passes12/12 supported
+native/agent/disk/TAP no-heartbeat cells across all four modes, with all
+sampled tasks enforced/nonroot/empty groups/CapEff0. Native/agent shutdown0;
+TAP is explicitly terminated after18 integrity checks, not graceful-exit
+acceptance. Seven existing integrations remain b8a9 evidence, not rerun.
+The new IOAPIC cases use ACK-before-EOI; active congestion/EOI-first and full
+qualification remain unfinished. Exact pins/failures/payload receipts are
+published in the results' IOAPIC archive; no new performance samples/gates.
+
+At01:24:54 UTC the filesystem had only339 MiB available. The queued IOAPIC
+build was stopped before acquiring the lock/creating its log; no compiler/test
+executed in that request. The completed native memory
+images are sparse (~50 MiB allocated each), not512 MiB of reclaimable storage.
+Preserve them, all raw measurements and canonical restore sources. A bounded
+locked cleanup may remove only this worktree's rebuildable `vmm/.zig-cache`
+after checking ownership and independent immutable binary pins, documenting
+actual paths/size/outcome and rechecking pins. Keep the private global package
+cache, agent cache, source, installed/pinned ELFs and all evidence untouched.
+Actual first cleanup removes1,315,749,888 namespace allocated bytes. A later
+post-correction Linux request was also stopped before execution at20,480 bytes
+free; second bounded cleanup removes223,674,368 rebuilt-cache bytes at02:20:15
+UTC and verifies both corrected ELF pins before/after. All raw/images remain.
+Only the subsequent new02:23 phase counts as the passing Linux regression.
+Filesystem changes from other tasks are not attributed to these cleanups.
 
 **Issue**: [#3](https://github.com/cataggar/hearth/issues/3)
 
@@ -709,11 +777,11 @@ preserves logical rings/interrupts; never switch a live queue unsafely.
 If acceleration is rejected, retain its result and assess common correctness
 controls independently, without calling them an eventfd speedup.
 
-- [ ] W0 untouched baseline, perf stacks/exit/ioctl breakdown and limitations retained.
-- [ ] W1 ownership/route/lifecycle decisions documented from baseline evidence.
-- [ ] W2 controlled legacy passes actual no-heartbeat and integrity tests.
-- [ ] W3 C00/L0 effects and legacy noise measured; numeric gates frozen.
-- [ ] W4 ioeventfd-only and W5 irqfd-only independently execute/diagnose capabilities.
+- [x] W0 untouched baseline, perf stacks/exit/ioctl breakdown and limitations retained.
+- [x] W1 ownership/route/lifecycle decisions documented from baseline evidence.
+- [x] W2 controlled legacy passes actual no-heartbeat and integrity tests.
+- [x] W3 C00/L0 effects and legacy noise measured; numeric gates frozen (noise qualification fails).
+- [x] W4 ioeventfd-only and W5 irqfd-only independently execute/diagnose capabilities.
 - [ ] W6 combined and all pause/reset/snapshot/restore/teardown/race/jail cases pass on real KVM; no skipped-as-passing coverage.
 - [ ] W7 required nested-Azure workload/concurrency/idle matrix, all-thread CPU and raw profiles retained; optional non-nested comparison or absence stated.
 - [ ] W8 benefit/regression/variance analysis and explicit keep/reject/inconclusive/default decision recorded, including negative results.

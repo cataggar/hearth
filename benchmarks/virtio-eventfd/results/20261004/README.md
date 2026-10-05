@@ -53,9 +53,10 @@ acceptance. No unrelated task/process metadata or stacks were captured.
 
 ## W2 four controlled modes — actual correctness, not adoption
 
-### Shared filter reconciliation pending
+### Shared filter reconciliation — resumed validation
 
-The authoritative shared jail repair is #1's `f2f9ab4` + `5ee81b1`.
+The authoritative shared jail repair is #1's `f2f9ab4` + `5ee81b1` +
+`ced7ed72` (checked supplementary-group clearing).
 Build19 reused the first and independently implemented PID0-affinity/ignored
 clone compatibility, but its ordinary poll7/epoll_pwait281 allowances were
 unconditional. It was **not the exact second shared filter**. All historical
@@ -69,21 +70,146 @@ permission contract under077, not UID-owned0700 replacement directories.
 Supplementary-group clearing is an additional explicit #3 prerequisite:
 `jail.zig` calls `setgroups(0,NULL)` before the UID/GID drop, retained from
 the original isolation control. Upstream `f2f9ab4` does not contain that call.
-Its actual empty-group enforced rosters remain #3 evidence; consolidation
-into the authoritative shared revision was requested directly from #1.
-It is not silently described as identical to #1's unmodified group policy.
-The new filter is **unvalidated draft source**. Four attempts exited1 before
+Its actual empty-group enforced rosters remain #3 evidence. Shared
+`ced7ed72b5b2f80286e37ba8c9d5eada0cb90236` now implements the same checked
+runtime operation. The hermetic #3 helper reuses that commit's deterministic
+`sudo setpriv --groups=0` launch wrapper without importing the block runner;
+the newly seeded Python case now passes in both optimization builds.
+
+At the original `b8a9b37` publication boundary the new filter was
+**unvalidated draft source**. Four attempts exited1 before
 any build log was created: a combined replay waiting300s, full rebuild waiting
 180s, longer rebuild waiting900s, and a smaller nonblocking Safe-only phase.
-Thus **zero compilers, tests or VMs executed**, no new binary/hash exists,
-and no request remains queued/holding the lock. These are lock-refusal
+Thus **zero compilers, tests or VMs executed in those four requests**, and no
+new binary/hash existed at that boundary. These are lock-refusal
 receipts, not skipped/passing tests. Parent must coordinate an available bounded
 fleet window; no bypass, unowned-holder inspection/termination, gate relaxation
 or default promotion is permitted. [Pending receipt](shared-filter-pending.json)
-captures provenance, source changes and actual missing execution.
+captures provenance, source changes and actual missing execution at that time.
 Old production/performance/L0 pins stay immutable, gates unchanged.
 
-Final pinned static-musl binaries:
+A resumed exclusive phase subsequently completed on2026-10-05 at00:20:12 UTC.
+Actual `zig build test eventfd-test -Dtarget=x86_64-linux-musl
+-Doptimize=ReleaseSafe --summary all` passes **53/53 (39 unit +14 dedicated)**,
+including the four new enforced NULL-mask/blocking-poll denial scenarios.
+`zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe --summary all`
+then succeeds and installs the separately pinned binary:
+`4c3bd1bd56cd4c58aa1c581658a473e640a0e759c41057459dd1dd1fd3fad5de`.
+Raw log: `.perf/eventfd/w5/shared-filter/resume-safe.log`.
+Debug subsequently passes **60/60 (39 unit +14 dedicated +7 existing)**;
+ReleaseSafe's separately executed existing integration suite passes **7/7**.
+Both new pinned binaries pass **4/4 standalone Python jail cases**, including
+one deliberately inherited-root-group API case each (two actual jailed API
+cases plus two deterministic PID-cleanup cases per optimization). The unchanged
+benchmark Python suite passes **17/17**.
+
+The fresh ReleaseSafe binary also passes **12/12 enforced no-heartbeat Linux
+cells**: native eight64KiB slow-reader messages, agent pending-write
+disconnect/reconnect + disk readback/exec/PTY, and private TAP for every mode.
+TAP validates18 messages per cell before/after two-second silence. Native and
+agent cells exit gracefully0; TAP's owned VMM is explicitly terminated by
+SIGTERM after successful integrity checks, **not counted as graceful exit**.
+All observed tasks have configured UID/GID, empty groups, CapEff0, Seccomp2,
+NoNewPrivs1. [Verified receipt](shared-filter-validation.json) and
+[selective raw archive](shared-filter-validation.tar.gz) retain136 individually
+hashed files; archive SHA256
+`3891d581e143d973ceb383442a6340343b49bd54fef2ad9a5870acf5e3ab483a`.
+All64 recorded owned PID/TID numbers are absent at the actual seal boundary.
+
+New independent five-second no-owned-VM host floor: **38.82 busy CPU seconds /
+5.000238 seconds =7.76363 busy cores**,0.41 CPU seconds iowait,0 steal.
+It excludes guest double counting, is aggregate noise rather than owned
+backend CPU, and is **not** a new A/A repetition or justification to relax
+the frozen gates. Earlier briefly lower TAP traffic-window controls are not
+substituted for this independent floor.
+
+Three later Debug-group requests refused the lock (480s,1200s,300s); an
+acquired attempt failed opening its log with `ENOSPC`, before any test ran.
+The later successful02:02 UTC request supersedes those missing executions,
+without overwriting their receipts or counting them as passes.
+
+This validates the reconciled **b8a9 runtime**, not the subsequently added
+IOAPIC tests/correction below, and is not a replay of historical performance
+samples or a new speedup claim.
+
+| Reconciled b8a9 correctness binary | SHA256 |
+|---|---|
+| ReleaseSafe | `4c3bd1bd56cd4c58aa1c581658a473e640a0e759c41057459dd1dd1fd3fad5de` |
+| Debug | `5b9f7201168d1b0b614d3d31d69da6813385c006aeb800999c989146f60dc84d` |
+
+### IOAPIC follow-up — real failed oracle and verified correction
+
+Two added real KVM tests enable a LAPIC/IOAPIC vector with both PICs masked.
+The unchanged policy actually passes **15/16** dedicated tests: unmasked
+edge/level routes pass for IRQ_LINE and IRQFD, but the masked IOAPIC level
+case fails. Its first scenario uses ordinary IRQ_LINE, a masked edge PIC and
+masked level IOAPIC. The common fallback selects edge, so the high/low pulse
+discards the IOAPIC's pending level assertion. This is a common-control
+correctness defect, **not an eventfd-specific performance finding**.
+
+Retain `.perf/eventfd/w5/ioapic/baseline-safe-abi-final.log` (actual15/16).
+The prior `baseline-safe.log` only failed compilation: directly referencing
+the translated C IOAPIC struct exposes its opaque bitfield union. The new
+`HEARTH_IOAPIC_IRR_OFFSET` uses target-C `__builtin_offsetof`, like the
+existing redirection/PIC offsets; no guessed host layout.
+
+The surgical common correction retains level when both routes are masked and
+either is level. Active-route selection and incompatible-active rejection
+are unchanged. Fresh static-musl ReleaseSafe and Debug each actually pass
+**55/55 =39 units +16 dedicated cases**, then build the executable. The
+dedicated suite is15 real enforced KVM cases plus one policy unit, with no
+skips. Each optimization executes eight new IOAPIC scenarios: four unmasked
+edge/level ×IRQ_LINE/IRQFD, and four masked level unmask/reset ×IRQ_LINE/IRQFD.
+The guest observes the used index, interrupt count, transport ACK and LAPIC
+EOI; no timer or heartbeat substitutes for the wake. These new IOAPIC
+scenarios use ACK-before-EOI; active congestion/EOI-first coverage is still
+incomplete.
+
+| Corrected IOAPIC correctness binary | SHA256 |
+|---|---|
+| ReleaseSafe | `d0beacfc752f7fd2917d26c829447252490707a4c578c8f85e340f5bae2f4ea0` |
+| Debug | `18b3a12bd3f57a2ea616bb4d7106d48acca013a90a7d319f07f79f8575a6c9a4` |
+
+On these corrected binaries the hermetic jail suite actually passes4/4 per
+optimization, including deliberately inherited root-group clearing. New
+ReleaseSafe executions pass12/12 no-heartbeat Linux cells (native, agent/disk/
+pending-write reconnect/PTY and private TAP in all four modes). All actual
+sampled tasks have UID/GID1000, empty groups, CapEff0, Seccomp2 and NNP1.
+Native/agent shutdown exits0; TAP integrity passes18 messages including after
+two-second silence, then uses explicit owned SIGTERM, not a claimed graceful
+exit. [Verified receipt](ioapic-correctness-validation.json) and
+[selective archive](ioapic-correctness-validation.tar.gz) preserve the original
+compile-only error, actual15/16 old-policy failure, fixed55/55 logs, new
+payload/isolation/cleanup receipts and relevant sources including the target-C
+header. Existing seven integrations are **not rerun** after this correction;
+b8a9 results and historical performance are not silently relabelled.
+The109,263-byte archive verifies143 individually hashed files; all64 recorded
+owned PID/TID numbers are absent at the new seal boundary. No images, ELF
+fixtures, raw perf traces or unrelated task records are published.
+
+### Owned storage preservation
+
+At01:24 UTC only339 MiB remained; a queued IOAPIC build was stopped before
+any compiler/test ran. Snapshot memory images are sparse (~50 MiB allocated
+each), not512 MiB of reclaimable bytes; none were deleted.
+The [owned cleanup ledger](owned-cache-cleanup.json) records removal of only
+this worktree's rebuildable `vmm/.zig-cache` at01:35:54 UTC
+(1,315,749,888 allocated bytes in its namespace). All five immutable binary
+pins are verified before/after. Global package/agent caches, sources, raw
+measurements, native/canonical restore images and other tasks' files remain
+untouched. Concurrent filesystem free-space changes are not exclusively
+attributed to this cleanup; later `ENOSPC` remains an actual separate boundary.
+After both corrected builds, another Linux regression request was stopped
+before lock/log creation with only20,480 bytes available; no test or VM ran
+in that request. A second bounded
+[owned-cache cleanup](owned-cache-cleanup-2.json) at02:20:15 UTC removed only
+the newly rebuilt `vmm/.zig-cache` (223,674,368 namespace allocated bytes),
+checking both corrected binary pins before/after and retaining all images,
+raw data and global/agent caches. A subsequent new locked request actually
+ran the passing post-correction suites above at02:23:06–02:23:53 UTC.
+Concurrent capacity changes are not attributed solely to our cleanup.
+
+Historical build19 static-musl measurement binaries:
 
 | Optimization | SHA256 |
 |---|---|

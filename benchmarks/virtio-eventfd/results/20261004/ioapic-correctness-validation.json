@@ -1,0 +1,169 @@
+{
+  "issue": 3,
+  "date": "2026-10-05",
+  "kind": "common_masked_IOAPIC_correctness_not_performance",
+  "binary_sha256": {
+    "ReleaseSafe": "d0beacfc752f7fd2917d26c829447252490707a4c578c8f85e340f5bae2f4ea0",
+    "Debug": "18b3a12bd3f57a2ea616bb4d7106d48acca013a90a7d319f07f79f8575a6c9a4"
+  },
+  "target": "x86_64-linux-musl",
+  "source_base_commit": "b8a9b3760dccab303252d7d4949b110abef00fd7",
+  "source_tree_at_execution": "base plus archived narrow masked-route correction, IOAPIC tests/C-offset and seeded-group test",
+  "source_sha256": {
+    "vmm/src/devices/virtio/accelerator.zig": "a1a8113fff9327b36726ababe6f07e191f632cfa71338b1399d6eb408a06d8a5",
+    "vmm/src/devices/virtio/owner.zig": "27888b760f46c2ce5f7907c8687261b9b9dcd5787b972cd4fe142d26e62c23f2",
+    "vmm/src/eventfd_tests.zig": "7528e19c9a100db40b3aadb96f120e9cbbeff81eda3b4f742bafe4664c6a5bbb",
+    "vmm/src/kvm/abi.h": "bc3867fc3fb2511f49dc9729d5ce3ae19dc76fdfafee777b3b01e0252962d640",
+    "vmm/src/seccomp.zig": "229f005084f79f1f9da83da7457c8fce2ed42e37d79021fc55c6a20c1acf4248",
+    "tools/perf/test_jail_prerequisites.py": "a457f8e142b98d1b4450d9cc84b8f57d4d451f3be407a1578482bf527b7b1ede"
+  },
+  "exclusive_lock": "/d/hearth/.perf/fleet/host.lock",
+  "umask": "077",
+  "before": {
+    "unchanged_policy_dedicated_passed": 15,
+    "total": 16,
+    "failed_real_case": "masked level IOAPIC with edge PIC also masked; first case ordinary IRQ_LINE",
+    "prior_compile_error_is_not_KVM_test_execution": true
+  },
+  "after_per_optimization": {
+    "unit_tests": 39,
+    "dedicated_tests": 16,
+    "dedicated_real_enforced_KVM": 15,
+    "dedicated_policy_unit": 1,
+    "combined_passed": 55,
+    "skips": 0,
+    "new_unmasked_IOAPIC_edge_level_line_IRQFD_scenarios": 4,
+    "new_masked_IOAPIC_level_unmask_reset_line_IRQFD_scenarios": 4,
+    "standalone_Python_jail_cases": 4,
+    "deliberately_seeded_root_group_cases": 1
+  },
+  "post_correction_no_heartbeat_Linux_cases": [
+    {
+      "mode": "C00",
+      "kind": "n",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "graceful_exit_code": 0,
+      "checked_messages": 8,
+      "bytes_each_direction": 524288
+    },
+    {
+      "mode": "C00",
+      "kind": "a",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "graceful_exit_code": 0,
+      "pending_write_reconnect": true,
+      "unchanged_agent_poll_ms": 50
+    },
+    {
+      "mode": "C00",
+      "kind": "t",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "checked_messages": 18,
+      "post_silence_seconds": 2,
+      "owned_VMM_terminated_with_SIGTERM_not_graceful_exit": true
+    },
+    {
+      "mode": "C10",
+      "kind": "n",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "graceful_exit_code": 0,
+      "checked_messages": 8,
+      "bytes_each_direction": 524288
+    },
+    {
+      "mode": "C10",
+      "kind": "a",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "graceful_exit_code": 0,
+      "pending_write_reconnect": true,
+      "unchanged_agent_poll_ms": 50
+    },
+    {
+      "mode": "C10",
+      "kind": "t",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "checked_messages": 18,
+      "post_silence_seconds": 2,
+      "owned_VMM_terminated_with_SIGTERM_not_graceful_exit": true
+    },
+    {
+      "mode": "C01",
+      "kind": "n",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "graceful_exit_code": 0,
+      "checked_messages": 8,
+      "bytes_each_direction": 524288
+    },
+    {
+      "mode": "C01",
+      "kind": "a",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "graceful_exit_code": 0,
+      "pending_write_reconnect": true,
+      "unchanged_agent_poll_ms": 50
+    },
+    {
+      "mode": "C01",
+      "kind": "t",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "checked_messages": 18,
+      "post_silence_seconds": 2,
+      "owned_VMM_terminated_with_SIGTERM_not_graceful_exit": true
+    },
+    {
+      "mode": "C11",
+      "kind": "n",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "graceful_exit_code": 0,
+      "checked_messages": 8,
+      "bytes_each_direction": 524288
+    },
+    {
+      "mode": "C11",
+      "kind": "a",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "graceful_exit_code": 0,
+      "pending_write_reconnect": true,
+      "unchanged_agent_poll_ms": 50
+    },
+    {
+      "mode": "C11",
+      "kind": "t",
+      "status": "passed",
+      "all_actual_tasks_enforced_nonroot_empty_groups_cap0": true,
+      "checked_messages": 18,
+      "post_silence_seconds": 2,
+      "owned_VMM_terminated_with_SIGTERM_not_graceful_exit": true
+    }
+  ],
+  "recorded_owned_PID_TID_count": 64,
+  "all_recorded_owned_IDs_absent_at_seal": true,
+  "existing_seven_integration_cases_reexecuted_after_this_correction": false,
+  "existing_b8a9_integration_and_performance_pins_relabelled": false,
+  "archive": "ioapic-correctness-validation.tar.gz",
+  "archive_sha256": "9afc07fe534865cc2aacaa894c0f52bb6cff248033e39002b5ebcdf2b3fb0ef3",
+  "archive_bytes": 109263,
+  "archive_verified_files": 143,
+  "frozen_gates_changed": false,
+  "performance_samples_collected": 0,
+  "default_changed": false,
+  "performance_adoption_eligible": false,
+  "remaining": [
+    "qualified quiet full paired performance matrix and confidence",
+    "complete marginal kernel dispatcher/scheduler CPU",
+    "mixed-device four/eight-VM qualification",
+    "active IOAPIC congestion and full EOI-before-ACK lifecycle coverage",
+    "old-new legacy compatibility, actual save-on-halt, host-glibc setup"
+  ]
+}

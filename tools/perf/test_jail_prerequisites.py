@@ -1,6 +1,6 @@
 """Real enforced-jail regressions; run non-root under the fleet host lock.
 
-Requires sudo -n mount/jail bootstrap and functional /dev/kvm. No skips.
+Requires sudo -n mount/jail bootstrap, setpriv and functional /dev/kvm. No skips.
 FLINT_JAIL_TEST_BINARY selects the compiled binary; FLINT_JAIL_TEST_STRACE
 optionally retains its actual enforced-filter trace.
 """
@@ -21,13 +21,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class JailedApi(jail_support.OwnedVm):
-    def __init__(self):
+    def __init__(self, inherit_root_group=False):
         folder = ROOT / ".perf/jail-tests"
         folder.mkdir(mode=0o700, parents=True, exist_ok=True)
         super().__init__(folder / f"{os.getpid()}-{time.time_ns()}")
         self.binary = Path(os.environ.get(
             "FLINT_JAIL_TEST_BINARY", ROOT / "vmm/zig-out/bin/flint",
         )).resolve()
+        self.inherit_root_group = inherit_root_group
 
     def __enter__(self):
         try:
@@ -43,6 +44,8 @@ class JailedApi(jail_support.OwnedVm):
             tracer = os.environ.get("FLINT_JAIL_TEST_STRACE")
             if tracer:
                 argv = [tracer, "-f", "-o", str(self.path / "startup.strace"), *argv]
+            if self.inherit_root_group:
+                argv = ["setpriv", "--groups=0", "--", *argv]
             argv = ["sudo", "-n", "--", *argv]
             self.process = subprocess.Popen(
                 argv, cwd=self.path, stdout=self.stdout, stderr=self.stderr,
@@ -125,7 +128,7 @@ class JailPrerequisites(unittest.TestCase):
         )
 
     def test_real_api_receive_and_send_under_kill_filter_after_uid_drop(self):
-        with JailedApi() as vm:
+        with JailedApi(inherit_root_group=True) as vm:
             status = subprocess.check_output(
                 ["sudo", "-n", "cat", f"/proc/{vm.pid}/status"], text=True,
             )

@@ -1,0 +1,25 @@
+{
+  "issue": 3,
+  "date_utc": "2026-10-05T01:35:54Z",
+  "kind": "owned_rebuildable_cache_cleanup_only",
+  "exclusive_lock": "/d/hearth/.perf/fleet/host.lock",
+  "umask": "077",
+  "removed_path": "vmm/.zig-cache",
+  "cached_regular_files": 425,
+  "cache_namespace_allocated_bytes_before": 1315749888,
+  "filesystem_available_bytes_before": 2336403456,
+  "filesystem_available_bytes_after": 3652173824,
+  "filesystem_delta_is_exclusive_attribution": false,
+  "immutable_binary_pins_verified_before_and_after": {
+    ".perf/eventfd/fixtures/legacy/flint": "bd10cfef94ef4cf2402e485913b3f4a9ffb93f9cf80d25d0310d093b55111d23",
+    ".perf/eventfd/w2/modes-19/ReleaseSafe/flint": "5555ae64b42c81ec71e80201bd27dd807d71ccca563114194e02d91b03769f4f",
+    ".perf/eventfd/w2/modes-19/Debug/flint": "516892168b405f26fea9cdeda1362ae9ecc9157c377393b0f98de4d39dcb5a30",
+    ".perf/eventfd/w5/shared-filter/ReleaseSafe/flint": "4c3bd1bd56cd4c58aa1c581658a473e640a0e759c41057459dd1dd1fd3fad5de",
+    ".perf/eventfd/w5/shared-filter/Debug/flint": "5b9f7201168d1b0b614d3d31d69da6813385c006aeb800999c989146f60dc84d"
+  },
+  "all_native_and_canonical_restore_memory_sources_preserved": true,
+  "raw_measurements_changed_or_deleted": false,
+  "own_package_global_cache_changed": false,
+  "agent_cache_changed": false,
+  "unowned_paths_accessed_or_changed": false
+}

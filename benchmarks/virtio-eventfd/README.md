@@ -51,6 +51,9 @@ timeout 120 flock -x /d/hearth/.perf/fleet/host.lock \
 ```
 
 Every output directory must be new/exclusive; never overwrite a baseline.
+Historical build19 hashes remain the performance pins. The shared-filter
+follow-up builds a separate binary under `.perf/eventfd/w5/shared-filter/`;
+its fresh correctness runs do not reclassify the old performance captures.
 
 * `control.py`: actual enforced-jail native/agent/disk/PTY, active pause/v2
   snapshot/resume, direct CLI restore, or API snapshot-load followed by
@@ -173,6 +176,17 @@ tasks remain in CPU accounting; names are not userspace-owner evidence.
 using hermetic `tools/perf/jail_support.py`, never sibling block runners.
 `--native-workload echo|backpressure` checks traffic after silence; boot/connect
 alone is not successful I/O/lifecycle. No audit mode/permission relaxation.
+
+`tools/perf/test_jail_prerequisites.py` is a standalone regression suite,
+without the #1 block runner import. Run nonroot with
+`FLINT_JAIL_TEST_BINARY=<absolute pinned ELF>` inside the fleet lock. Actual
+bootstrap uses sudo; the API case deliberately seeds supplementary group0
+with `setpriv --groups=0`, then verifies empty groups, configured UID/GID,
+CapEff0, NoNewPrivs1 and Seccomp2 after the checked privilege drop and real
+HTTP traffic. It also verifies root0755 jail directories/configured-user0600
+device nodes independent of077 and PID-generation-safe cleanup. The shared
+correctness provenance is `f2f9ab4`→`5ee81b1`→`ced7ed72`; these repairs are
+not eventfd acceleration.
 
 Client CPUs must exclude VMM CPUs and SMT siblings. Old CPU8/client0 artifacts
 remain confounded; controlled CPU8/client1 evidence is separate. Historical

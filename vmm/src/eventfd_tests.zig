@@ -316,10 +316,12 @@ test "real KVM batched kicks aggregate counters and drain eight-byte values" {
 const Run = struct {
     vcpu: *Vcpu,
     tid: std.atomic.Value(i32) = std.atomic.Value(i32).init(0),
+    done: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     exit: u32 = 0,
     failed: bool = false,
 
     fn entry(self: *Run) void {
+        defer self.done.store(true, .release);
         self.tid.store(@intCast(linux.gettid()), .release);
         self.exit = self.vcpu.run() catch {
             self.failed = true;
@@ -350,18 +352,28 @@ const IrqOptions = struct {
     accelerated: bool = true,
     masked: bool = false,
     reset_pending: bool = false,
+    ioapic: bool = false,
 };
+
+fn irqPending(vm: *Vm, ioapic: bool) !bool {
+    const chip = try vm.getIrqChip(if (ioapic) c.KVM_IRQCHIP_IOAPIC else c.KVM_IRQCHIP_PIC_MASTER);
+    if (ioapic) {
+        const offset = c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_IOAPIC_IRR_OFFSET;
+        return std.mem.readInt(u32, chip[offset..][0..4], .little) & 0x20 != 0;
+    }
+    return chip[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IRR_OFFSET] & 0x20 != 0;
+}
 
 fn irqScenario(options: IrqOptions) !void {
     const level = options.level;
     const eoi_first = options.eoi_first;
     const code = [_]u8{
         0xb0, 0x11, 0xe6, 0x20, // PIC ICW1
-        0xb0, 0x20,                               0xe6, 0x21, // PIC vector base
-        0xb0, 0x04,                               0xe6, 0x21,
-        0xb0, 0x01,                               0xe6, 0x21,
-        0xb0, if (options.masked) 0xff else 0xdf, 0xe6, 0x21,
-        0xba, 0xd0, 0x04, 0xb0, if (level) 0x20 else 0, 0xee, // ELCR
+        0xb0, 0x20,                                                 0xe6, 0x21, // PIC vector base
+        0xb0, 0x04,                                                 0xe6, 0x21,
+        0xb0, 0x01,                                                 0xe6, 0x21,
+        0xb0, if (options.masked or options.ioapic) 0xff else 0xdf, 0xe6, 0x21,
+        0xba, 0xd0, 0x04, 0xb0, if (level and !options.ioapic) 0x20 else 0, 0xee, // ELCR
         0xb0, 0x11, 0xe6, 0xe9, // ready barrier
         0xfb, 0xf4, 0xeb, 0xfd, // sti; hlt loop
     };
@@ -372,23 +384,47 @@ fn irqScenario(options: IrqOptions) !void {
         0xff, 0x06, 0x00, 0x07, // count IRQ
     };
     const ack = [_]u8{ 0x66, 0xb8, 1, 0, 0, 0, 0x66, 0xa3, 0x64, 0x80 };
-    const eoi = [_]u8{ 0xb0, 0x20, 0xe6, 0x20 };
+    const pic_eoi = [_]u8{ 0xb0, 0x20, 0xe6, 0x20 };
+    const apic_eoi = [_]u8{ 0x67, 0x66, 0xc7, 0x05, 0xb0, 0, 0xe0, 0xfe, 0, 0, 0, 0 };
+    const eoi: []const u8 = if (options.ioapic) &apic_eoi else &pic_eoi;
     const finish = [_]u8{ 0xb0, 0xa5, 0xe6, 0xe9, 0xcf };
     @memcpy(fixture.mem.mem[0x300..][0..prologue.len], &prologue);
-    if (eoi_first) {
-        @memcpy(fixture.mem.mem[0x30a..][0..eoi.len], &eoi);
-        @memcpy(fixture.mem.mem[0x30e..][0..ack.len], &ack);
-    } else {
-        @memcpy(fixture.mem.mem[0x30a..][0..ack.len], &ack);
-        @memcpy(fixture.mem.mem[0x314..][0..eoi.len], &eoi);
+    var address: usize = 0x300 + prologue.len;
+    const operations = if (eoi_first) [_][]const u8{ eoi, &ack } else [_][]const u8{ &ack, eoi };
+    for (operations) |instructions| {
+        @memcpy(fixture.mem.mem[address..][0..instructions.len], instructions);
+        address += instructions.len;
     }
-    @memcpy(fixture.mem.mem[0x318..][0..finish.len], &finish);
+    @memcpy(fixture.mem.mem[address..][0..finish.len], &finish);
     std.mem.writeInt(u16, fixture.mem.mem[0x25 * 4 ..][0..2], 0x300, .little);
     try std.testing.expectEqual(@as(u32, c.KVM_EXIT_IO), try fixture.vcpu.run());
+    if (options.ioapic) {
+        var slave = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_SLAVE);
+        slave[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IMR_OFFSET] = 0xff;
+        try fixture.vm.setIrqChip(&slave);
+        var sregs = try fixture.vcpu.getSregs();
+        sregs.apic_base = 0xfee00900;
+        // The 16-bit microguest uses a 32-bit address for LAPIC EOI.
+        sregs.ds.limit = 0xffff_ffff;
+        sregs.ds.g = 1;
+        try fixture.vcpu.setSregs(&sregs);
+        var lapic = try fixture.vcpu.getLapic();
+        const registers = std.mem.asBytes(&lapic);
+        std.mem.writeInt(u32, registers[0xf0..][0..4], 0x1ff, .little);
+        std.mem.writeInt(u32, registers[0x80..][0..4], 0, .little);
+        try fixture.vcpu.setLapic(&lapic);
+        var chip = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_IOAPIC);
+        const offset = c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_IOAPIC_REDIR_OFFSET + 5 * 8;
+        const entry: u64 = 0x25 | (if (level) @as(u64, 1) << 15 else 0) |
+            (if (options.masked) @as(u64, 1) << 16 else 0);
+        std.mem.writeInt(u64, chip[offset..][0..8], entry, .little);
+        try fixture.vm.setIrqChip(&chip);
+    }
     var irq = try Accelerator.Irq.init(&fixture.vm, 5, options.accelerated);
     defer irq.deinit() catch {};
     try irq.reconcile(true, 0);
-    try std.testing.expectEqual(if (level) Accelerator.Trigger.level else .edge, irq.trigger);
+    if (!options.ioapic or !options.masked)
+        try std.testing.expectEqual(if (level) Accelerator.Trigger.level else .edge, irq.trigger);
     var action = linux.Sigaction{
         .handler = .{ .handler = &signalHandler },
         .mask = linux.sigemptyset(),
@@ -414,21 +450,24 @@ fn irqScenario(options: IrqOptions) !void {
     if (options.masked) {
         var pending = false;
         for (0..1000) |_| {
-            const pic = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_MASTER);
-            if (pic[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IRR_OFFSET] & 0x20 != 0) {
+            if (try irqPending(&fixture.vm, options.ioapic)) {
                 pending = true;
                 break;
             }
             _ = linux.nanosleep(&.{ .sec = 0, .nsec = 1_000_000 }, null);
         }
-        try std.testing.expect(pending);
+        if (!pending) {
+            std.debug.print("masked IRQ lost: ioapic={} irqfd={} trigger={s} reset={} used={}\n", .{
+                options.ioapic, options.accelerated, @tagName(irq.trigger), options.reset_pending, expected_index,
+            });
+            return error.MaskedPendingInterruptLost;
+        }
         try expectSleeping(run.tid.load(.acquire));
         try std.testing.expectEqual(@as(u16, 0), std.mem.readInt(u16, fixture.mem.mem[0x700..][0..2], .little));
         if (options.reset_pending) {
             const generation = irq.generation;
             try irq.quiesce();
-            const pic = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_MASTER);
-            try std.testing.expectEqual(@as(u8, 0), pic[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IRR_OFFSET] & 0x20);
+            try std.testing.expect(!try irqPending(&fixture.vm, options.ioapic));
             if (options.accelerated) {
                 try std.testing.expect(!irq.assigned);
                 try std.testing.expect(irq.generation != generation);
@@ -440,8 +479,14 @@ fn irqScenario(options: IrqOptions) !void {
             }
             try irq.reconcile(true, 0);
         }
-        var chip = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_MASTER);
-        chip[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IMR_OFFSET] &= ~@as(u8, 0x20);
+        var chip = try fixture.vm.getIrqChip(if (options.ioapic) c.KVM_IRQCHIP_IOAPIC else c.KVM_IRQCHIP_PIC_MASTER);
+        if (options.ioapic) {
+            const offset = c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_IOAPIC_REDIR_OFFSET + 5 * 8;
+            const entry = std.mem.readInt(u64, chip[offset..][0..8], .little);
+            std.mem.writeInt(u64, chip[offset..][0..8], entry & ~(@as(u64, 1) << 16), .little);
+        } else {
+            chip[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IMR_OFFSET] &= ~@as(u8, 0x20);
+        }
         try fixture.vm.setIrqChip(&chip);
         if (options.reset_pending) {
             _ = linux.nanosleep(&.{ .sec = 0, .nsec = 100_000_000 }, null);
@@ -452,6 +497,11 @@ fn irqScenario(options: IrqOptions) !void {
             try irq.notify(1);
         }
     }
+    for (0..1000) |_| {
+        if (run.done.load(.acquire)) break;
+        _ = linux.nanosleep(&.{ .sec = 0, .nsec = 1_000_000 }, null);
+    }
+    try std.testing.expect(run.done.load(.acquire));
     thread.join();
     joined = true;
     try std.testing.expect(!run.failed);
@@ -462,11 +512,31 @@ fn irqScenario(options: IrqOptions) !void {
     try irq.reconcile(true, 0);
     try std.testing.expectEqual(@as(u32, c.KVM_EXIT_IO), try fixture.vcpu.run());
     if (level and options.accelerated) try irq.resampled(true, 0);
-    const pic = try fixture.vm.getIrqChip(c.KVM_IRQCHIP_PIC_MASTER);
-    const irr = pic[c.HEARTH_IRQCHIP_DATA_OFFSET + c.HEARTH_PIC_IRR_OFFSET];
-    try std.testing.expectEqual(@as(u8, 0), irr & 0x20);
+    try std.testing.expect(!try irqPending(&fixture.vm, options.ioapic));
     try std.testing.expectEqual(@as(u16, 1), std.mem.readInt(u16, fixture.mem.mem[0x700..][0..2], .little));
     try irq.quiesce();
+}
+
+test "real KVM IOAPIC edge and level routes deliver with both PICs masked" {
+    try isolated(struct {
+        fn run() !void {
+            for ([_]bool{ false, true }) |accelerated| {
+                for ([_]bool{ false, true }) |level|
+                    try irqScenario(.{ .accelerated = accelerated, .level = level, .ioapic = true });
+            }
+        }
+    }.run);
+}
+
+test "real KVM masked IOAPIC level holds pending work and fences reset epochs" {
+    try isolated(struct {
+        fn run() !void {
+            for ([_]bool{ false, true }) |accelerated| {
+                for ([_]bool{ false, true }) |reset_pending|
+                    try irqScenario(.{ .accelerated = accelerated, .level = true, .ioapic = true, .masked = true, .reset_pending = reset_pending });
+            }
+        }
+    }.run);
 }
 
 test "real KVM irqfd wakes timer-free HLT with used-before-IRQ and edge ACK" {

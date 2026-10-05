@@ -78,7 +78,8 @@ pub const Policy = struct {
     pub fn trigger(self: Policy) !Trigger {
         if (!self.pic_masked and !self.ioapic_masked and self.pic_level != self.ioapic_level)
             return error.MixedActiveIRQTrigger;
-        const level = if (!self.pic_masked) self.pic_level else if (!self.ioapic_masked) self.ioapic_level else self.pic_level;
+        // A masked level route still needs an assertion, not a discarded pulse.
+        const level = if (!self.pic_masked) self.pic_level else if (!self.ioapic_masked) self.ioapic_level else self.pic_level or self.ioapic_level;
         return if (level) .level else .edge;
     }
 };
@@ -235,6 +236,12 @@ test "IRQ policy follows the active chip and rejects incompatible active routing
         .pic_masked = true,
         .ioapic_level = true,
         .ioapic_masked = false,
+    }).trigger());
+    try std.testing.expectEqual(Trigger.level, try (Policy{
+        .pic_level = false,
+        .pic_masked = true,
+        .ioapic_level = true,
+        .ioapic_masked = true,
     }).trigger());
     try std.testing.expectError(error.MixedActiveIRQTrigger, (Policy{
         .pic_level = false,

@@ -2,7 +2,7 @@
 
 **Status**: Blocked qualification — four controlled modes implemented; timer-free integrity,80 active mixed fresh restores and cross-mode v2 restores pass; frozen performance gates unmet
 
-**Last updated**: 2026-10-04
+**Last updated**: 2026-10-05
 
 **Issue**: [#3](https://github.com/cataggar/hearth/issues/3)
 
@@ -396,6 +396,27 @@ IRQ_LINE/IRQFD modes; masked level reset drains/deassigns the stale source,
 then only a fresh publication wakes the guest. These checks do not complete
 active IOAPIC-mask/congestion acceptance or justify performance adoption.
 
+IOAPIC acceptance must use an actual enabled LAPIC/IOAPIC vector with both
+PICs masked, not infer that path from PIC tests or host writes alone. Include
+pending level completion while the masked PIC remains edge-configured:
+masked-route selection must retain the level assertion until unmask/ACK,
+rather than allow an ephemeral pulse to erase it. Verify mask/unmask,
+ACK/EOI and reset epochs with timer-free guest observations in both modes.
+The real unchanged-policy oracle now fails its masked IOAPIC level case
+(15/16 dedicated tests pass). Common policy must preserve a level assertion
+when both routes are masked and either is level; active-route choice and
+mixed-active rejection remain unchanged. Fresh static-musl Debug/ReleaseSafe
+actually pass55/55 each (39 units+16 dedicated,15 real enforced KVM plus one
+policy unit). Each executes eight new unmasked edge/level and masked level
+unmask/reset IOAPIC scenarios across IRQ_LINE/IRQFD. Both fresh binaries pass
+4/4 hermetic jail cases, including deliberately inherited root-group clearing;
+fresh ReleaseSafe passes12/12 native/agent/disk/TAP no-heartbeat four-mode
+cells with enforced task identity. The seven prior integration cases are not
+rerun or relabelled. New IOAPIC cases cover ACK-before-EOI, not complete active
+congestion/EOI-first acceptance. This verified common correctness fix is not
+an eventfd performance improvement; exact pins and raw evidence are in the
+[results](../../benchmarks/virtio-eventfd/results/20261004/README.md).
+
 The parent independently reported15.961/16 busy cores during a locked idle
 control, with no iowait/steal, at22:33 UTC. This is externally reported control
 evidence, not an owned baseline repetition. A quieter reserved window/host is
@@ -421,11 +442,27 @@ exact blocks with experimental dispatch and validate before accepting a new
 binary. Historical production/measurement pins remain immutable, and none of
 the shared jail fixes are counted as eventfd acceleration.
 
-The follow-up narrowing is **pending/unvalidated**: four bounded acquisition
-requests (300s,180s,900s and nonblocking) ended before any compiler/test/VM
-started. It has no new production binary pin or performance sample. Retained
-build19/e2f3f69 correctness evidence is historical, not a replay of this source;
-a coordinated fleet window is required before acceptance.
+The original four bounded acquisition requests (300s,180s,900s and
+nonblocking) ended before any compiler/test/VM started. That publication
+boundary remains in the immutable pending receipt. A subsequently acquired
+exclusive window on2026-10-05 actually passes **39 unit +14 dedicated tests**
+in ReleaseSafe and builds a separately pinned static-musl binary
+`4c3bd1bd56cd4c58aa1c581658a473e640a0e759c41057459dd1dd1fd3fad5de`.
+The same reconciled runtime subsequently passes Debug60/60, ReleaseSafe's
+separate7/7 existing integration,4/4 hermetic Python jail cases per optimization
+(deliberately seeded group0),17/17 benchmark Python and12/12 fresh four-mode
+native/agent/disk/TAP no-heartbeat cells. New Debug SHA256:
+`5b9f7201168d1b0b614d3d31d69da6813385c006aeb800999c989146f60dc84d`.
+The verified selective archive contains136 hashed files and no VM images;
+all64 recorded owned PID/TID numbers are absent at that seal boundary.
+These b8a9-runtime results do not cover the later IOAPIC correction.
+No new performance sample is collected; historical build19/performance/L0
+pins remain immutable and are not relabelled as this new filter.
+
+Shared `ced7ed72b5b2f80286e37ba8c9d5eada0cb90236` now supplies the existing
+checked supplementary-group clearing semantics and a deterministic inherited
+root-group regression. The hermetic #3 helper reuses its `setpriv --groups=0`
+launch wrapper; the new case actually passes on both pinned binaries.
 
 An ephemeral, unpinned, owned-TGID/exact-function BPF observer accounts actual
 on-CPU `irqfd_inject`/`irqfd_shutdown` work and subtracts scheduler off-CPU
