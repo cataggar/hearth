@@ -367,7 +367,9 @@ jobs:
           timeout --kill-after=10s 5m \
             bash -c 'cd agent && zig build -Dtarget=x86_64-linux-musl -Doptimize=safe --summary all --color off'
           timeout --kill-after=10s 5m \
-            bash -c 'cd vmm && zig build eventfd-guest-probe -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe --summary all --color off'
+            bash -c 'cd vmm && zig build eventfd-guest-probe eventfd-tcp-probe -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe --summary all --color off'
+          timeout --kill-after=10s 2m zig cc -target x86_64-linux-musl -O2 \
+            benchmarks/virtio-eventfd/disk_probe.c -o .perf/eventfd-pty/disk-probe
           python3 - <<'PY'
           import sys
           from types import SimpleNamespace
@@ -376,17 +378,12 @@ jobs:
           matrix.prepare(SimpleNamespace(
               out=".perf/eventfd-pty/fixture", kernel=".ci/guest/bzImage",
               agent="agent/zig-out/bin/hearth-agent", native="vmm/zig-out/bin/eventfd-guest-probe",
-              tcp="vmm/zig-out/bin/eventfd-guest-probe", disk_probe=None,
-              vsock_only=True, profile_only=False))
+              tcp="vmm/zig-out/bin/eventfd-tcp-probe", disk_probe=".perf/eventfd-pty/disk-probe",
+              vsock_only=False, profile_only=False))
           PY
-          status=0
-          for mode in L0 C00; do
-            sudo -n python3 benchmarks/virtio-eventfd/pty_repro.py supervise \
-              --out ".perf/eventfd-pty/$mode" --mode "$mode" \
-              --binary "$PWD/vmm/zig-out/bin/flint" --fixture "$PWD/.perf/eventfd-pty/fixture" \
-              || status=1
-          done
-          exit "$status"
+          sudo -n unshare --net -- python3 benchmarks/virtio-eventfd/pty_repro.py supervise \
+            --out ".perf/eventfd-pty/C00" --mode C00 --all-devices --closed-pty \
+            --binary "$PWD/vmm/zig-out/bin/flint" --fixture "$PWD/.perf/eventfd-pty/fixture"
       - name: Retain only source-allowlisted PTY correctness receipts
         if: always() && matrix.optimize == 'ReleaseSafe'
         uses: actions/upload-artifact@v4

@@ -23,6 +23,19 @@ If reproduced, add a focused cause regression and a surgical fix, then prove
 current exact source; otherwise report unresolved scope after distinct bounded
 attempts. No fifth qualification/label, new agents or peer broadcasts.
 
+Actual first attempt37347514253/d2c2d68: unchanged-runtime C00 completes all
+7936 execs/15 slow-reader/4096 normal PTYs, one control connection, clean custody.
+L0 fails with empty header during its first exec batch (no completed64-op batch;
+partial operations not recorded), one connection, clean
+custody; retain this failed comparison, not a passed/skipped baseline. Overall
+CI fails;75 focused/25+7 KVM and39/opt units are separate successful scopes.
+The reduced no-TAP fixture does not reproduce the original C00 failure.
+Second distinct bounded attempt adds all three devices with disk/TAP/vsock
+prelude, then the same load/PTY count, plus a valid child that closes its terminal
+before finishing. This targets the source's HUP-before-reap/stale-connection
+conflation; no fix is claimed until actual failure proves it. C00-only targeted
+CI does not erase L0's failed first receipt or satisfy legacy qualification.
+
 ### Third hosted epoch — bounded empty-frame timeout attribution
 
 Preserve14 original JSONs/13 hashes from37337531285/8a30. Pre-build actual
