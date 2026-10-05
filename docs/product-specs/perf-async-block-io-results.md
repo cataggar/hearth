@@ -330,6 +330,13 @@ post-idle0/3, full workload/control/lifecycle/SDK matrix and aligned all-worker
 plus attributable deferred-kernel-I/O cost still require acceptance. The old
 fifteen-core saturation is historical, not the current reason.
 
+The stable private epoch is sealed as1,238files (1,236unique regular inputs)
+in`.perf/blk-io/quiet-1/final-evidence-seal.json`, SHA256
+`7436ade146601c62e62099878e1522dcc7b8f50d84c60a54df16546d599b46d7`.
+It records c734runtime/9f39518source provenance and includes originals,
+failed attempts, distributions, compressed raw bytes and executed drivers;
+it is not a claim that incomplete rows pass.
+
 ## What was implemented
 
 The original diagnostic integration suite accepts `-Dintegration-kernel=<path>` relative to
