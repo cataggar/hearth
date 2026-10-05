@@ -50,6 +50,19 @@ the fresh A/A remains pinned to old frozen `d0beacfc`, not relabeled as
 new-ELF performance. The shared jail contract records current-source guards,
 93 verified public payload hashes and actual uncached-success summaries.
 
+Published peer halt acceptance supplies a separate actual negative:
+`--save-on-halt --vmstate-path /state --mem-path /memory` reaches initial
+agent/disk/PTY integrity and guest `System halted` in all four modes, but
+**0/4 exit/save within20seconds** and both snapshot files are absent.
+Corrected L0 stalls before halt and is not counted as a fifth halt case;
+ordinary API snapshots/reboots are not substitutes. C00 also fails, so no
+accelerator-specific cause or this worker's own failure is inferred.
+Read-only archive verification checks45 published payload hashes, SHA256
+`85b29b2c8cab49eff0b3b866240ed9f185ea91880a04478dca1fd3cd1088bcd5`.
+The delayed reported469424b is an ancestor of7efea14; current published tip
+`b4108da` additionally changes accelerator runtime/tests. Earlier correctness
+ELFs/counts and the frozen d0beacf A/A must not be relabeled as that new source.
+
 C00's serialized-owner/mailbox platform is different from the minimal common
 jail repair and this worktree's c734 runtime, even with KVM accelerators off.
 It has not been imported or authorized as this plan's replacement baseline.
