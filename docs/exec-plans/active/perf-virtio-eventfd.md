@@ -4,6 +4,77 @@
 
 **Date**: 2026-10-04
 
+### Authorized harness-review integration — 2026-10-05
+
+Parent authorized exact helper `22c5fcadc19850fd8559f02d1de0b4522ffc15e2`
+onto validated runtime `7aecb9641caaa371a1af69c30c98f98bd806c58b`.
+Preserve adaptive hosted affinity/optional attribution, all runtime fixes and
+the sustained nanosecond/noise guard while merging the stricter recorded-control
+provenance. Narrow disk startup retry to the explicit live pre-exec child and
+fence its generation; inject an unrelated backend failure that must propagate
+without sleep/retry. Run focused then combined Python/workflow guards under a
+bounded fleet phase, followed by fresh corrected real all-device capture/restore
+acceptance on unchanged validated ELFs as capacity permits. Retain all failures
+and historical80 invalid-oracle receipts; never requalify prior gates.
+Publish the exact integrated source for parent review only. No hosted trigger,
+label, default adoption or merge occurs here.
+
+First actual corrected C00 attempt failed before producer/capture because its
+enforced-roster inspector required process basename `flint`; the frozen Safe
+ELF is deliberately named `flint-ReleaseSafe` (also the hosted pin). Empty
+roster fails, not a security pass. Retain this epoch and teardown. Pass the
+already-discovered owned PID/start-time generation explicitly to inspection,
+independent of basename, retaining every per-thread UID/GID/groups/capability/
+NoNewPrivs/seccomp/Kthread predicate. Add an actual owned-process/stale-generation
+regression and rerun in a new output epoch; never infer confinement from stderr.
+
+The next real attempt passes all six actual task confinement rows and initial
+agent/disk/PTY, but the new live check fails: the unchanged agent's `jsonStr`
+preserves raw JSON escapes, so `"$pid"` arrives as literal escaped quotes and
+fails numeric validation (and escaped `printf` would not produce the required
+separator). Preserve this failed epoch. Keep the agent/fixtures unchanged;
+validate digits before quote-free PID expansions and use `busybox echo`.
+Host fixture regressions now model the actual raw-escaped wire command rather
+than silently decoding it like a full JSON parser. No liveness predicate weakens.
+
+Corrected C00 v3 then passes three actual active restores; cycle4 fails native
+TCP rebind (`BindFailed`) despite valid live disk capture/restored generation,
+zero owner CPU while paused and clean source join. Old-app `kill -9` queues
+delivery but immediate relaunch may precede socket release. Add a bounded
+startup-only actual-exit/zombie barrier before relaunch, with real owned-process
+and malformed-PID regression. Preserve the failed snapshot bytes and complete
+receipts; further runtime remains subject to unchanged3GiB entry guard.
+
+The exit barrier gives C00 v4 20/20, but C10 then passes5 and fails6 on the
+same bind symptom. Exact fixture metadata identifies the real preparation
+mistake: the older `restore-stress` native TCP has no SO_REUSEADDR, while
+validated `restore-reuse` carries the separately pinned corrected probe.
+Do not attribute that fixture failure to acceleration or pool old cycles.
+Prepare one final idempotent tracked derivative from `restore-reuse`, verify
+all input/runner/ELF hashes, then rerun all four modes on that identical fixture.
+Both failed snapshot memories remain byte-exact private verified gzip, not
+deleted evidence; only exact owned original leaves are unlinked after proof.
+
+Final actual acceptance:52/52 Python tests, workflow scope/shell syntax, exact
+unchanged validated runtime source/ELF checks, then **20/20 per C00/C10/C01/C11**
+on one final tracked `restore-reuse` derivative. All80 cycles verify live disk
+generation before capture and after restore, outstanding native TAP/vsock,
+zero acknowledged-pause task CPU, snapshot-v2, actual block/payload integrity
+and clean source/restored joins.160 actual enforced VMM processes execute;
+all1120 recorded owned numeric PID/TID paths are absent at the evidence seal.
+Successful bulky images are removed only after verified restore receipts.
+No skipped tests, CPU-zero substitute or performance sample is counted.
+
+The52-test exit-barrier regression first raced its own background marker file;
+its supervisor now joins both finite owned test launchers. That failed log is
+retained, not counted as passing. Final raw logs/fixture/source receipts:
+`.perf/eventfd/harness-review/`; sanitized durable archive is linked in the
+result report. Historical80 and failed epochs remain unpooled; frozen old gates
+are not requalified. Both reviewed runtime fixes retain prior actual Debug/Safe
+70+3 acceptance on identical native source. Workflow is prepared for parent
+exact-source review/label only; issue/performance qualification stays blocked
+on actual hosted results and all remaining mandatory lifecycle/regression gates.
+
 ### Independent runtime-review fixes — 2026-10-05
 
 Todo `fix-eventfd-runtime-review` owns established IRQ trigger preservation
@@ -16,8 +87,9 @@ failure check only, wake paused API waiters, and deterministically exercise
 the exact signal-consumed-before-entry race plus clear/resume cases.
 Validate actual Debug/Safe KVM and enforced CLI/API jail coverage, no skips.
 
-Do not edit `matrix.py`, `restore_stress.py` or `performance.py` until the
-parent relays the isolated harness-fix commit. Downgrade historical80 active
+At the original runtime-review stage, reserve `matrix.py`, `restore_stress.py`
+and `performance.py` until the parent relays the isolated harness-fix commit
+(subsequently authorized/integrated above). Downgrade historical80 active
 disk restore acceptance now; preserve original receipts/archives. No hosted
 label/qualification, default adoption or merge before both runtime/harness
 fixes and corrected acceptance are available. All local execution retains

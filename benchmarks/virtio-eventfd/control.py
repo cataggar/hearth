@@ -131,7 +131,8 @@ class Guest(support.OwnedVm):
             self.native_connection, _ = self.native_listener.accept()
             self.native_connection.settimeout(10)
         inspected = subprocess.run(
-            ["sudo", "-n", "python3", "-c", probe_jail.INSPECT, str(self.process.pid)],
+            ["sudo", "-n", "python3", "-c", probe_jail.INSPECT, str(self.process.pid),
+             str(self.pid), str(self.pid_start_ticks)],
             cwd=ROOT, capture_output=True, check=True, timeout=5,
         )
         roster = json.loads(inspected.stdout)

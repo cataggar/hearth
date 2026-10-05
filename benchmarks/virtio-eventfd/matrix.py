@@ -89,6 +89,70 @@ def rpc_exec(guest, command, timeout=15):
     return base64.b64decode(reply.get("stdout", ""), validate=True)
 
 
+DISK_START_COMMAND = (
+    "/bin/busybox test ! -e /bench/disk-pid && "
+    "/bin/busybox test ! -e /bench/run-disk && "
+    "/bin/busybox test ! -e /bench/disk-done && "
+    "/bin/busybox touch /bench/run-disk && "
+    "{ /bin/sh /disk-load >/dev/null 2>&1 & echo $! >/bench/disk-pid; } && "
+    "printf STARTED"
+)
+
+
+class DiskProducerExecPending(RuntimeError):
+    def __init__(self, identity):
+        super().__init__("recorded disk producer has not completed exec")
+        self.identity = identity
+
+
+def disk_running(guest, expected=None, *, startup=False):
+    # The unchanged agent returns raw JSON string escapes; validated numeric
+    # expansions and echo keep this recipe free of quotes/backslashes.
+    data = rpc_exec(guest, (
+        "/bin/busybox test -f /bench/run-disk && "
+        "/bin/busybox test ! -f /bench/disk-done && "
+        "pid=$(/bin/busybox cat /bench/disk-pid) && "
+        "case $pid in ''|*[!0-9]*) exit 1;; esac && "
+        "/bin/busybox test $pid -gt 1 && "
+        "/bin/busybox kill -0 $pid && "
+        "/bin/busybox cat /proc/$pid/stat && /bin/busybox echo && "
+        "/bin/busybox cat /proc/$pid/cmdline"
+    ))
+    stat, separator, command = data.partition(b"\n\n")
+    prefix, stat_separator, fields_bytes = stat.rpartition(b") ")
+    fields = fields_bytes.split()
+    pid, comm_separator, _ = prefix.partition(b" (")
+    if (not separator or not stat_separator or not comm_separator or len(fields) < 20
+            or fields[0] not in (b"R", b"S", b"D", b"T", b"t", b"I", b"W", b"K", b"P")):
+        raise RuntimeError("recorded disk producer is not a live disk-load shell")
+    if not pid.isdigit() or not fields[19].isdigit():
+        raise RuntimeError("invalid recorded disk producer identity")
+    identity = {"pid": int(pid), "start_ticks": int(fields[19])}
+    if identity["pid"] <= 1 or identity["start_ticks"] < 0 or (expected is not None and identity != expected):
+        raise RuntimeError("recorded disk producer generation changed")
+    if command != b"/bin/sh\0/disk-load\0":
+        if startup and command == b"/bin/sh\0-c\0" + DISK_START_COMMAND.encode() + b"\0":
+            raise DiskProducerExecPending(identity)
+        raise RuntimeError("recorded disk producer is not a live disk-load shell")
+    return identity
+
+
+def start_disk(guest):
+    if rpc_exec(guest, DISK_START_COMMAND) != b"STARTED":
+        raise RuntimeError("disk background fixture did not start")
+    # The child's exec may trail its parent's PID-recording RPC response.
+    deadline = time.monotonic() + 5
+    identity = None
+    while True:
+        try:
+            return disk_running(guest, identity, startup=True)
+        except DiskProducerExecPending as error:
+            identity = error.identity
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(.005)
+
+
 class Outstanding:
     def __init__(self, connection):
         self.connection = connection
@@ -215,8 +279,7 @@ def correctness(args):
         time.sleep(1)
         result["idle_wake_vsock"] = bench.native_echo(guest.native_connection, 41, 64)
         result["idle_wake_tap"] = bench.native_echo(tcp, 41, 64)
-        if rpc_exec(guest, "/bin/busybox touch /bench/run-disk; /bin/sh /disk-load >/dev/null 2>&1 & printf STARTED") != b"STARTED":
-            raise RuntimeError("disk background fixture did not start")
+        disk_identity = start_disk(guest)
         deadline = time.monotonic() + 5
         with (guest.path / "disk").open("rb", buffering=0) as disk:
             while True:
@@ -230,8 +293,7 @@ def correctness(args):
         for producer in producers:
             producer.barrier()
         result["loaded_interactive"] = bench.interactive(guest.connection, "printf CONCURRENT", "CONCURRENT")
-        if rpc_exec(guest, "/bin/busybox test -f /bench/run-disk && /bin/busybox test ! -f /bench/disk-done; printf RUNNING") != b"RUNNING":
-            raise RuntimeError("disk producer not active at pause")
+        result["disk_producer_at_pause"] = disk_running(guest, disk_identity)
         guest.api("PATCH", "/vm", {"state": "Paused"})
         before = bench.thread_roster(guest.pid)
         time.sleep(0.2)
@@ -239,7 +301,7 @@ def correctness(args):
         if result["paused_all_thread_cpu_seconds"] != 0:
             raise RuntimeError("backend ran while acknowledged paused")
         result["snapshot"] = guest.snapshot()
-        result["outstanding_sources_at_pause"] = ["synchronous-block", "native-vsock", "userspace-TAP"]
+        result["outstanding_sources_at_pause"] = ["live-continuous-block-producer", "native-vsock", "userspace-TAP"]
         guest.api("PATCH", "/vm", {"state": "Resumed"})
         result["vsock_messages"] = producers[0].finish()
         result["tap_messages"] = producers[1].finish()

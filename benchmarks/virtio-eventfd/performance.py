@@ -109,6 +109,80 @@ WORKLOADS = ["disk-read-4096", "disk-write-4096", "disk-flush-4096", "disk-read-
              "idle", "lifecycle"]
 
 
+def execution_identity(manifest):
+    if not isinstance(manifest, dict):
+        raise ValueError("missing recorded execution provenance: manifest")
+    # These are the fixed fields emitted by this runner, not today's build args.
+    fields = (
+        "binary_sha256", "fixture", "cpus", "client_cpus", "vcpus", "ram_mib",
+        "host_kernel", "host_arch", "host_provenance", "non_nested_host", "pmu", "guest_pmu",
+        "compiler", "backends", "storage", "network", "warmup", "samples",
+        "agent_poll_ms", "heartbeat_ms", "disk_seed", "runner_sha256", "control_sha256",
+        "observer_sha256", "observer_object_sha256", "source_commit", "source_files_sha256",
+        "long_primary", "accounting", "minimum_nonidle_seconds", "cpu_accounting",
+    )
+    missing = [field for field in fields if manifest.get(field) in (None, "")]
+    if missing:
+        raise ValueError(f"missing recorded execution provenance: {', '.join(missing)}")
+    minimum = manifest["minimum_nonidle_seconds"]
+    if isinstance(minimum, bool) or not isinstance(minimum, (int, float)) or minimum < 5:
+        raise ValueError("fresh sustained nanosecond-accounted baselines required")
+    identity = {key: value for key, value in manifest.items() if key not in (
+        "mode", "started_unix", "argv", "cwd", "out", "pid", "connected_marker_seconds_since_launch",
+    )}
+    if any(not isinstance(identity[field], list) or not identity[field] for field in ("cpus", "client_cpus")):
+        raise ValueError("missing recorded execution provenance: CPU affinity")
+    fixture = identity["fixture"]
+    if not isinstance(fixture, dict) or any(
+        fixture.get(field) in (None, "") for field in (
+            "kernel_sha256", "initrd_sha256", "init_sha256", "disk_script_sha256",
+            "sources_sha256", "diagnostic_heartbeat_ms", "guest_agent_interactive_poll_ms",
+            "native_probe", "combined", "transport", "unsupported",
+        )
+    ):
+        raise ValueError("missing recorded fixture provenance")
+    for hashes in (identity["source_files_sha256"], fixture["sources_sha256"]):
+        if not isinstance(hashes, dict) or not hashes or any(not value for value in hashes.values()):
+            raise ValueError("missing recorded source/fixture hashes")
+    # A relocated pinned kernel is the same fixture; timestamps, mode and run
+    # paths likewise do not enter fixed execution identity.
+    identity["fixture"] = {key: value for key, value in fixture.items() if key != "kernel"}
+    return identity
+
+
+def fixture_identity_sha256(identity):
+    return hashlib.sha256(json.dumps(identity["fixture"], sort_keys=True).encode()).hexdigest()
+
+
+def verify_artifacts(identity, binary, fixture):
+    if bench.digest(binary) != identity["binary_sha256"]:
+        raise ValueError("supplied binary differs from recorded execution")
+    metadata = json.loads((fixture / "fixture.json").read_text())
+    if not isinstance(metadata, dict) or not metadata.get("kernel"):
+        raise ValueError("supplied fixture lacks its kernel artifact path")
+    if {key: value for key, value in metadata.items() if key != "kernel"} != identity["fixture"]:
+        raise ValueError("supplied fixture differs from recorded execution")
+    if (bench.digest(fixture / "initrd.cpio.gz") != identity["fixture"]["initrd_sha256"]
+            or bench.digest(bench.artifact_path(metadata["kernel"])) != identity["fixture"]["kernel_sha256"]):
+        raise ValueError("supplied fixture artifacts changed")
+
+
+def validate_candidate_gates(gates, manifest, binary, fixture):
+    frozen = gates.get("execution_identity")
+    if not isinstance(frozen, dict):
+        raise ValueError("frozen gates lack recorded execution provenance; historical gates are unqualified")
+    if gates.get("status") != "noise-provisionally-acceptable":
+        raise ValueError("fresh C00 A/A noise gates have not passed")
+    frozen = execution_identity(frozen)
+    if (gates.get("binary_sha256") != frozen["binary_sha256"]
+            or gates.get("fixture_sha256") != fixture_identity_sha256(frozen)):
+        raise ValueError("frozen gate artifact identity is inconsistent")
+    current = execution_identity(manifest)
+    verify_artifacts(current, binary, fixture)
+    if current != frozen:
+        raise ValueError("candidate differs from frozen recorded execution conditions")
+
+
 def child(args):
     if os.geteuid() == 0:
         raise RuntimeError("nonroot controller required")
@@ -119,7 +193,7 @@ def child(args):
     guest, tcp, observer = None, None, None
     try:
         binary, fixture = bench.artifact_path(args.binary), bench.artifact_path(args.fixture)
-        bench.save_json(out / "manifest.json", {
+        manifest = {
             "binary_sha256": bench.digest(binary), "fixture": json.loads((fixture / "fixture.json").read_text()),
             "mode": args.mode, "cpus": [8], "client_cpus": [1], "vcpus": 1, "ram_mib": 512,
             "host_kernel": os.uname().release, "host_arch": os.uname().machine,
@@ -143,16 +217,11 @@ def child(args):
             "source_files_sha256": {str(path.relative_to(bench.ROOT)): bench.digest(path) for path in (bench.ROOT / "vmm/src").rglob("*.zig")},
             "started_unix": time.time(), "long_primary": args.long_primary,
             "accounting": "all live VMM task CPU plus exact owned irqfd-work CPU; client separate; BPF observer overhead conservatively retained",
-        })
+        }
+        bench.save_json(out / "manifest.json", manifest)
         if args.mode != "C00":
             gates = json.loads(bench.artifact_path(args.gates).read_text())
-            if gates["binary_sha256"] != bench.digest(binary) or gates["fixture_sha256"] != bench.digest(fixture / "fixture.json"):
-                raise ValueError("gates/source fixtures changed")
-            if gates["status"] != "noise-provisionally-acceptable":
-                raise ValueError("fresh C00 A/A noise gates have not passed")
-            manifest = json.loads((out / "manifest.json").read_text())
-            if any(manifest.get(key) != value for key, value in gates["baseline_conditions"].items()):
-                raise ValueError("candidate conditions differ from frozen current baseline")
+            validate_candidate_gates(gates, manifest, binary, fixture)
             result["frozen_gates_sha256"] = bench.digest(bench.artifact_path(args.gates))
         started = time.monotonic()
         guest = control.Guest.__new__(control.Guest)
@@ -242,19 +311,19 @@ def freeze(args):
     samples = [json.loads(path.read_text()) for path in paths]
     if len(samples) < 5 or any(sample["status"] != "passed" or sample["mode"] != "C00" for sample in samples):
         raise ValueError("at least five actually passing untouched functioning-control repetitions required")
-    manifests = [json.loads(path.with_name("manifest.json").read_text()) for path in paths]
-    expected_binary = bench.digest(bench.artifact_path(args.binary))
-    expected_fixture = json.loads((bench.artifact_path(args.fixture) / "fixture.json").read_text())
-    conditions = ("minimum_nonidle_seconds", "cpu_accounting", "runner_sha256",
-                  "control_sha256", "observer_sha256", "observer_object_sha256",
-                  "source_files_sha256", "cpus", "client_cpus", "vcpus", "ram_mib")
-    if any(manifest["binary_sha256"] != expected_binary or manifest["fixture"] != expected_fixture
-           or any(manifest.get(key) != manifests[0].get(key) for key in conditions)
-           for manifest in manifests):
-        raise ValueError("baseline conditions changed; do not freeze mixed A/A")
-    if any(manifest.get("minimum_nonidle_seconds", 0) < 5 or not manifest.get("cpu_accounting")
-           for manifest in manifests):
-        raise ValueError("fresh sustained nanosecond-accounted baselines required")
+    identities = []
+    manifests = [path.with_name("manifest.json") for path in paths]
+    for path in manifests:
+        if not path.is_file():
+            raise ValueError(f"missing recorded control manifest: {path.relative_to(bench.ROOT)}")
+        manifest = json.loads(path.read_text())
+        if manifest.get("mode") != "C00":
+            raise ValueError("recorded control manifest is not C00")
+        identities.append(execution_identity(manifest))
+    identity = identities[0]
+    if any(recorded != identity for recorded in identities[1:]):
+        raise ValueError("mixed recorded control execution conditions")
+    verify_artifacts(identity, bench.artifact_path(args.binary), bench.artifact_path(args.fixture))
     noise = {}
     for name in WORKLOADS:
         rows = [next(row for row in sample["rows"] if row["name"] == name) for sample in samples]
@@ -269,11 +338,16 @@ def freeze(args):
     result = {
         "status": "noise-inconclusive" if exceeds else "noise-provisionally-acceptable",
         "frozen_unix": time.time(), "candidate_performance_observed": False,
-        "binary_sha256": bench.digest(bench.artifact_path(args.binary)),
-        "fixture_sha256": bench.digest(bench.artifact_path(args.fixture) / "fixture.json"),
-        "baseline_result_sha256": {str(path.relative_to(bench.ROOT)): bench.digest(path) for path in sorted(source.glob("aa-*/result.json"))},
+        "binary_sha256": identity["binary_sha256"],
+        "fixture_sha256": fixture_identity_sha256(identity),
+        "execution_identity": identity,
+        "baseline_manifest_sha256": {str(path.relative_to(bench.ROOT)): bench.digest(path) for path in manifests},
+        "baseline_result_sha256": {str(path.relative_to(bench.ROOT)): bench.digest(path) for path in paths},
         "primary": "disk-flush-4096", "samples": len(samples), "noise": noise, "exceeds_noise_caps": exceeds,
-        "baseline_conditions": {key: manifests[0][key] for key in conditions},
+        "baseline_conditions": {key: identity[key] for key in (
+            "minimum_nonidle_seconds", "cpu_accounting", "runner_sha256",
+            "control_sha256", "observer_sha256", "observer_object_sha256",
+            "source_files_sha256", "cpus", "client_cpus", "vcpus", "ram_mib")},
         "candidate_order": [["C10", "C01", "C11"], ["C01", "C11", "C10"], ["C11", "C10", "C01"],
                             ["C01", "C10", "C11"], ["C11", "C01", "C10"]],
         "gates": {"benefit_percent": 10, "paired_confidence": .95, "mechanism_reduction_percent": 90,

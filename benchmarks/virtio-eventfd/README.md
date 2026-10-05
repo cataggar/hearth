@@ -146,7 +146,15 @@ its fresh correctness runs do not reclassify the old performance captures.
   `sudo -n unshare --net`. Bootstrap creates owned TAP resources only, drops
   controller credentials, and checks every actual VMM task's enforced filter.
   TAP is admitted with the real pre-jail `--tap` argument, not permission
-  widening after API configuration.
+  widening after API configuration. Mixed captures require a recorded live
+  disk-load PID/start-time generation with matching command identity and no
+  completion/controller-stop marker. This proves a continuous disk producer,
+  not an exact disk syscall in flight at the capture instant.
+  Startup retries only an identified live child whose command is the exact
+  launcher before exec, bounded to five seconds and its original generation.
+  Backend/transport failures, malformed/dead/unrelated processes or generation
+  changes propagate immediately. Capture/restore checks never accept or retry
+  a pre-exec child.
 * `mixed_scale.py`: four/eight real enforced sandboxes, each in its own private
   TAP namespace, sharing the fixed CPU8 VMM budget and CPU1 traffic budget.
   All sandboxes must reach verified outstanding disk/TAP/vsock barriers before
@@ -163,6 +171,15 @@ its fresh correctness runs do not reclassify the old performance captures.
   `--fixture`, and a new `--out <gates.json>` freezes gates. Candidates require
   `--gates`; failed noise caps are never relaxed. `--long-primary` is a separate
   five≥10-second diagnostic, not retroactive replacement of the frozen policy.
+  Every control needs its recorded `manifest.json`: source/compiler, artifacts,
+  host, affinity, workload, cache/storage/network and accounting conditions must
+  agree with each other and the supplied binary/kernel/initrd/fixture.
+  Gates include those fixed `execution_identity` fields and control-manifest
+  hashes; `fixture_sha256` fingerprints the recorded fixture content excluding
+  its relocatable kernel path, rather than today's metadata file bytes.
+  Candidates must match that provenance (mode/timestamps/run locations may
+  vary). Old gates lacking provenance fail explicitly and remain unqualified;
+  a different `--long-primary` policy needs its own matching controls.
 * `profile.py`: owned-TID software stat, DWARF stacks, KVM/ioctl/read/write/epoll
   and scheduler attribution, never unprofiled benefit samples. `--buffer-pages`
   selects a bounded private perf ring without changing global tracing.
@@ -177,6 +194,16 @@ its fresh correctness runs do not reclassify the old performance captures.
   explicit native app relaunch using recorded owned guest PIDs. Bounded
   startup-only TCP retries are not a heartbeat/idle workaround. Successful
   bulky images are removed only after hashes and actual restore receipts.
+  Preparation preserves validated already-PID-tracked startup idempotently and
+  normalizes only the known older adjacent untracked startup. Unknown or
+  duplicate startup/entries fail visibly.
+  Restore relaunch waits boundedly for the recorded old native apps to exit
+  before rebinding. Use the pinned SO_REUSEADDR TCP probe already in source;
+  an older `restore-stress` fixture lacking it is not the final matched fixture.
+  Final local corrected acceptance uses the tracked `restore-reuse` derivative,
+  with20 cycles/mode and unchanged runtime ELF/agent. See the independent new
+  [harness review result](results/20261004/README.md#authorized-harness-integration--corrected-actual-acceptance).
+  Historical80-cycle acceptance and older gates are not requalified.
 
 `tools/perf/irqfd_cpu.bpf.c` / `irqfd_cpu.py` implement an ephemeral
 owned-TGID/work-function-filtered kernel CPU observer, requiring verified BPF/

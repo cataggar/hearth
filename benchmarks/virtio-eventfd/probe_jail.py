@@ -16,6 +16,8 @@ from run import ROOT, artifact_path, command, digest, native_backpressure, nativ
 INSPECT = """
 import json,pathlib,sys
 root=int(sys.argv[1]); pending=[root]; seen=set(); rows=[]
+target=int(sys.argv[2]) if len(sys.argv)==4 else None
+generation=sys.argv[3] if target is not None else None
 while pending:
     pid=pending.pop()
     if pid in seen: continue
@@ -23,9 +25,12 @@ while pending:
     try:
         base=pathlib.Path(f'/proc/{pid}')
         pending.extend(int(x) for x in (base/'task'/str(pid)/'children').read_text().split())
-        if (base/'comm').read_text().strip() != 'flint': continue
+        if target is not None:
+            if pid != target: continue
+        elif (base/'comm').read_text().strip() != 'flint': continue
         stat=(base/'stat').read_text()
         start_ticks=stat[stat.rfind(')')+2:].split()[19]
+        if generation is not None and start_ticks != generation: continue
         for task in (base/'task').iterdir():
             status=dict(line.split(':',1) for line in (task/'status').read_text().splitlines() if ':' in line)
             rows.append({'pid':pid,'tid':int(task.name),'start_ticks':start_ticks,

@@ -20,6 +20,85 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Authorized harness integration — corrected actual acceptance
+
+Parent-authorized helper `22c5fcadc19850fd8559f02d1de0b4522ffc15e2` is
+integrated onto validated runtime `7aecb964`, without importing sibling
+optimizations or changing native runtime/filter/default/v2. Startup retries
+only typed `DiskProducerExecPending` for the exact live launching command,
+bounded to five seconds and the original generation. A real injected backend
+failure propagates without any retry/sleep; dead/malformed/unrelated processes
+and generation changes fail immediately. Capture/restore checks never accept
+or retry a pre-exec child.
+
+Recorded manifest/artifact identity replaces argument-stamping while retaining
+the current sustained nanosecond and failed-noise guards. Historical missing
+provenance gates fail explicitly, never backfilled. Tracked lifecycle fixture
+preparation is idempotent for validated inputs, not an overwrite of outputs.
+
+Actual integration exposed two further harness incompatibilities before any
+new acceptance: a basename-only inspector returned an empty roster for named
+`flint-ReleaseSafe`, and the unchanged guest agent preserves raw JSON escapes
+in command strings. Inspection now binds the already-known owned PID/start
+generation while retaining every confinement predicate; the disk recipe is
+quote/backslash-free with prior digit validation. Host regressions execute the
+actual raw-escaped wire command, not an idealized decoded string. Agent and
+its50ms interactive limitation remain unchanged.
+
+Preparation failures and the old TCP fixture's `BindFailed` are retained.
+An old-app exit barrier now precedes relaunch; the final identical fixture
+derives from known `restore-reuse` with the pinned SO_REUSEADDR probe, not the
+earlier no-reuse `restore-stress`. Earlier C00 three then20 and C10 five passing
+cycles are not pooled with final repetitions. One52-test marker-race failure
+is retained; joining its finite owned test launchers fixes that unit oracle.
+
+**Final actual results:52/52 Python guards and80/80 active mixed captures/
+fresh-process restores (20 per C00/C10/C01/C11),160 enforced VMM processes.**
+Every final cycle verifies the same live continuous disk PID/start generation
+before capture and after restore, actual outstanding slow-reader TAP/vsock,
+zero all-task CPU after acknowledged pause, v2,14MiB restored disk integrity,
+actual payload integrity and both source/restored exit0. This proves a live
+continuous producer, not a syscall in flight at the exact snapshot instant.
+All1120 recorded owned numeric PID/TID paths are absent at seal; successful
+images are removed after actual restore/hash receipts.
+
+Exact commands, each with `cd` to this worktree, private umask077 and a bounded
+exclusive fleet lock:
+
+```
+python3 -m unittest discover -s benchmarks/virtio-eventfd -p 'test_*.py' -v
+sudo -n unshare --net python3 benchmarks/virtio-eventfd/restore_stress.py \
+  --out .perf/eventfd/harness-review/final-C00 \
+  --binary .perf/eventfd/review-fixes/flint-ReleaseSafe \
+  --fixture .perf/eventfd/harness-review/fixture-final --mode C00 --cycles 20
+```
+
+The second command is independently repeated for C10/C01/C11 with new
+mode-specific output directories, releasing the lock between bounded phases.
+Final fixture initrd SHA256:
+`a00b9c1776a2baeb703f43ddae784791a50e9cbd50ef9e351907e4ecfadda968`;
+TCP probe `5836bcef86ea026490eaa367dc06c7027f1496d1a7e879194c400fcbece86eb2`.
+Runtime Safe SHA remains
+`8871882a4bae37b08250afce4da623d83873798e7616f29ef07395b40334fca8`;
+native source/ELFs match the actual70+3 per-optimization runtime acceptance below.
+
+Private raw/failed evidence is `.perf/eventfd/harness-review/`. Two failed
+512MiB snapshot memories remain full-byte verified private lossless gzip
+(22,308,896/22,296,337B), with original SHA/length and exact-owned unlink receipts.
+No guest images, foreign inventories or secrets are published.
+The sanitized [harness-review-validation.tar.gz](harness-review-validation.tar.gz)
+contains final/failed owned receipts, confinement/teardown and test logs.
+SHA256: `a916d49c956e8cfcbc39a75ae057dcb6b962c8dd96d3b5b316ab6c297468de13`;
+[harness-review-SHA256SUMS](harness-review-SHA256SUMS) authenticates it.
+
+**No performance gain or default adoption is claimed.** Historical80 remains
+invalid and prior performance gates remain unqualified. Hosted workflow is
+ready for parent exact-source review, then parent-only label
+`perf-qualify-virtio-eventfd`; zero hosted measurements/labels occur here.
+Actual save-on-halt0/4, expensive ioeventfd pause, old↔new legacy compatibility,
+full congestion/scaling/idle and qualified paired profiles remain mandatory
+blockers. PR9 stays draft/no auto-merge; the main plan stays active.
+
 ## Independent runtime-review fixes — actually validated
 
 Frozen6c's masked-level fallback was already corrected in the subsequent

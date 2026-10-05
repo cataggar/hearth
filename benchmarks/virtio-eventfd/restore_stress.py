@@ -51,20 +51,29 @@ def prepare(args):
         start = (offset + 110 + namesize + 3) & ~3
         data = archive[start:start + size]
         offset = (start + size + 3) & ~3
-        if name == "init":
-            old = b"/native-vsock &\n/native-tcp &\n"
-            new = (b"/native-vsock &\necho $! >/bench/vsock-pid\n"
-                   b"/native-tcp &\necho $! >/bench/tcp-pid\n")
-            if old not in data:
-                raise ValueError("unknown native app startup fixture")
-            data = data.replace(old, new)
         if name == "native-tcp" and args.tcp_binary:
             data = bench.artifact_path(args.tcp_binary).read_bytes()
         entries.append((name, data, mode))
         if name == "TRAILER!!!":
             break
+    for name in ("init", "native-vsock", "native-tcp"):
+        if sum(entry[0] == name for entry in entries) != 1:
+            raise ValueError(f"fixture requires exactly one {name} entry")
+    init_index = next(index for index, entry in enumerate(entries) if entry[0] == "init")
+    _, init, mode = entries[init_index]
+    old = b"\n/native-vsock &\n/native-tcp &\n"
+    tracked = (b"\n/native-vsock &\necho $! >/bench/vsock-pid\n"
+               b"/native-tcp &\necho $! >/bench/tcp-pid\n")
+    if init.count(b"/native-vsock") != 1 or init.count(b"/native-tcp") != 1:
+        raise ValueError("unknown or ambiguous native app startup fixture")
+    if tracked in init and init.count(b"/bench/vsock-pid") == init.count(b"/bench/tcp-pid") == 1:
+        pass
+    elif old in init and b"/bench/vsock-pid" not in init and b"/bench/tcp-pid" not in init:
+        init = init.replace(old, tracked, 1)
+    else:
+        raise ValueError("unknown or ambiguous native app startup fixture")
+    entries[init_index] = ("init", init, mode)
     out.mkdir(mode=0o700, parents=True, exist_ok=False)
-    init = next(data for name, data, _ in entries if name == "init")
     (out / "init").write_bytes(init)
     (out / "initrd.cpio.gz").write_bytes(gzip.compress(b"".join(
         bench.newc_entry(*entry, index + 1) for index, entry in enumerate(entries)), mtime=0))
@@ -81,6 +90,26 @@ def prepare(args):
     return 0
 
 
+def restart_native_apps(guest, pids):
+    if len(pids) != 2 or len(set(pids)) != 2 or any(not pid.isdigit() or int(pid) <= 1 for pid in pids):
+        raise ValueError("invalid recorded owned guest probe PIDs")
+    # kill queues delivery; await exit before rebinding the snapshot's port.
+    # This bounded startup barrier is not a workload/idle heartbeat.
+    command = (
+        "for pid in " + " ".join(pid.decode() for pid in pids) + "; do "
+        "/bin/busybox kill -9 $pid 2>/dev/null || /bin/busybox test ! -d /proc/$pid; "
+        "attempts=0; while /bin/busybox test -r /proc/$pid/stat; do "
+        "state=$(/bin/busybox awk '{print $3}' /proc/$pid/stat); "
+        "case $state in Z|X|x) break;; esac; "
+        "attempts=$((attempts+1)); /bin/busybox test $attempts -lt 600 || exit 1; "
+        "/bin/busybox sleep 0.005; done; done && "
+        "{ /native-vsock >/bench/vsock-restarted 2>&1 & "
+        "/native-tcp >/bench/tcp-restarted 2>&1 & } && printf RESTARTED"
+    )
+    if matrix.rpc_exec(guest, command, 8) != b"RESTARTED":
+        raise RuntimeError("fixture applications did not restart after transport reset")
+
+
 def cycle(args, out):
     out.mkdir(mode=0o700)
     source, restored, tcp, restored_tcp, producers = None, None, None, None, []
@@ -93,7 +122,7 @@ def cycle(args, out):
                         vm_cpu=getattr(args, "vm_cpu", 8))
         result["before"] = control.agent(source, True)
         tcp = connect_tcp()
-        matrix.rpc_exec(source, "/bin/busybox touch /bench/run-disk; /bin/sh /disk-load >/dev/null 2>&1 & printf STARTED")
+        disk_identity = matrix.start_disk(source)
         deadline = time.monotonic() + 5
         with (source.path / "disk").open("rb", buffering=0) as disk:
             while True:
@@ -106,8 +135,7 @@ def cycle(args, out):
         producers = [matrix.Outstanding(source.native_connection), matrix.Outstanding(tcp)]
         for producer in producers:
             producer.barrier()
-        if matrix.rpc_exec(source, "/bin/busybox test -f /bench/run-disk && /bin/busybox test ! -f /bench/disk-done; printf RUNNING") != b"RUNNING":
-            raise RuntimeError("disk producer ended before capture")
+        result["disk_producer_at_capture"] = matrix.disk_running(source, disk_identity)
         source.api("PATCH", "/vm", {"state": "Paused"})
         before = bench.thread_roster(source.pid)
         time.sleep(.1)
@@ -116,7 +144,7 @@ def cycle(args, out):
             raise RuntimeError("acknowledged pause did not fence all mutation owners")
         result["snapshot"] = source.snapshot()
         result["snapshot_sha256"] = {name: bench.digest(out / name) for name in ("state", "memory", "disk")}
-        result["outstanding_sources_at_capture"] = ["block-producer", "vsock-slow-reader", "TAP-slow-reader"]
+        result["outstanding_sources_at_capture"] = ["live-continuous-block-producer", "vsock-slow-reader", "TAP-slow-reader"]
         source.api("PATCH", "/vm", {"state": "Resumed"})
         result["source_vsock"] = producers[0].finish()
         result["source_tap"] = producers[1].finish()
@@ -135,19 +163,12 @@ def cycle(args, out):
         restored.__init__(destination, binary, args.mode, fixture, out, disk=True,
                           tap="hef3tap0", restore_api=True, accept_native=False,
                           vm_cpu=getattr(args, "vm_cpu", 8))
+        result["restored_disk_producer"] = matrix.disk_running(restored, disk_identity)
         # v2 intentionally does not serialize live host connections. The
         # unchanged agent reconnects; the fixture explicitly restarts its two
         # native apps rather than promising transparent stream preservation.
         pids = matrix.rpc_exec(restored, "/bin/busybox cat /bench/vsock-pid /bench/tcp-pid").split()
-        if len(pids) != 2 or any(not pid.isdigit() or int(pid) <= 1 for pid in pids):
-            raise ValueError("invalid recorded owned guest probe PIDs")
-        command = (
-            "/bin/busybox kill -9 " + " ".join(pid.decode() for pid in pids)
-            + "; /native-vsock >/bench/vsock-restarted 2>&1 & "
-            "/native-tcp >/bench/tcp-restarted 2>&1 & printf RESTARTED"
-        )
-        if matrix.rpc_exec(restored, command) != b"RESTARTED":
-            raise RuntimeError("fixture applications did not restart after transport reset")
+        restart_native_apps(restored, pids)
         restored.native_connection, _ = restored.native_listener.accept()
         restored.native_connection.settimeout(10)
         restored_tcp = connect_tcp()

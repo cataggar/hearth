@@ -1,6 +1,6 @@
 # Product Spec: VirtIO ioeventfd/irqfd Performance Experiment
 
-**Status**: Blocked qualification — four controlled modes implemented; timer-free integrity and separately scoped v2 restore evidence retained; historical80-cycle active disk oracle invalid pending corrected reruns; frozen performance gates unmet
+**Status**: Blocked qualification — four controlled modes implemented; new corrected80-cycle live-producer restore acceptance passes; historical80-cycle oracle remains invalid; frozen performance gates unmet
 
 ### Independent runtime-review acceptance
 
@@ -22,6 +22,25 @@ Historical80-cycle receipts remain intact but no longer prove an active disk
 producer: the reviewed shell oracle can report RUNNING after a failed test.
 The isolated harness fixes and actual corrected reruns are prerequisites,
 not a relabeling of prior captures.
+
+Authorized helper `22c5fca` is integrated with explicit typed startup-only
+exec-pending retry, generation fencing and injected unrelated backend-failure
+acceptance. Recorded-control identity now retains the sustained nanosecond/noise
+guard in addition to actual manifest/artifact provenance; old gates are rejected,
+not backfilled. Named immutable ELF inspection uses the known owned PID/start
+generation and all existing confinement predicates. The unchanged agent's raw
+JSON escaping is accounted for without changing its protocol or50ms limitation.
+
+New, separately pinned Safe epoch passes20 actual mixed capture/new-process
+restore cycles per controlled mode (**80/80**,160 VMM processes). Each requires
+the same live continuous disk PID/start generation before capture and after
+restore, outstanding TAP/vsock producers, zero task CPU while acknowledged
+paused, v2, actual payload/block integrity and clean source/restored joins.
+This is not proof of a disk syscall in flight at the exact capture instant,
+old↔new legacy compatibility or full lifecycle/scaling/performance qualification.
+Earlier inspector/raw-escape/old-TCP-fixture failures remain separate and intact.
+All52 collector/harness/hosted guards pass; hosted execution remains parent-only
+and untriggered pending exact-source review.
 
 Final local review-fix acceptance: Debug/Safe each70 actual Zig+3 enforced
 standalone cases, including eight active→masked guest IRQ scenarios, four
@@ -408,6 +427,23 @@ dependency pins, host/guest kernels, Azure SKU/CPU/nesting, vCPU/RAM, driver and
 IRQ state, affinity, cache/storage/network policy, warmups and samples.
 Retain raw L0/C00 and every prototype's perf data/reports, counters, failures
 and repeated-run distributions; distinguish profiled from unprofiled samples.
+
+The harness must reject inactive or completed disk producers at a mixed-device
+capture barrier, checking the recorded PID/start-time generation and command
+identity as well as controller-stop/completion markers. A live continuous disk
+workload is not proof of a disk syscall in flight at the exact capture instant.
+Only startup may retry an explicitly recognized live child still executing
+the exact launching shell command before exec. Its PID/start-time generation
+must remain stable. Transport/backend errors, malformed identities, dead
+processes, unrelated commands and generation changes fail immediately;
+capture/restore liveness checks never retry or accept pre-exec children.
+Lifecycle fixture preparation accepts only the validated tracked startup or its
+single known older untracked equivalent. Frozen gates must derive their source,
+compiler, binary, fixture and fixed execution conditions from every recorded
+control manifest, verify supplied artifacts, and require the same identity for
+candidates. Missing provenance is unqualified historical evidence, never
+backfilled from current arguments; mode, run timestamps and artifact locations
+are not substitutes for fixed execution identity.
 
 Freeze numeric gates from L0/C00 noise **before inspecting prototype results**.
 The following are **provisional suggested criteria**, not measured thresholds:

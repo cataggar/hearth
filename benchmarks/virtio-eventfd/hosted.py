@@ -339,6 +339,7 @@ def build_inputs(phases, source):
                                   for name, module in (("hosted", sys.modules[__name__]), ("control", control),
                                                        ("matrix", matrix), ("performance", performance), ("run", bench))}
     pins["runner_files_sha256"]["visible_cpu"] = bench.digest(Path(visible_cpu.__file__))
+    pins["runner_files_sha256"]["restore_stress"] = bench.digest(Path(restore_stress.__file__))
     save(PUBLIC / "pins.json", pins)
     return pins
 
@@ -556,7 +557,8 @@ def cell(args):
         result = {key: result[key] for key in ("status", "mode", "snapshot", "snapshot_sha256",
                                              "paused_all_task_cpu_seconds", "source_exit", "restore_exit",
                                              "restored_disk_bytes_verified", "bulky_images_removed_after_verified_restore",
-                                             "outstanding_sources_at_capture") if key in result}
+                                             "outstanding_sources_at_capture", "disk_producer_at_capture",
+                                             "restored_disk_producer") if key in result}
         result["classification"] = "one actual active mixed fresh v2 restore, not20/old-new/full lifecycle"
         result["failure_message_sha256"] = error_hashes
         result["owned_image_cleanup"] = remove_owned_images(out / "cycle", ("state", "memory", "disk"))
