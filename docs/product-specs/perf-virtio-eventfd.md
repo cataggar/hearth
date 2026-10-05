@@ -52,6 +52,14 @@ alone is insufficient. Hosted admission records capability136 and rejects
 zero, negative, missing or failed probes before profiling/build/workloads.
 No signal-only fallback or legacy-default admission change is allowed.
 
+New source4939d78 actually passes isolated CI37300988648:9/9 jobs;
+Safe/Debug each25 dedicated+7 integrations,55 focused guards/skip0 and4 jail
+cases, with39 static units per mode separately. The new enforced real-KVM
+query mask models absent136 and verifies all four modes reject before owner/
+vCPU association/fd changes; this is not an actual unsupported-host claim.
+Existing24 fatal paths/8 actual pre-entry KVM EINTR cases per mode remain
+passing. No active restore/lifecycle/performance qualification is inferred.
+
 Historical80-cycle receipts remain intact but no longer prove an active disk
 producer: the reviewed shell oracle can report RUNNING after a failed test.
 The isolated harness fixes and actual corrected reruns are prerequisites,

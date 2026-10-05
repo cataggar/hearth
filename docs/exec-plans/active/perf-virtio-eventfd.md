@@ -20,8 +20,23 @@ hosted tests must exercise actual query/descriptor cleanup and reject missing,
 zero, negative/malformed/error results without downstream admission.
 Extend ordinary isolated Safe/Debug CI to execute these guards and the new
 dedicated case; preserve886's successful9-job epoch as historical, not proof
-of this change. Validation/publication is pending. No parent performance label,
-measurements, default change or merge authorization.
+of this change.
+
+Source4939d78, tree9369996, now actually completes9/9 jobs in isolated
+CI37300988648. Both Safe/Debug independently execute25 dedicated+7 integrations,
+all55 focused guards/skip0 and4 jail cases (2 real API+2 mocked cleanup).
+Static unit CI executes39 per mode/26 actual fork controls. New missing136
+case rejects all four modes before owner/vCPU association/fd mutation; all24
+fatal paths and8 consumed-signal→real KVM EINTR/RIP0x100 cases per mode run
+again. The masked/unmask/reset/IRET-HLT controls remain passing.
+
+Local exact-CI runner55/55+10 coverage fixtures and source formatting pass
+under separately bounded fleet phases; the same unchanged3GiB guard admits
+evidence sealing. Raw logs/ZIPs remain private,14 sanitized receipt/source
+members are durably published with SHA in the result report. Evidence-only
+publication leaves native/harness/workflow bytes unchanged. No parent
+performance label, measurements, default change, new active restore/lifecycle
+qualification or merge authorization.
 
 ### Dedicated ephemeral correctness CI — 2026-10-05
 

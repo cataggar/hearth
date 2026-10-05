@@ -20,7 +20,7 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
-## Immediate-exit admission correction — new source, CI pending
+## Immediate-exit admission correction — actual correctness-only acceptance
 
 Parent accepts7aec's tested-host fatal/trigger repairs, but API12 alone
 does not prove their required `KVM_CAP_IMMEDIATE_EXIT`. Experimental
@@ -52,9 +52,38 @@ then prove all four modes reject before owners/vCPU association/fd changes.
 It models an absent capability on a functioning KVM host, not a claim that
 the tested host lacks136. Ordinary isolated Safe/Debug CI now requires
 25 dedicated+7 integrations and all55 focused guards without skips/caches.
-Native compilation/execution for this new source is **pending**, not inferred
-from the local Python guards or886's older24-case CI. No hosted performance
-label/run, measurements, default change, new lifecycle qualification or merge.
+At first publication native execution was pending, not inferred from local
+Python guards or886's older24-case CI. It subsequently executes in
+[CI37300988648](https://github.com/cataggar/hearth/actions/runs/37300988648)
+at exact source `4939d78e84d69ab68197d7c5fb97608c357f0cc7`, tree
+`9369996c65d3649e0c9e85841355a6050aaf6fa0`: **9/9 successful jobs**.
+
+| Actual job | ID | New executed coverage |
+|---|---|---|
+| KVM ReleaseSafe |111733383695|25 dedicated (24 real-KVM scenarios+1 policy),7 integration,55 focused/skip0,4 jail (2 real API+2 mocked cleanup) |
+| KVM Debug |111733383646|Same actual coverage, independently compiled/run |
+| Static unit Debug+Safe |111733383785|39 per mode,26 enforced baseline/reactor fork scenarios each |
+
+Both KVM cells actually record missing-capability rejection for all four
+modes, count0/no vCPU association/unchanged fd count. All24 fatal paths and8
+consumed-signal→actual KVM EINTR/RIP0x100 cases per optimization run again,
+along with existing masked/unmask/reset/IRET-HLT proof. The three new hosted
+query/error/rejection guards execute in each55-case CI runner. Unsupported
+hardware remains a modeled query result, not a falsely claimed actual
+unsupported-host deployment.
+
+Full raw job logs/metadata and artifact ZIPs11341837981 (Safe),
+11341912945 (Debug) are private `.perf/eventfd/immediate-exit-admission/`.
+The [immediate-exit-admission-validation.tar.gz](immediate-exit-admission-validation.tar.gz)
+contains14 sanitized actual/local/source receipt members,21,962B; SHA256
+`a3ff8be9c39c987897d45bf569093f19e078fb35e47a054fdf05a2a2b1de6714`
+is in [immediate-exit-admission-SHA256SUMS](immediate-exit-admission-SHA256SUMS).
+Evidence verification/sealing uses a separate bounded fleet phase and the
+unchanged3GiB guard; network retrieval holds no host lease. Every phase and
+watcher finishes/releases. No executed ELF/raw/old proof or fixture is removed.
+This evidence-only follow-up changes no tested native/harness/workflow byte.
+No hosted performance label/run, measurements, default change, new active
+restore/lifecycle qualification or merge.
 
 ## Ordinary correctness CI — dedicated coverage, not qualification
 
