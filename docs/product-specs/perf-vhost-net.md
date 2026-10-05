@@ -1,7 +1,7 @@
 # Product Spec: Capability-gated vhost-net Evaluation
 
 **Status**: Experimental opt-in shadow prototype implemented; full acceptance and performance blocked
-**Last updated**: 2026-10-04
+**Last updated**: 2026-10-05
 **Issue**: [#2 — Perf-profile and evaluate a vhost-net backend for Flint](https://github.com/cataggar/hearth/issues/2)
 **Execution plan**: [perf-vhost-net](../exec-plans/active/perf-vhost-net.md)
 
@@ -81,9 +81,49 @@ owned PIDs/TIDs and70 cgroups absent. New aggregate busy observations span
 0.279334–4.322714 cores, versus earlier near16-core saturation: a changing
 unreserved load is not established A/A noise or a qualified CPU/unit benefit.
 
-CPU quota delegation, arbitrary injected ioctl/allocator failures, UDP/loss,
-4/8-VM and external Azure cells, long idle/tail/noise and installed SDK controls
+CPU quota delegation, sustained IRQ/lifecycle races, deciding UDP/loss,
+4/8-VM and external Azure cells, long idle/tail and installed SDK controls
 remain unaccepted. No prototype correctness diagnostic is a performance gate.
+
+Fresh post-cleanup A′ A/A now passes30 complete active windows; conservative
+N=.2288553413 freezes a benefit requirement above45.7711%. The first identical
+notification A′/B pair is unfavorable: B goodput changes−24.40%RPC,
+−37.89%h2g and−16.37%g2h, with no errors but worse p99. This is one pair,
+not a confidence interval or attributable CPU result; no performance adoption
+is justified. The correctly phase-targeted setup-fault matrix passes58/58.
+The older100-reset controls fail and actually reach the owned pids.max16 limit,
+with pids.events max1 and no memory/OOM event. Avoid creating a dispatcher
+thread for each partial setup register: start it only when both queues and
+DRIVER_OK are ready. This is a common A′/B lifecycle correction, not a speedup;
+all earlier ELF measurements remain separate and any future performance
+qualification needs new identical-source controls. Do not relax pids/memory
+limits, add a retry heartbeat, or treat resource denial as passing100resets.
+
+The corrected static Debug/Safe rows actually pass35 units, seven existing real
+KVM cases and three standalone canonical-jail cases **each**. The test harness
+alone accepts an explicit `FLINT_TEST_KERNEL` so validation uses the owned pinned
+kernel; compiler/backend/runtime kernel options are unchanged. New-Safe
+100-generation resets now pass **100/100 per backend**, stable FD populations,
+pids.peak5, pids.events max0 and no memory/OOM events under unchanged limits.
+Current-head58/58 setup faults and12/12 real lifecycle faults pass: injected
+unbind/detach/base failures never acknowledge pause/resume/snapshot, exit1,
+join all recorded tasks and leave no snapshot. Supervisor FDs remain5→5.
+An initially overlong socket, missing collector input and incorrectly rejected
+fatal-disconnect outcome are retained fixture failures, not runtime passes.
+When shared storage prevents a correctness fence, an explicitly labeled fixture
+may replace a completed snapshot output with a full-hash-identical sparse copy
+before creating the second fence. Preserve owner/mode and original bytes on
+copy failure. This is neither a runtime memory backend nor a timed performance
+variant; never use it to claim lower snapshot latency or shared restore RAM.
+
+A separate complete installed iperf closure includes its actually required
+conditional pthread-cancellation library, with fixture-relative/private state.
+Both backends pass four three-second TCP/UDP direction smokes; UDP receiver
+loss is zero, while TCP retransmission counts are retained. These are loader/
+protocol diagnostics, not decisive throughput, CPU, error noninferiority or
+idle gates. Historical failures remain excluded. No current product TAP
+consumer, paired confidence interval or whole-network CPU attribution exists,
+and the unfavorable old-ELF pair is not pooled with corrected-ELF execution.
 
 ### Reopened safe opt-in work (18:01 UTC)
 

@@ -192,6 +192,23 @@ def sparse_copy(source, target):
         raise RuntimeError("sparse correctness-input copy changed raw bytes")
 
 
+def compact_correctness_snapshot(source):
+    target = source.with_name(source.name + ".sparse-correctness")
+    if target.exists():
+        raise ValueError("refusing to replace an existing correctness copy")
+    identity = source.stat()
+    try:
+        sparse_copy(source, target)
+        target.chmod(stat.S_IMODE(identity.st_mode))
+        os.chown(target, identity.st_uid, identity.st_gid)
+        os.replace(target, source)
+    except FileExistsError:
+        raise
+    except BaseException:
+        target.unlink(missing_ok=True)
+        raise
+
+
 class JailedLayout:
     def __init__(self, directory, fixture=None, backing=None, tap_name="hn2tap0"):
         private_directory(directory)
@@ -767,6 +784,7 @@ def boot(args, directory):
             "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
             "argv": argv,
             "jailed": jailed, "memory_directory": str(memory_directory),
+            "sparse_correctness_snapshots": getattr(args, "sparse_correctness_snapshots", False),
         }, indent=2) + "\n")
         deadline = time.monotonic() + 15
         while not sock.exists():
@@ -876,10 +894,14 @@ def boot(args, directory):
                 transitions.append({"route": route, "duration_ms": (time.monotonic_ns() - begin) / 1e6,
                                     "response": response})
             inventory(directory, "paused", child.pid)
+            if getattr(args, "sparse_correctness_snapshots", False):
+                compact_correctness_snapshot(memory_directory / "baseline.mem")
             first_hash = hashlib.sha256((memory_directory / "baseline.mem").read_bytes()).hexdigest()
             if args.traffic_snapshot:
                 request(sock, "PUT", "/snapshot/create",
                         {"snapshot_path": "fenced.vmstate", "mem_file_path": "fenced.mem"})
+                if getattr(args, "sparse_correctness_snapshots", False):
+                    compact_correctness_snapshot(memory_directory / "fenced.mem")
                 second_hash = hashlib.sha256((memory_directory / "fenced.mem").read_bytes()).hexdigest()
                 owned_file(directory / "traffic-fence.json", json.dumps({
                     "first_sha256": first_hash, "second_sha256": second_hash,
@@ -1007,6 +1029,8 @@ def main():
     parser.add_argument("--repetitions", type=int, default=2)
     parser.add_argument("--seconds", type=float, default=60)
     parser.add_argument("--profiles", action="store_true")
+    parser.add_argument("--sparse-correctness-snapshots", action="store_true",
+                        help="byte-identical sparse snapshot outputs; correctness only, not performance")
     parser.add_argument("--net-backend", choices=("userspace", "vhost", "auto"))
     parser.add_argument("--warmup", type=float, default=10)
     parser.add_argument("--rpc-rate", type=float)
@@ -1035,6 +1059,8 @@ def main():
         parser.error("strict phase needs an owned unavailable-device control")
     if args.traffic_snapshot or args.restore_backend or args.malformed:
         args.snapshot = True
+    if args.sparse_correctness_snapshots and (not args.snapshot or args.profiles):
+        parser.error("sparse-correctness-snapshots requires a non-profiled correctness snapshot")
     if args.phase in ("probe", "quiet"):
         raise ValueError("new profiling requires a scoped owned-process/kernel collector; historical all-host stack capture is disabled")
     os.umask(0o077)

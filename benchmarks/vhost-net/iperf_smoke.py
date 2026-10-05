@@ -52,19 +52,18 @@ def main():
                         argv.append("-R")
                     if udp:
                         argv += ["-u", "-b", "10M", "-l", "1200"]
-                    status = runner.command(argv, directory, name, user=True, timeout=12)
+                    status = runner.command(argv, directory, name, user=True, timeout=12,
+                                            env={**os.environ, "TMPDIR": str(directory)})
                     data = json.loads((directory / f"{name}.stdout").read_text())
                     end = data.get("end", {})
-                    sums = [end[k] for k in ("sum_received", "sum") if k in end]
-                    received = next((s for s in sums if s.get("sender") is False), None)
-                    if received is None:
-                        received = next((s for s in sums if s.get("bytes", 0) > 0), {})
+                    received = end.get("sum_received", {})
                     passed = status == 0 and "error" not in data and received.get("bytes", 0) > 0
                     if udp:
                         passed = passed and received.get("lost_packets", -1) == 0
                     rows.append({
                         "name": name, "status": status, "passed": passed,
                         "received": received,
+                        "sent": end.get("sum_sent", {}),
                         "classification": "3s loader/protocol/loss-free smoke; not performance or idle acceptance",
                     })
             runner.owned_file(directory / "iperf-smoke.json", json.dumps(rows, indent=2) + "\n")

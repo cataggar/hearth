@@ -1,7 +1,7 @@
 # Execution Plan: Evaluate Flint vhost-net
 
 **Status**: In progress — fresh post-cleanup baselines/A/A and deterministic acceptance; no adoption qualification
-**Last updated**: 2026-10-04
+**Last updated**: 2026-10-05
 **Issue**: [#2](https://github.com/cataggar/hearth/issues/2)
 **Spec**: [Capability-gated vhost-net Evaluation](../../product-specs/perf-vhost-net.md)
 
@@ -15,6 +15,42 @@ Experiment completion requires the evidence/checklist at the end, including a
 valid keep/reject outcome. The default remains userspace.
 
 ## Execution findings (2026-10-04)
+
+### Current-head execution (2026-10-05; earlier epochs retained below)
+
+The fresh A′ A/A completes30/30 active windows; frozen conservative
+N=.2288553413 requires benefit above45.7711% plus unchanged product/regression
+gates. The first matched old-Safe-ELF pair completes6/6 windows with zero errors
+but B goodput regresses24.40%RPC,37.89%h2g and16.37%g2h; p99 also worsens.
+One pair is not the required paired confidence interval. Aggregate CPU/unit is
+unattributed and cannot qualify savings. The historical near16-core saturation
+and authorized orphan cleanup are not optimization data.
+
+Canonical minimal correctness prerequisite7dfee42 is converged asa72b0a1,
+without borrowing asynchronous/compiler/notification changes. Current static
+Debug/Safe each actually pass35units+7existing KVM+3standalone enforced-jail
+cases. The ready-only common-dispatcher correction addresses demonstrated
+owned pids-limit exhaustion without relaxing limits or adding a timer.
+New-Safe100reset generations per backend pass, pids.peak5/max0, no OOM,
+FDs stable and owned cgroups joined.58/58 setup and12/12 lifecycle injections
+now pass against that ELF; lifecycle errors are fatal exits with no API ACK,
+snapshot or surviving owned task, not live fallback.14 focused Python tests
+pass, including timeout-versus-fatal-rejection and resource cleanup.
+
+The complete installed guest-tool closure now passes4/4 TCP/UDP direction
+smokes per backend; three-second samples are not deciding performance or idle
+acceptance. Earlier overlong/missing-input/fatal-disconnect fixture failures,
+missing guest state/libgcc cancellation failures, limit denials and storage
+aborts remain retained separately. Owned obsolete compile caches and identical
+closed-case kernel/initrd input duplicates were reclaimed, never another task's
+files, RAM/state or raw measurements.
+
+S0 still supplies no established current product TAP consumer. S6/S7 remain
+incomplete for sustained IRQ/pending-state lifecycle populations, delegated
+CPU quota, true-idle/tail floors,4/8VM scaling, external Azure and existing
+SDK/CONNECT gaps. Whole softirq/network attribution and deciding paired
+confidence remain unavailable. Keep this plan active/blocked and PR8 draft;
+no default, auto-merge or performance-improvement recommendation is justified.
 
 **Current implementation update:** S4/common dispatcher and S5/shadow-ring
 backend/lifecycle are implemented, with the existing guest features, 12-byte

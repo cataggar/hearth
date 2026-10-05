@@ -4,6 +4,7 @@
 import argparse
 import array
 import ctypes
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -18,13 +19,36 @@ import fault_probe
 import runner
 
 
+def rejection(sock, method, route, body):
+    try:
+        response = runner.request(sock, method, route, body)
+        return {"response": response, "acknowledged": response.startswith("HTTP/1.1 204")}
+    except RuntimeError as error:
+        response = str(error)
+        if not response.startswith("HTTP/1.1 "):
+            raise
+        return {"response": response, "acknowledged": False}
+    except (ConnectionRefusedError, ConnectionResetError, BrokenPipeError, FileNotFoundError) as error:
+        return {"disconnected": type(error).__name__, "acknowledged": False}
+
+
 def run_case(directory, operation, backend, queue):
     runner.private_directory(directory)
     baseline_fds = len(list(Path("/proc/self/fd").iterdir()))
     binary = runner.ROOT / "vmm/zig-out/bin/flint"
+    runner.owned_file(directory / "source-collect.py",
+                      (runner.ROOT / "benchmarks/vhost-net/collect.py").read_text())
+    runner.owned_file(directory / "variant.json", json.dumps({
+        "requested_backend": backend,
+        "effective_backend": "vhost",
+        "notification": "common blocked-poll, MMIO-exit kick, direct IRQ",
+        "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+        "classification": "owned lifecycle-fault correctness; not performance",
+    }, indent=2) + "\n")
     layout = runner.JailedLayout(directory, fixture=runner.ROOT / ".perf/vhost-net/20261004/fixture")
     parent, channel = socket.socketpair(socket.AF_UNIX, socket.SOCK_DGRAM)
     parent.settimeout(10)
+    jail_fd = None
     child, listener, controller = None, None, None
     configured = threading.Event()
     paused = threading.Event()
@@ -32,10 +56,13 @@ def run_case(directory, operation, backend, queue):
     result = {"operation": operation, "backend": backend, "queue": queue,
               "injected": False, "notifications": [],
               "classification": "real restrictive lifecycle fault, not performance"}
-    sock = layout.root / "api.sock"
+    sock = None
 
     def configure():
+        nonlocal jail_fd, sock
         try:
+            jail_fd = os.open(layout.root, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+            sock = Path(f"/proc/self/fd/{jail_fd}/api.sock")
             deadline = time.monotonic() + 15
             while not sock.exists():
                 if child.poll() is not None or time.monotonic() > deadline:
@@ -57,7 +84,7 @@ def run_case(directory, operation, backend, queue):
 
     def pause():
         try:
-            result["pause_response"] = runner.request(sock, "PATCH", "/vm", {"state": "Paused"})
+            result["pause_response"] = rejection(sock, "PATCH", "/vm", {"state": "Paused"})
         except Exception as error:
             errors.append(repr(error))
         finally:
@@ -70,6 +97,7 @@ def run_case(directory, operation, backend, queue):
                 "--notify-fd", str(channel.fileno()), "--", *argv[6:],
                 "--api-sock", "api.sock", "--net-backend", backend]
         with (directory / "serial.log").open("wb") as output:
+            os.chown(directory / "serial.log", runner.UID, runner.GID)
             child = subprocess.Popen(argv, cwd=directory, stdout=output, stderr=subprocess.STDOUT,
                                      pass_fds=(channel.fileno(),))
         channel.close()
@@ -92,12 +120,14 @@ def run_case(directory, operation, backend, queue):
         deadline = time.monotonic() + 35
         ready = False
         while not paused.is_set():
-            if errors or child.poll() is not None or time.monotonic() > deadline:
+            if errors or (child.poll() is not None and not result["injected"]) or time.monotonic() > deadline:
                 raise RuntimeError(f"owned lifecycle fault incomplete: {errors}")
             text = (directory / "serial.log").read_text(errors="replace")
             if not ready and configured.is_set() and "PERF_TAP_READY" in text and "effective=vhost" in text:
                 controller.join(timeout=5)
                 layout.verify(child.pid, "vhost", "ready-verified")
+                result["owned_ready_tids"] = list(json.loads(
+                    (directory / "ready-verified.owned-status.json").read_text()))
                 if runner.workload(directory, "rpc", "before-fault", .2, 0):
                     raise RuntimeError("pre-fault real TCP payload failed")
                 ready = True
@@ -126,19 +156,22 @@ def run_case(directory, operation, backend, queue):
                                             "stop_operation": stop, "injected": inject})
             result["injected"] |= inject
         controller.join(timeout=5)
-        result["resume_response"] = runner.request(sock, "PATCH", "/vm", {"state": "Resumed"})
-        result["snapshot_response"] = runner.request(sock, "PUT", "/snapshot/create", {
+        result["resume_response"] = rejection(sock, "PATCH", "/vm", {"state": "Resumed"})
+        result["snapshot_response"] = rejection(sock, "PUT", "/snapshot/create", {
             "snapshot_path": "declined.vmstate", "mem_file_path": "declined.mem"})
-        runner.inventory(directory, "after-rejection", child.pid)
-        tasks = json.loads((directory / "after-rejection.owned-status.json").read_text())
-        result["owned_workers_after_rejection"] = sum(r["Name"].startswith("vhost-") for r in tasks.values())
+        child.wait(timeout=5)
+        result["fatal_exit_status"] = child.returncode
+        result["owned_tids_absent_after_fatal_join"] = all(
+            not Path("/proc", tid).exists() for tid in result["owned_ready_tids"])
+        result["owned_pids_current_after_fatal_join"] = (layout.cgroup / "pids.current").read_text().strip()
         result["snapshot_files_absent"] = not any((layout.root / n).exists()
                                                   for n in ("declined.vmstate", "declined.mem"))
         result["passed"] = (
             result["injected"] and not errors and
-            all(not result[n].startswith("HTTP/1.1 204")
+            all(not result[n]["acknowledged"]
                 for n in ("pause_response", "resume_response", "snapshot_response")) and
-            result["owned_workers_after_rejection"] == 0 and result["snapshot_files_absent"] and
+            result["fatal_exit_status"] == 1 and result["owned_tids_absent_after_fatal_join"] and
+            result["owned_pids_current_after_fatal_join"] == "0" and result["snapshot_files_absent"] and
             "operation=" in (directory / "serial.log").read_text(errors="replace") and
             "effective=userspace reason=" not in (directory / "serial.log").read_text(errors="replace")
         )
@@ -156,6 +189,8 @@ def run_case(directory, operation, backend, queue):
             os.close(listener)
         parent.close()
         channel.close()
+        if jail_fd is not None:
+            os.close(jail_fd)
         layout.close()
         result["supervisor_fds_before_after"] = [baseline_fds, len(list(Path("/proc/self/fd").iterdir()))]
         result["passed"] = result.get("passed", False) and result["supervisor_fds_before_after"][0] == result["supervisor_fds_before_after"][1]

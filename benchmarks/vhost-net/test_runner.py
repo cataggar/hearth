@@ -6,9 +6,55 @@ from pathlib import Path
 from unittest import mock
 
 import runner
+import lifecycle_fault
 
 
 class RunnerFixtures(unittest.TestCase):
+    def test_failed_snapshot_compaction_keeps_source_and_removes_partial_copy(self):
+        previous = os.umask(0o077)
+        directory = runner.ROOT / ".perf/vhost-net/unit-fixtures" / f"{os.getpid()}-{time.time_ns()}"
+        directory.mkdir(parents=True, mode=0o700)
+        source = directory / "snapshot.mem"
+        target = directory / "snapshot.mem.sparse-correctness"
+        payload = b"frozen-snapshot" + bytes(8192)
+        source.write_bytes(payload)
+        def partial_copy(_source, output):
+            output.write_bytes(b"partial")
+            raise OSError(errno.ENOSPC, "owned sparse evidence full")
+        try:
+            with mock.patch.object(runner, "sparse_copy", side_effect=partial_copy):
+                with self.assertRaises(OSError):
+                    runner.compact_correctness_snapshot(source)
+            self.assertEqual(source.read_bytes(), payload)
+            self.assertFalse(target.exists())
+        finally:
+            target.unlink(missing_ok=True)
+            source.unlink()
+            directory.rmdir()
+            os.umask(previous)
+
+    def test_lifecycle_rejection_distinguishes_ack_decline_and_fatal_disconnect(self):
+        for response, acknowledged in (
+            ("HTTP/1.1 204 No Content", True),
+            (RuntimeError('HTTP/1.1 400 Bad Request\r\n{"fault_message":"VM has exited"}'), False),
+            (ConnectionRefusedError("owned fatal exit"), False),
+        ):
+            with self.subTest(response=response):
+                with mock.patch.object(runner, "request", **(
+                    {"side_effect": response} if isinstance(response, Exception)
+                    else {"return_value": response}
+                )):
+                    self.assertEqual(lifecycle_fault.rejection(
+                        Path("owned.sock"), "PATCH", "/vm", {"state": "Paused"})["acknowledged"],
+                        acknowledged)
+
+    def test_lifecycle_timeout_and_unrecognized_response_are_not_rejection_proof(self):
+        for error in (TimeoutError("not joined"), RuntimeError("")):
+            with self.subTest(error=error):
+                with mock.patch.object(runner, "request", side_effect=error):
+                    with self.assertRaises(type(error)):
+                        lifecycle_fault.rejection(Path("owned.sock"), "PATCH", "/vm", {})
+
     def test_sparse_copy_keeps_zero_tail_and_nonzero_payload(self):
         previous = os.umask(0o077)
         directory = runner.ROOT / ".perf/vhost-net/unit-fixtures" / f"{os.getpid()}-{time.time_ns()}"

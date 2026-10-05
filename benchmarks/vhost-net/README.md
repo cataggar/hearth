@@ -17,6 +17,10 @@ not production-jail acceptance.** Artifact directories are private and cannot
 be overwritten; use short boot IDs (UNIX socket paths must fit108bytes).
 
 Existing baseline fixture/image hashes and failures are retained unchanged.
+Existing Zig integration tests accept`FLINT_TEST_KERNEL=<verified project kernel>`;
+set it explicitly so validation does not access the legacy kernel location.
+The override is test-only, not a Flint/kernel/compiler option or a common
+prerequisite runtime change.
 `prepare` creates a new current fixture only if none exists; `prepare-reset`
 builds a separately pinned control fixture without rewriting the baseline:
 
@@ -140,7 +144,9 @@ output path and root private`unshare --mount --net` supervisor:
 - `lifecycle_fault.py --output <owned-path>` targets both queues' kick-unbind,
   backend-detach and GET_VRING_BASE after checked traffic in strict/auto modes.
   Pause/resume/snapshot must reject, workers join, no snapshot appears and
-  supervisor FD count stays unchanged.
+  supervisor FD count stays unchanged. A diagnosed fatal exit1 and disconnected
+  API is a valid fail-closed rejection only after every recorded owned task
+  disappears and the cgroup is empty; a timeout is not rejection proof.
 - `reset_diagnostic.py --boot-id <short-id> --backend userspace|vhost`
   samples only its owned cgroup's pids/memory current/peak/events during100
   resets. It does not relax limits or wake the guest.
@@ -155,6 +161,19 @@ mis-scoped and unrun population, including the first100-reset resource failure
 and guest iperf control-socket failures. Canonical common prerequisite
 `7dfee42` is reused with standalone`tools/perf/test_jail_baseline.py`; its
 three cases do not stand in for TAP/vhost/worker acceptance.
+
+Fresh reset resource observations hit owned pids.max16 with pids.events max1,
+without memory/OOM events. The common adapter now avoids spawning a dispatcher
+until both queues/DRIVER_OK are ready, retaining any pending IRQ delivery.
+This is a lifecycle correction only; old-ELF performance samples cannot be
+pooled with rebuilt acceptance or credited as a speedup. Guest iperf state
+uses a separate fixture-relative directory; host peers set TMPDIR to their
+private artifact directory, never a shared scratch path.
+The installed guest closure also includes libgcc_s.so.1, actually needed by
+glibc pthread_cancel although omitted from ldd's direct dependency output.
+TCP acceptance uses the named receiver summary, not a positive sender-only
+counter; retransmissions remain recorded. Three-second smokes are not qualified
+performance or an error-rate noninferiority test.
 
 The prior shared5ee jailed credentials retained supplementary group0; the
 preserved `jail_probe.py --expect inherited-groups` cases record fail-closed
@@ -178,7 +197,11 @@ traffic. Jailed malformed/capability injection uses fresh per-case resources;
 unjailed controls are not substitutes. Correctness RAM copies omit verified
 zero pages and require unchanged full-file hashes; this is not a new memory
 backend or a performance variant. Artifact-write failure cannot prevent empty
-cgroup/device cleanup. Consult the results for actually run
+cgroup/device cleanup. An explicit `--sparse-correctness-snapshots` reduces only
+stored, completed snapshot outputs before the next fence, preserving full
+hashes, identity and bytes on copy failure. It requires non-profiled snapshot
+correctness; it is not a memory backend, snapshot-latency gain or performance
+variant. Consult the results for actually run
 populations; command support alone is not acceptance.
 
 `cow_isolation.py --jail --source <snapshot-jail>` tests two simultaneous enforced

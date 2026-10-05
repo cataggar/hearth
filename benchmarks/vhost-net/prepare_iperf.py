@@ -35,6 +35,10 @@ def main():
     closure = subprocess.check_output(["ldd", str(binary)], text=True)
     paths = {Path(word) for line in closure.splitlines() for word in line.split() if word.startswith("/")}
     paths.add(binary)
+    cancellation = Path("/lib64/libgcc_s.so.1")
+    if not cancellation.is_file():
+        raise RuntimeError("installed pthread_cancel runtime libgcc_s.so.1 is missing")
+    paths.add(cancellation)
     hashes = {}
     for path in sorted(paths):
         destination = guest / path.relative_to("/")
@@ -45,7 +49,8 @@ def main():
     script = (guest / "init").read_text()
     if not script.endswith("wait\n"):
         raise RuntimeError("unexpected original init; do not rewrite it")
-    server = f"{binary} -s -B 192.0.2.2 -p 5201 --forceflush"
+    (guest / "perf-state").mkdir(mode=0o700)
+    server = f"TMPDIR=./perf-state {binary} -s -B 192.0.2.2 -p 5201 --forceflush"
     script = script[:-5] + (
         f"{{ {binary} --version; {server}; }} >/dev/console 2>&1 &\nwait\n"
         if args.server_console else f"{server} >/dev/null 2>&1 &\nwait\n")
@@ -63,6 +68,7 @@ def main():
         "classification": "separate installed-binary guest tool closure; no baseline replacement",
         "iperf_version": subprocess.check_output([str(binary), "--version"], text=True),
         "dependencies": closure, "hashes": hashes, "no_heartbeat": True,
+        "conditional_dependencies": {"pthread_cancel": str(cancellation)},
         "server_console_diagnostic": args.server_console,
     }, indent=2) + "\n")
     for path in target.iterdir():

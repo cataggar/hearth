@@ -83,6 +83,11 @@ pub fn start(self: *Self) !void {
         return err;
     };
     self.unlock();
+    // Partial queue setup cannot perform I/O; avoid a thread per register write.
+    if (!self.ready()) {
+        if (self.dev.interrupt_status & virtio.INT_USED_RING != 0) try self.raiseIrq();
+        return;
+    }
     self.stopping.store(false, .release);
     self.thread = try std.Thread.spawn(.{}, run, .{self});
     log.info("requested={s} adapter=blocked-poll/direct-irq generation={}", .{ @tagName(self.requested), self.generation });
