@@ -76,6 +76,16 @@ stalls in agent traffic before issuing halt and is not counted as a halt case.
 Successful API snapshots/reboot shutdown do not replace this acceptance;
 the report preserves actual flags, halt markers, errors and owned cleanup.
 
+A separately pinned fixture-only three-port diagnostic on corrected C00
+passes5675 exact64-byte RPC echoes,41×8MiB host→guest,15×8MiB guest→host and
+one TCP wake, with actual enforced jail/private mount+network namespace and
+graceful owner join. Host initiates TCP to guest listeners; byte/sequence/
+acknowledgement checks are not CRC. Only authorized guest/protocol Git objects
+are reused, not sibling runtime or whole commits. No agent/heartbeat/periodic
+serial workaround is added. These short cases do not substitute for untouched
+L0, noise-qualified paired performance or demand; the linked receipt discloses
+aggregate-CPU, raw-counter and helper-census limits. All existing blockers hold.
+
 The common restore path retains snapshot v2 and the guest reconnect policy:
 it publishes the standard `VIRTIO_VSOCK_EVENT_TRANSPORT_RESET` through the
 already-existing event queue. This wakes the unchanged agent from obsolete

@@ -63,6 +63,26 @@ classified. Preserve these failures as mandatory blockers, not skips or
 accelerator-specific causation. Generation-checked owned teardown completed;
 all recorded owned process numbers are absent at the halt evidence seal.
 
+### Fixture-only three-port continuation
+
+Import only the three authorized guest/protocol Git objects from103d7325,
+never the sibling runtime/dispatcher or whole commit. Actual frozen corrected
+C00 Safe8f1ca382 then passes four short classes in a fresh mount/net namespace,
+owned `h3w0tap0` and enforced jail:5675 exact64-byte RPC echoes,41×8MiB
+host→guest,15×8MiB guest→host and one host-initiated TCP wake after silence.
+No agent, heartbeat, periodic serial workaround, CRC or SDK CONNECT is used.
+Guest-listening TCP direction is explicit. RPC capability gates later attempts.
+Actual API shutdown joins with code0;11 recorded owned process/thread numbers
+are absent at seal. Private build/kernel/blob pins and source-only scope are
+verified; original L0/previous image and ELF pins stay unchanged.
+
+These one-second diagnostics are not untouched L0, fresh A/A, candidate
+performance or demand proof. Historical collector notification labels are
+overridden by actual C00 metadata, and aggregate host CPU is control/noise,
+not backend attribution. Scalar VMM CPU lacks full marginal kernel accounting
+and retained raw per-window counters. Keep helper census limits, earlier
+failures, noise/halt-save blockers, legacy default and draft/HOLD unchanged.
+
 ### Parent-requested focused correctness continuation,22:33 UTC
 
 The parent independently measured **15.961/16 visible busy cores** during a

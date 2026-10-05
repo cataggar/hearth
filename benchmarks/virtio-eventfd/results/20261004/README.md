@@ -159,6 +159,45 @@ diff check. The complete `SHA256SUMS` ledger is independently checked. Separate
 fresh/mixed/halt seals verify183/516/23 recorded owned PID/TID numbers absent;
 these are per-seal counts, not an asserted unique aggregate helper census.
 
+### Separate three-port C00 fixture diagnostic
+
+Fixture-only reuse imports **only** `guest.c`, `guest-init.sh` and `collect.py`
+Git objects from `103d732514e6d5b1f0cf32cd78ecaed9b6d944a6`; no sibling
+worktree was read and no vhost dispatcher/runtime or whole commit imported.
+The guest **listens** on TCP7000/7001/7002; the host initiates connections.
+Integrity is numbered64-byte exact echo and8MiB0x5a bulk byte/count/error
+acknowledgement checks, **not CRC** or SDK CONNECT. Source blob identities,
+static Zig0.17 build and kernel SHA were verified with private caches/TMPDIR.
+The new initrd pin is
+`9268e088a630cea4ff8f82a5badbd171a52172deb78a727690a2bf31c3bd020f`.
+
+On frozen **corrected C00 Safe8f1ca382**, four short diagnostic classes pass
+under a fresh mount/network namespace and an actual enforced jail:
+**5,675 RPC echoes;41 host→guest8MiB transfers (328MiB);15 guest→host8MiB
+transfers (120MiB);one host-initiated TCP wake after silence**.
+RPC had to pass before bulk/wake attempts. The guest has no agent, heartbeat
+or periodic serial workaround; startup prints are not periodic stimulation.
+Private `h3w0tap0` uses MTU1500/offloads0, without uplink/NAT/default route or
+host ACL/sysctl/controller changes. Every observed VMM task remains configured
+UID/GID1000, emptygroups, CapEff0, NNP1, Seccomp2. API shutdown exits0 and
+joins owners before generation-checked cleanup;11 recorded owned PID/TID
+numbers are absent at the evidence seal.
+
+These are **one-second fixture correctness diagnostics**, not untouched L0,
+fresh A/A, paired candidates or performance qualification; original L0 and
+all existing ELF/image pins remain unchanged. The historical collector's
+hardcoded legacy notification label is ignored: actual C00 uses blocking
+readiness owners and direct IRQ. Aggregate host CPU fields are noise/control
+only; scalar all-VMM-task deltas omit full marginal softirq/scheduler
+accounting and raw per-window task counters were not persisted. Short
+inspection/sudo helper PID creation census is incomplete, though waited.
+No demand, speedup, threshold relaxation or default eligibility follows.
+
+[Three-port receipt](three-port-c00-validation.json) and
+[37-file selected evidence](three-port-c00-validation.tar.gz) preserve the
+source-only import, real flags, isolation, raw byte/ACK results and cleanup.
+Earlier no-heartbeat failures and frozen noise/halt-save blockers are retained.
+
 ## Parent-requested mask/reset follow-up
 
 The parent independently reported a locked idle-window **15.961/16 busy-core**
