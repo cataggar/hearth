@@ -217,6 +217,17 @@ installed-image workloads must be capability-checked, not presumed working.
    later failure needs ordered quiescence/error handling. Worker threads
    inherit the jail/filter/cgroup. Keep clone/socket/mprotect restrictions;
    no new host device node, broad syscall allowance or weakened jail.
+9. **IRQ-route qualification.** Preserving the inherited pulse mechanism is
+   not proof that a masked level-triggered route retains a completion until
+   unmask. Independently exercise the legacy `KVM_IRQ_LINE` path with masked
+   IOAPIC level routes, both PIC routes masked, subsequent unmask, reset and
+   retained interrupt state across pause/restore. Include worker completion
+   and quiescence publication, not only ordinary unmasked wake cases. These
+   real KVM controls must pass before promotion; ioeventfd/irqfd remains
+   disabled and is not a prerequisite. Any separately approved common IRQ
+   correctness repair must apply identically to sync/worker, receive fresh
+   lifecycle acceptance, and establish new matched baseline gates before
+   attributing a performance difference to block I/O.
 
 Prefer the simplest bounded FIFO worker first **if profiling supports it**.
 Multiple workers and io_uring are conditional alternatives only if measured

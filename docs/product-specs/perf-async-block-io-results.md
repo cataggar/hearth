@@ -12,6 +12,30 @@
 
 **Plan:** [active execution plan](../exec-plans/active/perf-async-block-io.md)
 
+## Masked IRQ-route coverage gap — 2026-10-05 05:03 UTC
+
+Direct read-only source inspection finds the inherited
+`main.zig:injectIrq` asserts and immediately deasserts `KVM_IRQ_LINE`.
+Worker completion and quiescence both reuse this helper; MMIO
+`MMIO_INTERRUPT_ACK` only clears `interrupt_status` in this implementation.
+There is no route-aware holding policy here. Existing ordinary wake and
+lifecycle passes do not independently establish masked IOAPIC-level delivery
+when both PIC routes are masked, followed by unmask/reset.
+
+Sibling [#3](https://github.com/cataggar/hearth/pull/9) reports an actual
+common fallback failure under that route combination and a new policy fix.
+This is **peer evidence, not this worktree's KVM reproduction**. Neither its
+runtime policy nor its test counts/binaries are imported or adopted here.
+Independent legacy-route controls, completion/quiescence/pause/restore
+coverage and any separately approved correction remain additional promotion
+requirements. A common correctness change must affect sync/worker equally,
+receive fresh guest acceptance and establish a new matched baseline; old
+c734 profiles cannot quantify a changed runtime.
+
+This review executes **zero new tests or VMs** and changes no runtime, guest
+feature, notification mode or performance gate. Sync remains default, and
+the existing worker's qualification is still incomplete/not merge-eligible.
+
 ## Owned completed-cache cleanup — 2026-10-05 04:44 UTC
 
 A single exclusive fleet-locked phase, capped at90seconds, removes only

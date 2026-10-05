@@ -6,6 +6,27 @@
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
 **Actual results**: [baseline capability execution](../../product-specs/perf-async-block-io-results.md)
 
+### Masked IRQ-route admission gap — 2026-10-05 05:03 UTC
+
+Read-only inspection of this worktree confirms `main.zig:injectIrq` always
+asserts then immediately deasserts `KVM_IRQ_LINE`. Both worker completion
+and pause/quiescence publication call it. MMIO interrupt acknowledgement
+clears transport status, without a route-aware host line lifetime here.
+The inherited helper has not received this worktree's independent masked
+IOAPIC-level/both-PIC-masked/unmask/reset KVM oracle coverage.
+
+Sibling #3 reports an actual masked-level fallback failure followed by a
+common-policy repair and fresh hardware tests. Those are peer results,
+not a reproduction or accepted repair in this worktree. Do not import that
+runtime/backend or count its cases as this worker's validation.
+Register this additional admission gate: independently reproduce/resolve the
+legacy masked-route behavior and cover completion/quiescence/pause/restore
+before any promotion. Any parent-approved common fix requires fresh Debug/Safe
+and guest lifecycle acceptance plus new identical-ELF force-sync A/A gates.
+No new runtime patch, KVM/test execution, performance row or notification
+mode is added by this source review. Existing c734 profiles/counts retain
+their original scopes; default/merge qualification remains blocked.
+
 ### Owned completed-cache retention follow-up — 2026-10-05 04:44 UTC
 
 One exclusive fleet-locked,90-second-capped phase removes only five completed,
