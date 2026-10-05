@@ -63,6 +63,13 @@ Only a clarifying comment and reproducible architectural fixture are added.
 The deterministic Flint API pending-exit snapshot/restore race remains unrun;
 these unjailed/no-TAP models do not waive production lifecycle or IRQ gates.
 
+An own lightweight topology read at03:22:34UTC shows logical CPU8/9 expose
+thread_siblings_list8-9, package0/core4. The existing identical logical pins are
+not independent exposed cores or proof of physical Azure placement. This later
+read does not retroactively establish topology at earlier sample cuts. Preserve
+the unfavorable/unqualified population; any future deciding phase needs its own
+actual topology freeze before controls, not an assumed0/8 sibling map.
+
 **Current implementation update:** S4/common dispatcher and S5/shadow-ring
 backend/lifecycle are implemented, with the existing guest features, 12-byte
 header and format-v2 snapshot. A′ and B now have actual unjailed KVM payload,
