@@ -4,6 +4,36 @@
 
 **Date**: 2026-10-04
 
+### Dedicated ephemeral correctness CI — 2026-10-05
+
+Parent found existing eight green checks omit `eventfd-test`; add it and the
+complete focused `benchmarks/virtio-eventfd/test_run.py` suite to existing
+ubuntu24 correctness CI. Use fixed x86_64-linux-musl Safe/Debug matrix, exact
+signed Zig0.17, functional nonroot sg-kvm and pinned5.10.245 kernel in `.ci/`,
+finite phase/job limits and explicit per-suite nonskipped/noncached execution
+checks. Keep existing integration/full-jail controls, fixing the tightly
+coupled typed baseline-policy log assertion. Select the same static target
+for ordinary unit controls instead of broadening GNU-only syscall permissions.
+Do not touch production native source/ELFs or reserved performance workflow.
+
+Validate focused guards and existing real jail cases on already frozen2dcb
+ELFs with separately released bounded local fleet phases where available;
+workflow syntax/coverage parser checks are not actual hosted KVM acceptance.
+Publish and inspect actual current-head ordinary CI runs, retain failures/
+queued states and only report suite execution after real receipts. No parent
+performance label/hosted performance run, old refusal relabeling, full
+restore/lifecycle shortcut or peer heartbeat/quiescent continuity borrowing.
+
+Local actual preparation:32/32 focused tests (no skips) and existing four
+jail-prerequisite cases on each frozen2dcb Safe/Debug ELF pass; the latter
+are2 real enforced API plus2 mocked cleanup regressions per optimization,
+not guest-restore/disk acceptance. YAML/shell/inline-Python validation and10
+positive/negative coverage-gate fixtures pass. Initial source-count checker
+failed before focused execution because it missed three nested KVM tests;
+the final guard includes all23 dedicated source declarations plus the imported
+policy test. That failed log is preserved. No native source/ELF changed.
+Hosted current-head results are pending publication/execution, not passed.
+
 ### Legacy/readiness policy separation — 2026-10-05
 
 Read-only current f52 inspection disproves the peer's stale e2 unconditional

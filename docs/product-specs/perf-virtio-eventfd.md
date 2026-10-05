@@ -81,6 +81,26 @@ not performance evidence or closure of delegated harness/lifecycle gates.
 
 **Last updated**: 2026-10-05
 
+### Ordinary ephemeral correctness CI
+
+The existing `zig-kvm` ubuntu24 job must run both static-musl Safe and Debug
+on current PR source, not only the older integration target. Run the actual
+`eventfd-test` (currently24 cases,23 real KVM plus one policy) and existing
+integration tests with the exact pinned kernel selected by the supported
+`integration-kernel` build option. Reject skips, cached executions, partial
+counts and missing per-suite run summaries. Add the complete focused
+`test_run.py` suite, including typed producer startup/backend failure and
+recorded-control/restore-fixture guards; reject skipped/incomplete unittest
+execution. All phases and the job are finite and nonroot under `sg kvm`
+where KVM is required. Keep kernel/log/fixture paths project-relative.
+Static-musl unit CI must retain the real baseline/reactor SIGSYS controls;
+do not waive GNU ABI restrictions with broader syscalls.
+
+This CI supplies current-head correctness independently of shared local
+lease refusals. A queued/running CI check is not a pass, and its green result
+is not active restore/lifecycle acceptance, hosted performance evidence,
+default eligibility or permission to apply the parent-only perf label.
+
 **Issue**: [#3](https://github.com/cataggar/hearth/issues/3)
 
 **Execution plan**: [VirtIO eventfd experiment](../exec-plans/active/perf-virtio-eventfd.md)

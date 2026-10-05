@@ -140,7 +140,7 @@ class JailPrerequisites(unittest.TestCase):
             self.assertEqual(fields["CapEff"].strip(), "0000000000000000")
             self.assertEqual(fields["NoNewPrivs"].strip(), "1")
             self.assertEqual(fields["Seccomp"].strip(), "2")
-            self.assertIn(b"seccomp filter installed", (vm.path / "stderr.log").read_bytes())
+            self.assertIn(b"seccomp baseline filter installed", (vm.path / "stderr.log").read_bytes())
             replies = []
             for memory in (512, 640, 512):
                 self.assertEqual(vm.api("PUT", "/machine-config", {"mem_size_mib": memory}), b"")

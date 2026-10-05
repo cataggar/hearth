@@ -20,6 +20,54 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Ordinary correctness CI — dedicated coverage, not qualification
+
+The earlier eight green checks omitted `eventfd-test`. Existing ephemeral
+ubuntu24 `zig-kvm` now uses immutable PR-head checkout and a fixed static-musl
+**ReleaseSafe/Debug** matrix, signed exactZig0.17 and pinned5.10.245 kernel
+selected through the real `integration-kernel` option. The kernel remains in
+project-relative `.ci/guest/`, not an OS temporary directory. Nonroot `sg kvm`
+checks actual API12/createVM before executing both dedicated and integration
+targets. Each matrix cell must execute24 dedicated (23 actual KVM+1 policy)
+and7 integration (5 guest+2 CLI/error), with no skips/cache/partial counts.
+The parser includes three nested dedicated tests and the imported IRQ policy
+test, rather than incorrectly counting only top-level declarations. Standard
+Flint unit CI also uses static-musl/debug+safe and requires all39 actual unit
+cases, retaining baseline/reactor SIGSYS without a GNU syscall waiver.
+
+The complete focused `test_run.py` suite runs in each KVM cell and must execute
+all32 cases with no skips/xfails: typed startup-only retry, injected unrelated
+backend failure, live generation/dead process/raw-agent command predicates,
+actual exit/relaunch barriers and recorded provenance/fixture guards.
+Existing four jail-prerequisite cases remain; their log assertion recognizes
+the explicit baseline-policy banner. These are2 actual enforced API and2
+mocked cleanup cases per optimization, not guest disk/restore acceptance.
+Native code and validated2dcb ELFs are unchanged.
+
+Local actual preparation, each under separately bounded fleet phases:
+
+```
+python3 .perf/eventfd/correctness-ci/check_ci.py
+FLINT_JAIL_TEST_BINARY="$PWD/.perf/eventfd/policy-review/flint-ReleaseSafe" \
+  python3 -m unittest discover -s tools/perf -p test_jail_prerequisites.py -v
+```
+
+First command checks final YAML/shell/inline-Python,10 positive/negative
+actual coverage-gate fixtures, then executes the workflow's exact focused
+runner:32/32, skipped0. Second independently repeats with frozen Debug:
+4/4 each. The initial checker failed before focused tests because it missed
+nested declarations; `.perf/eventfd/correctness-ci/check-ci.log` is retained
+and is not a passing phase. Final local logs are `check-ci-final.log` and
+`jail-{ReleaseSafe,Debug}.log`; no shared-host refusal is reclassified.
+
+CI job is bounded30min; build/run phases10min each, focused/jail2min each;
+native unit phases5min each. Read-only token, no credential persistence,
+finite diagnostics and own logs retained7days. Publication-triggered hosted
+current-head execution is **pending**, not claimed by syntax/local checks.
+These ordinary checks do not run active restore/lifecycle/performance
+qualification, apply `perf-qualify-virtio-eventfd`, change default or authorize
+merging. Parent-only performance workflow and all remaining blockers stand.
+
 ## Default/readiness policy separation — new correctness-only epoch
 
 Current-source inspection against canonical7d confirms `poll(timeout=0)` and
