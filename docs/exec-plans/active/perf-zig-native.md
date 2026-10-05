@@ -199,9 +199,14 @@ the unsupported ignored `--cmdline` token while retaining its positional
 string and all `98b10c21` cleanup hardening. Do not import that publication's
 other files/runtime. Validate only the existing CLI guest-disk case in four
 separate locked cells against the unchanged named ELFs and512MiB guard.
-Status: selected, validation pending. Keep the prior16-case cleanup cohort
-separate; report four targeted cases, exact launch argv/actual cmdline and
-all-task/owned teardown, not renewed full matrix or performance.
+Own `fd5db24` imports only that hunk. Actual four targeted cells pass1/1 each,
+4/4 total, no skips;8 recorded PID paths and private nodes/sockets are gone.
+Eight captured VMM task statuses retain empty groups/UID/GID/caps/NNP/seccomp.
+All four actual logged command lines match the old cohort's positional string.
+`postcleanup-summary/canonical-cli-positional-v1-final.json` preserves full
+launch argv, source/ELF/fixture pins and cleanup. Keep the prior16-case cleanup
+cohort separate, not renewed full matrix/compilation or performance. No peer
+runtime/compiler/flags or default/idle/GNU/size-gate change is introduced.
 
 ## Evidence and fixed scope
 

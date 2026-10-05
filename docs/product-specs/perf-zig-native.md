@@ -341,9 +341,20 @@ any #3 eventfd/queue/IRQ/runtime source. Keep the `98b10c21` cleanup-fault fix.
 
 Run only the existing CLI guest-disk testcase on the four immutable static
 Debug/safe × LLVM/native ELFs, with the unchanged locked512MiB guard and
-separate source/fixture hashes. Validation is pending. Any passing four CLI
-cases remain a new targeted epoch, not a new16-case full fixture suite,
-forced32+7 compilation or default/transport/performance acceptance.
+separate source/fixture hashes. Own `fd5db24` applies only that shared one-line
+hunk atop the hardened fixture. Actual targeted execution passes **1/1 per
+cell, 4/4 total, no skips**. All8 recorded supervisor/VMM PID paths are gone;
+8 captured VMM task statuses satisfy the unchanged identity/filter checks,
+and private nodes/sockets are removed. New launch argv omits `--cmdline`;
+actual VMM cmdline logs match the old epoch's positional string in all four
+cells, so the selected guest command line was not changed or retroactively
+corrected. Fixture SHA256 is
+`23b15b655d2b93d2ed0431f97be36c842b50c7aa4440e5bdead89842671d4ee6`.
+Actual locked free-space observations are3,362,906,112–3,396,775,936B, not
+reserved phase budget. `postcleanup-summary/canonical-cli-positional-v1-final.json`
+indexes commands, immutable ELF/fixture hashes, source pin, logs and teardown.
+These four CLI cases remain a new targeted epoch, not a new16-case full fixture
+suite, forced32+7 compilation or default/transport/performance acceptance.
 
 This is an experiment specification, not a benchmark result
 or decision to change defaults. The compiler migration in
