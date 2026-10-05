@@ -21,6 +21,7 @@ import socket
 import struct
 import subprocess
 import statistics
+import sys
 import tarfile
 import time
 
@@ -42,6 +43,66 @@ def sha256(path):
 def save_json(path, value):
     path.write_text(json.dumps(value, indent=2) + "\n")
     path.chmod(0o600)
+
+
+def start_time(pid, jailed=False):
+    path = Path(f"/proc/{pid}/stat")
+    text = subprocess.check_output(
+        ["sudo", "-n", "cat", str(path)], text=True, timeout=5,
+        stderr=subprocess.DEVNULL,
+    ) if jailed else path.read_text()
+    return int(text[text.rfind(")") + 2:].split()[19])
+
+
+def signal_owned_pid(pid, stamp, signum, jailed=False):
+    program = """
+import os, signal, sys
+pid, stamp, signum = map(int, sys.argv[1:])
+def current():
+    with open(f"/proc/{pid}/stat") as f:
+        text = f.read()
+    return int(text[text.rfind(")") + 2:].split()[19])
+fd = None
+try:
+    if current() != stamp:
+        print(0)
+    else:
+        fd = os.pidfd_open(pid)
+        if current() != stamp:
+            print(0)
+        else:
+            signal.pidfd_send_signal(fd, signum)
+            print(1)
+except (FileNotFoundError, ProcessLookupError):
+    print(0)
+finally:
+    if fd is not None:
+        os.close(fd)
+"""
+    prefix = ["sudo", "-n", "--"] if jailed else []
+    return subprocess.check_output(
+        [*prefix, sys.executable, "-I", "-B", "-S", "-c", program,
+         str(pid), str(stamp), str(int(signum))],
+        text=True, timeout=10,
+    ).strip() == "1"
+
+
+def fence_prepared_image(path):
+    before = time.monotonic_ns()
+    fd = os.open(path / "disk.ext4", os.O_RDWR | os.O_CLOEXEC)
+    try:
+        os.fdatasync(fd)
+    finally:
+        os.close(fd)
+    directory = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+    save_json(path / "copied-image-fence.json", {
+        "scope": "only owned copied run image and its directory before VMM launch",
+        "elapsed_ns": time.monotonic_ns() - before, "global_cache_drop": False,
+    })
 
 
 def run_logged(argv, output, timeout=120, cwd=ROOT):
@@ -244,7 +305,8 @@ def inventory():
 
 class OwnedVm:
     def __init__(self, path, cpu, jailed=True, heartbeat=True, boot_mode="api",
-                 trace_startup=False, startup_perf="none", startup_frequency=199, extra_args=()):
+                 trace_startup=False, startup_perf="none", startup_frequency=199, extra_args=(),
+                 sync_fixture=False):
         self.path = path
         self.path_created = False
         self.cpu = cpu
@@ -255,8 +317,10 @@ class OwnedVm:
         self.startup_perf = startup_perf
         self.startup_frequency = startup_frequency
         self.extra_args = tuple(extra_args)
+        self.sync_fixture = sync_fixture
         self.process = None
         self.pid = None
+        self.pid_starttime = None
         self.agent = None
         self.stdout = None
         self.stderr = None
@@ -275,6 +339,8 @@ class OwnedVm:
                     ["cp", "--reflink=auto", str(ARTIFACTS / source), str(self.path / target)],
                     check=True, timeout=120,
                 )
+            if self.sync_fixture:
+                fence_prepared_image(self.path)
             self.listener = socket.socket(socket.AF_UNIX)
             self.listener.settimeout(15)
             self.listener.bind(str(self.path / "vsock_1024"))
@@ -340,7 +406,11 @@ class OwnedVm:
                     except TimeoutError:
                         continue
             self.pid = self.find_vm_pid()
-            save_json(self.path / "pid.json", {"vmm_pid": self.pid, "supervisor_pid": self.process.pid})
+            self.pid_starttime = start_time(self.pid, self.jailed)
+            save_json(self.path / "pid.json", {
+                "vmm_pid": self.pid, "vmm_starttime": self.pid_starttime,
+                "supervisor_pid": self.process.pid,
+            })
             if self.boot_mode == "api":
                 self.api("PUT", "/machine-config", {"mem_size_mib": 512})
                 self.api("PUT", "/boot-source", {
@@ -407,18 +477,17 @@ class OwnedVm:
             if self.pid is None:
                 try:
                     self.pid = self.find_vm_pid()
-                except (OSError, RuntimeError):
+                    self.pid_starttime = start_time(self.pid, self.jailed)
+                except (OSError, RuntimeError, subprocess.SubprocessError):
                     pass
             try:
                 still_owned = self.pid is not None and self.find_vm_pid() == self.pid
             except (OSError, RuntimeError):
                 still_owned = False
             if still_owned:
-                subprocess.run(
-                    ["sudo", "-n", "kill", "-TERM", str(self.pid)] if self.jailed
-                    else ["kill", "-TERM", str(self.pid)],
-                    check=False, timeout=10,
-                )
+                if self.pid_starttime is None:
+                    raise RuntimeError("refuse to signal an unrecorded VMM identity")
+                signal_owned_pid(self.pid, self.pid_starttime, 15, self.jailed)
             else:
                 try:
                     self.process.wait(timeout=2)
@@ -432,11 +501,7 @@ class OwnedVm:
                 except (OSError, RuntimeError):
                     still_owned = False
                 if still_owned:
-                    subprocess.run(
-                        ["sudo", "-n", "kill", "-KILL", str(self.pid)] if self.jailed
-                        else ["kill", "-KILL", str(self.pid)],
-                        check=False, timeout=10,
-                    )
+                    signal_owned_pid(self.pid, self.pid_starttime, 9, self.jailed)
                 self.process.kill()
                 self.process.wait(timeout=5)
         for output in (self.stdout, self.stderr):
@@ -445,6 +510,7 @@ class OwnedVm:
         if self.process is not None:
             save_json(self.path / "exit.json", {
                 "supervisor_pid": self.process.pid, "vmm_pid": self.pid,
+                "vmm_starttime": self.pid_starttime,
                 "supervisor_exit_code": self.process.returncode,
             })
         if self.path_created:

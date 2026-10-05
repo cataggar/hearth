@@ -36,9 +36,10 @@ Storage before that phase has22,421,225,472free bytes. The earlier actual
 ENOSPC and narrowly named owned-intermediate cleanup remain distinct.
 Private new recipe/raw control/rosters/cleanup:
 `.perf/blk-io/quiet-1/{fresh-control.py,executed-control.log,control-before.json,fresh-summary.json}`.
-Fresh repaired-sync full-window profiles/A-A are being executed before any new
-candidate observations; numeric`B/N` remain unfrozen, and no gain/default/merge
-is inferred. Mandatory control/lifecycle/matrix/total-cost requirements remain.
+Fresh repaired-sync full-window profiles and20A/A samples now precede any new
+candidate observations. Their numeric`B/N` are frozen below, but tail noise
+is inadmissible; no gain/default/merge is inferred. Mandatory
+control/lifecycle/matrix/total-cost requirements remain.
 
 ### Fresh full-window baseline profiles
 
@@ -95,11 +96,63 @@ bypass the buffered host backing FD.
 Raw recipes/manifests/JSON/stat/stacks/control/rosters/cleanup:
 `.perf/blk-io/quiet-1/e2/{randread-qd8,flush}/profile-1/`.
 Both accepted profile VMs/collectors are gone. A separate single bounded locked
-series of ten **unprofiled** paired fresh flush A/A runs is queued; its
+series of ten **unprofiled** paired fresh flush A/A runs completed20/20; its
 registration defines`B=mean(all20)` and the95% paired relative noise bound
-before results. Numeric gates are not yet frozen. Successful redundant A/A
+before results. The frozen outcomes follow. Successful redundant A/A
 disk copies alone are deleted after exact-name/output-hash inventories;
 canonical inputs, all outputs and failed/profile inputs remain.
+
+### Fresh canonical A/A: completed, tail noise does not qualify
+
+Twenty independently booted unprofiled10s-ramp/60s flush runs, ten pairs,
+all return fio error0 and all owned VM identities disappear afterward. The
+twenty exact-name redundant runtime images are gone; all JSON/distributions,
+before/after controls, manifests and cleanup evidence remain. No candidate
+outcome has been used to tune these gates.
+
+| Frozen metric | B | Sample SD /CV | 95% paired relative N | Frozen margin /absolute gate |
+|---|---:|---:|---:|---:|
+| IOPS benefit | 5,023.310445 |143.614571 /2.858963% |3.502016% |15% /5,776.807012 minimum |
+| IOPS regression | same |same |same |7.004032% /4,671.476152 minimum |
+| Guest write p50(ns) |58,240 |281.661 /0.483622% |0.772765% |5% /61,152 maximum |
+| Guest write p95(ns) |87,705.6 |5,728.189 /6.531155% |8.721112% |17.442224% /103,003.407 maximum |
+| Guest write p99(ns) |130,457.6 |12,685.337 /9.723724% |17.020706% |**34.041412%**, inadmissible |
+| Guest fsync p50(ns) |119,603.2 |1,413.440 /1.181775% |1.161125% |5% /125,583.36 maximum |
+| Guest fsync p95(ns) |176,025.6 |8,851.905 /5.028760% |6.331245% |12.662489% /198,314.822 maximum |
+| Guest fsync p99(ns) |293,836.8 |35,869.207 /12.207187% |24.938210% |**49.876421%**, inadmissible |
+
+`N=max(abs(endpoints))` of the paired ratio-difference t95% interval
+(upward-rounded t2.263/df9) is registered before sampling. All outliers remain,
+including first-pair fsync p99 changing224,256→362,496ns. The tail margins
+exceed the prescribed20% cap: **do not approve a candidate/default from these
+gates**. More controls/data are required, not margin relaxation or trimming.
+This is fresh evidence, not the historical orphan-saturation condition.
+
+First-pair whole-host busy cores are1.779382/1.975681 including the VMM;
+CPU8busy0.706891/0.691800 plus iowait0.265188/0.264255, SMT siblingCPU9
+busy0.027347/0.025345; steal0. These aggregate/per-CPU controls neither inspect
+other tasks nor establish total attributable kernel CPU. All20controls are in
+`aa-host-controls-analysis.json`.5,531,467,776bytes are free after the series.
+
+Frozen recipes/raw registration/series/gates:
+`.perf/blk-io/quiet-1/e2/flush/{executed-aa-fio.py,aa-registration.json,aa-series.json,frozen-gates.json}`.
+An alternate newly registered **matched current force-sync** regime will
+fdatasync only its own copied run image and fsync its own directory before VMM
+launch, keeping exact guest inputs/ramp/cache flags/compiler fixed. This
+eliminates unaccounted copied-input writeback before attempting another
+profile/A/A; it is not a global cache drop or VMM optimization. Preserve the
+completed unfenced epoch separately. PID/start-time checked pidfd cleanup
+also closes the helper's bare-PID check-to-signal race; it does not change
+the guest or a measured workload window.
+
+The helper revision executes **13/13** focused tests, including real owned
+pidfd delivery and stale-start-time refusal. The intermediate read-fault
+revision executes Debug/Safe **45/45units +8/8real KVM +7/7enforced-jail**
+cases each, with explicit frozen kernel selection. A later Linux per-read
+transfer-cap edge adds a46th unit and is still awaiting validation; these
+45-case results do not attest that newer source. The initial missing-kernel
+fixture attempt (five errors) and rejected Zig frontend cache option
+(zero tests) remain separate failed logs, not passing executions.
 
 ## What was implemented
 

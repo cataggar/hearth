@@ -80,7 +80,10 @@ class JailedApi(blk.OwnedVm):
                     if self.process.poll() is not None or time.monotonic() > deadline:
                         raise
                     time.sleep(0.02)
-            blk.save_json(self.path / "pid.json", {"vmm_pid": self.pid})
+            self.pid_starttime = blk.start_time(self.pid, self.jailed)
+            blk.save_json(self.path / "pid.json", {
+                "vmm_pid": self.pid, "vmm_starttime": self.pid_starttime,
+            })
             return self
         except BaseException:
             self.close()

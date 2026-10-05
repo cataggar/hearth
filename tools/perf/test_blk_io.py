@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import subprocess
 import socket
 import struct
 import unittest
@@ -123,6 +124,63 @@ class PerfCacheTests(unittest.TestCase):
             target.rmdir()
             root.rmdir()
 
+
+class PreparedImageTests(unittest.TestCase):
+    def test_copy_fence_precedes_launch(self):
+        path = mock.MagicMock(spec=Path)
+        events = []
+        vm = MODULE.OwnedVm(path, 8, jailed=False, sync_fixture=True)
+        def stop_before_vm(*args, **kwargs):
+            events.append("spawn")
+            raise OSError("stop before VM")
+
+        with mock.patch.object(MODULE.subprocess, "run"), \
+                mock.patch.object(MODULE.socket, "socket"), \
+                mock.patch.object(MODULE, "fence_prepared_image",
+                                  side_effect=lambda _: events.append("fence")), \
+                mock.patch.object(MODULE.subprocess, "Popen",
+                                  side_effect=stop_before_vm):
+            with self.assertRaisesRegex(OSError, "stop before VM"):
+                vm.__enter__()
+        self.assertEqual(events, ["fence", "spawn"])
+
+    def test_copy_fence_failure_never_launches(self):
+        path = mock.MagicMock(spec=Path)
+        vm = MODULE.OwnedVm(path, 8, jailed=False, sync_fixture=True)
+        with mock.patch.object(MODULE.subprocess, "run"), \
+                mock.patch.object(MODULE, "fence_prepared_image",
+                                  side_effect=OSError("owned copy sync failed")), \
+                mock.patch.object(MODULE.subprocess, "Popen") as spawn:
+            with self.assertRaisesRegex(OSError, "owned copy sync failed"):
+                vm.__enter__()
+            spawn.assert_not_called()
+
+    def test_stale_recorded_pid_is_not_signaled(self):
+        process = subprocess.Popen(
+            [MODULE.sys.executable, "-I", "-B", "-S", "-c", "import time; time.sleep(60)"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        stamp = MODULE.start_time(process.pid)
+        try:
+            self.assertFalse(MODULE.signal_owned_pid(process.pid, stamp + 1, 15))
+            self.assertIsNone(process.poll())
+        finally:
+            MODULE.signal_owned_pid(process.pid, stamp, 15)
+            process.wait(timeout=5)
+
+    def test_recorded_owned_pidfd_signal_is_delivered(self):
+        process = subprocess.Popen(
+            [MODULE.sys.executable, "-I", "-B", "-S", "-c", "import time; time.sleep(60)"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        stamp = MODULE.start_time(process.pid)
+        try:
+            self.assertTrue(MODULE.signal_owned_pid(process.pid, stamp, 15))
+            self.assertEqual(process.wait(timeout=5), -15)
+        finally:
+            if process.poll() is None:
+                MODULE.signal_owned_pid(process.pid, stamp, 9)
+                process.wait(timeout=5)
 
 if __name__ == "__main__":
     unittest.main()
