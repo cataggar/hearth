@@ -92,3 +92,31 @@ bundle and extraction manifest are under
 `.perf/blk-io/canonical-prerequisite/jail-after-f2.bundle` and
 `.perf/blk-io/canonical-prerequisite/f2-forward-bridge.json`; peer convergence
 remains pending until application and fresh acceptance are acknowledged.
+
+Already-f2/5ee histories needing only supplementary-group reconciliation can
+instead use `fede9ba2fba736d151b53b0b17b45428cc1473b8`, exact parent
+`5ee81b163b266f9c7643fb67c88cb59fe7aa2878`. Its only runtime change is the
+checked group-clear before GID/UID drop; the two other changed files are the
+same standalone fixture and contract. It does not touch seccomp, so an owned
+conditional blocking-poll overlay remains independently reviewable. All five
+common jail/seccomp/unit/fixture/contract blobs match canonical `7dfee42`.
+Clean histories must still take `7dfee42`, not these historical forward chains.
+
+On October5 a fresh locked check reused the SHA-verified canonical LLVM static
+Debug/Safe executables and unchanged standalone fixture: **1/1 actual enforced
+API child-credential case per mode, 2/2 total**, two actual VMM tasks. Each
+bootstrap deliberately inherited root group0; every observed VMM task had
+configured UID/GID, empty groups, zero effective caps, NNP1 and Seccomp2.
+Private KVM access and six checked PUT/GET exchanges per mode passed. Recorded
+owned PID paths, private nodes and sockets were gone after both cases. These
+were not guest boots, new unit executions, peer-overlay/native/GNU acceptance,
+or performance measurements.
+
+Exact command and fresh rows are retained privately as
+`recheck-child-groups.py`, `groups-current-run.log`,
+`groups-current-{debug,safe}.log` and `groups-current-results.json` in the
+canonical-prerequisite directory. The bounded phase used the common exclusive
+fleet lock; copied fixtures remained project-relative and each admission
+required at least64MiB available space. The corresponding group-only bundle is
+`jail-groups-after-5ee.bundle`; its custody manifest is
+`groups-forward-bridge.json`.
