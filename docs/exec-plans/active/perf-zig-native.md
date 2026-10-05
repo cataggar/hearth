@@ -128,6 +128,12 @@ bytes; no active cache/frozen input is discarded. Resume with durable artifact
 capacity, retaining4GiB/3GiB guards. Failure records are
 `postcleanup-summary/canonical-bridge-storage-attempt{1,2,3}.json`.
 Canonical correctness convergence is not optimization adoption.
+A fourth standalone-only alternative checks512MiB inside the exclusive lock;
+actual locked capacity is9,588,736B, so it aborts before any output/fixture
+directory or compiler/test/VM. Zero accepted cases, no owned resource or held
+lock. `canonical-bridge-storage-attempt4.json` preserves this direct proof;
+the missing prerequisite is durable capacity, not a runtime repair or assumed
+quieter machine. Do not weaken512MiB correctness or4GiB/3GiB measurement guards.
 Retained deny cases are BPF-evaluator assertions in the32-unit suite, not
 real-kernel negative child executions. The separate three-case fixture supplies
 actual enforced API/CLI permissions/disk/all-task-identity acceptance.

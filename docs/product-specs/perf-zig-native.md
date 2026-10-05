@@ -215,6 +215,15 @@ inputs/active caches are removed. Actual phase failures are indexed in
 `postcleanup-summary/canonical-bridge-storage-attempt{1,2,3}.json`.
 Resume these correctness cases with durable capacity at locked launch; the
 4GiB build/3GiB runtime guards and all eligibility gates remain unchanged.
+A fourth practical alternative bypasses only the generic accounting wrapper,
+using the same standalone command/named ELFs and checking512MiB **inside**
+the exclusive lock immediately before launch. The actual locked filesystem
+has only **9,588,736 bytes free**; that attempt aborts before creating a
+fixture/output directory or launching a compiler/test/VM. Zero cases execute.
+This confirms the missing durable capacity rather than merely relying on an
+outside-lock observation. The exact result is retained in
+`postcleanup-summary/canonical-bridge-storage-attempt4.json`; no phase/helper,
+socket or lock remains, and no guard is relaxed.
 The denied-syscall/argument cases in the32-unit suite are **BPF-evaluator unit
 assertions**, not real-kernel negative child executions. Actual enforced-filter
 API/CLI permission, disk and all-task identity acceptance comes separately from
