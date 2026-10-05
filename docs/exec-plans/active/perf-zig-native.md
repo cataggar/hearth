@@ -148,6 +148,13 @@ directory creation under the fleet lock, before any manifest/VM/runtime row.
 Completed v5 correctness remains valid; no backend rejection or runtime pass
 is inferred. All owned phases end. Durable profile/measurement storage remains
 necessary, with unchanged3GiB guard and separate new identities/epochs.
+V8 continues the original runtime/stat pilots and a separately frozen ten-pair
+safe reference A/A, with258 pinned source/package hashes and the owned-only
+recorder epoch. Manifest creation succeeds, then actual3GiB/4GiB capacity
+guards refuse before any VM/build row. Original512MiB source remains pristine.
+`postcanonical-v8-capacity-refusals.json` retains exact errors; do not call zero
+new rows a zero-cost/cached profile, unsupported backend or complete execution.
+No #3 Azure/runtime/host measurement or other peer evidence is inherited.
 Retained deny cases are BPF-evaluator assertions in the32-unit suite, not
 real-kernel negative child executions. The separate three-case fixture supplies
 actual enforced API/CLI permissions/disk/all-task-identity acceptance.

@@ -252,6 +252,16 @@ before any runtime manifest/VM/guest row exists. This does not invalidate the
 completed v5 correctness or count as a backend failure. All owned phases end;
 resume profiles/measurement only with durable artifact capacity, with new
 current-script identities and no automatic pooling of earlier epochs.
+The next **v8 original-work continuation** successfully freezes runtime
+manifests and258 exact source/package hashes for a new ten-pair safe unchanged
+cold/warm/codegen-fragment A/A epoch. Both requested phases then refuse actual
+locked capacity before measurement: runtime retains the3GiB guard; build A/A
+retains the4GiB guard. **Zero v8 VM or build-measurement rows execute.**
+Manifest creation is not a successful profile or cached test/benchmark result.
+The original512MiB source hash remains pristine. Exact errors/manifests are
+indexed by `postcleanup-summary/postcanonical-v8-capacity-refusals.json`;
+no old/new recorder pooling, unsupported-backend classification, peer Azure/
+runtime evidence, default change or guard relaxation is inferred.
 The denied-syscall/argument cases in the32-unit suite are **BPF-evaluator unit
 assertions**, not real-kernel negative child executions. Actual enforced-filter
 API/CLI permission, disk and all-task identity acceptance comes separately from
