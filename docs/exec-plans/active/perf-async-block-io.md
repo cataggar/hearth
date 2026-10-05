@@ -95,6 +95,16 @@ cases+2additional actual Safe jailed CLI/API cases. Exact current counts,
 commands/raw paths/source hashes/custody and limitations are in results.
 The implementation todo is blocked, not done; this plan remains active.
 
+After the parent reports residual aggregate background8.733/16cores, retain
+all original/noisy epochs and no unowned task intervention or own-UID CPU
+attribution. New current-head Safe correctness executes8KVM+14helper+1actual
+restored-state lifecycle case, all pass;46unit results are cached in this
+phase, not newly executed. Identical c734Safe ELF and VMM/helper source
+equality preserve exact provenance. All23latest-ELF launch records are gone
+with nodes/sockets removed. ENOSPC custody-write failure remains; verified
+restored-side duplicates alone are removed and recovered custody persisted.
+Draft/default/blocker decisions stay unchanged; see the report addendum.
+
 The project-local integration kernel option and capability/diagnostic tooling
 are implemented and executed. Debug/safe unit suites each execute 31 tests;
 debug/safe existing integration suites each execute seven, including actual

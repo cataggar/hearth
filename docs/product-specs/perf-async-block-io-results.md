@@ -337,6 +337,38 @@ It records c734runtime/9f39518source provenance and includes originals,
 failed attempts, distributions, compressed raw bytes and executed drivers;
 it is not a claim that incomplete rows pass.
 
+### Current-head correctness continuation after residual-load report
+
+At02:26UTC the parent reports a new locked aggregate`/proc/stat` control of
+about8.733/16busy cores. That is **parent-reported background context**, not
+this agent's measurement or attributable worker CPU. Own-UID task deltas
+contain unrelated active workloads and are not a total-cost attribution
+method. No jobs are killed/moved; old16-core saturation remains historical.
+Do not compare pre/post-cleanup samples as an optimization or relax gates.
+
+Current HEAD`fb76e92` has byte-identical VMM sources to validated c734 and
+byte-identical helper sources to9f39518. A fresh locked Safe phase executes
+**8/8real KVM integrations,14/14helper cases,1/1actual enforced-jail lifecycle
+case** (three pause/resume cycles and fresh API+CLI restored guest counters),
+all pass. **The46-unit runner is cached, not re-executed in this phase**;
+retain its earlier actual source-proof counts without inventing new executions.
+Fresh Safe ELF remains exactly`baadc7e8…`; no compiler/features/backend change.
+
+The first post-phase custody write again encounters ENOSPC; its incomplete
+file remains. Resource predicates already pass. Two exact successful restored-
+side copies are SHA-compared with their retained original and removed
+(1,073,778,688allocated bytes), never a failed/original input. Recovered custody
+audits **all23latest-ELF launch records** with zero live PID paths/nodes/sockets.
+The PR remains draft, the issue blocked and default synchronous.
+
+Commands/raw addendum:
+`.perf/blk-io/quiet-1/current-head-safe-proof-{zig,helper,lifecycle}.log`,
+`current-head-restore-duplicates.json`,
+`current-head-proof-custody-recovered.json` SHA256
+`18d531eb47f69653b0338500aff920af2175e5d2120e864cdfed9750c30c9197`.
+This addendum does not replace the earlier immutable1,238-file seal or turn
+missing performance/liveness/matrix/attribution acceptance into a pass.
+
 ## What was implemented
 
 The original diagnostic integration suite accepts `-Dintegration-kernel=<path>` relative to
