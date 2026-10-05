@@ -192,6 +192,17 @@ all-task identities, exact hashes and ordinary/fault cleanup records are in
 v5 forced/standalone counts are not relabelled newly executed; all size,
 GNU/default, safe-A/A and full profiling/runtime blockers remain.
 
+### Positional CLI fixture follow-up
+
+Import only the one-line `test_jail_baseline.py` change from `7efea146`, removing
+the unsupported ignored `--cmdline` token while retaining its positional
+string and all `98b10c21` cleanup hardening. Do not import that publication's
+other files/runtime. Validate only the existing CLI guest-disk case in four
+separate locked cells against the unchanged named ELFs and512MiB guard.
+Status: selected, validation pending. Keep the prior16-case cleanup cohort
+separate; report four targeted cases, exact launch argv/actual cmdline and
+all-task/owned teardown, not renewed full matrix or performance.
+
 ## Evidence and fixed scope
 
 The spec records inspected definitions at Hearth

@@ -329,6 +329,22 @@ The completed v5 forced counts and all zero-row capacity failures remain
 unchanged. No current-script runtime profile, default/GNU acceptance, native
 size waiver or performance adoption follows from this helper-only epoch.
 
+### Positional CLI fixture correction
+
+Select only the one-line fixture diff from shared publication `7efea146`:
+remove the unsupported redundant `--cmdline` token, retaining the existing
+positional `console=ttyS0 reboot=k panic=1 pci=off rdinit=/init` string. Current
+`main.zig` recognizes struct flags and selects positional strings containing
+`=`; the extra token was ignored after the kernel/initrd positions. This does
+not introduce a CLI option, change the selected guest command line or import
+any #3 eventfd/queue/IRQ/runtime source. Keep the `98b10c21` cleanup-fault fix.
+
+Run only the existing CLI guest-disk testcase on the four immutable static
+Debug/safe × LLVM/native ELFs, with the unchanged locked512MiB guard and
+separate source/fixture hashes. Validation is pending. Any passing four CLI
+cases remain a new targeted epoch, not a new16-case full fixture suite,
+forced32+7 compilation or default/transport/performance acceptance.
+
 This is an experiment specification, not a benchmark result
 or decision to change defaults. The compiler migration in
 [#5](https://github.com/cataggar/hearth/pull/5) is complete.

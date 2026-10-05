@@ -129,7 +129,7 @@ class OwnedJail:
                 args += ["--api-sock", "api.sock"]
             else:
                 args += ["/bzImage", "/initrd.cpio.gz", "--disk", "/disk.raw",
-                         "--cmdline", "console=ttyS0 reboot=k panic=1 pci=off rdinit=/init"]
+                         "console=ttyS0 reboot=k panic=1 pci=off rdinit=/init"]
             tracer = os.environ.get("FLINT_JAIL_TEST_STRACE")
             if tracer:
                 args = [tracer, "-f", "-o", str(self.path / "startup.strace"), *args]
