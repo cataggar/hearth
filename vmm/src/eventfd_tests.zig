@@ -539,6 +539,17 @@ test "real KVM masked IOAPIC level holds pending work and fences reset epochs" {
     }.run);
 }
 
+test "real KVM IOAPIC EOI before transport ACK preserves completion for line and irqfd" {
+    try isolated(struct {
+        fn run() !void {
+            for ([_]bool{ false, true }) |accelerated| {
+                for ([_]bool{ false, true }) |level|
+                    try irqScenario(.{ .accelerated = accelerated, .level = level, .ioapic = true, .eoi_first = true });
+            }
+        }
+    }.run);
+}
+
 test "real KVM irqfd wakes timer-free HLT with used-before-IRQ and edge ACK" {
     try isolated(struct {
         fn run() !void {

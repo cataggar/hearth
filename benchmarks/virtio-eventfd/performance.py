@@ -132,7 +132,9 @@ def child(args):
             "storage": "fresh16MiB raw0xA5 disk; guest O_DIRECT QD1, host buffered pread/pwrite+fdatasync; no global cache manipulation",
             "network": "private namespace,192.0.2.0/30,MTU1500,offloads0,no uplink/NAT",
             "warmup": "checked agent/PTY plus64B TCP/vsock then1s silence",
-            "samples": "five10s primary windows" if args.long_primary else "17 fixed workload cells; every count in result",
+            "samples": "five10s primary windows" if args.long_primary else "17 sustained workload cells; every count in result",
+            "minimum_nonidle_seconds": args.minimum_seconds,
+            "cpu_accounting": "sum of owned task schedstat execution nanoseconds; ticks retained; generation/roster checked",
             "agent_poll_ms": 50, "heartbeat_ms": 0, "disk_seed": "0x31415926 LCG, raw offsets1MiB..9MiB",
             "runner_sha256": bench.digest(Path(__file__)), "control_sha256": bench.digest(Path(control.__file__)),
             "observer_sha256": bench.digest(bench.ROOT / "tools/perf/irqfd_cpu.py"),
@@ -146,6 +148,11 @@ def child(args):
             gates = json.loads(bench.artifact_path(args.gates).read_text())
             if gates["binary_sha256"] != bench.digest(binary) or gates["fixture_sha256"] != bench.digest(fixture / "fixture.json"):
                 raise ValueError("gates/source fixtures changed")
+            if gates["status"] != "noise-provisionally-acceptable":
+                raise ValueError("fresh C00 A/A noise gates have not passed")
+            manifest = json.loads((out / "manifest.json").read_text())
+            if any(manifest.get(key) != value for key, value in gates["baseline_conditions"].items()):
+                raise ValueError("candidate conditions differ from frozen current baseline")
             result["frozen_gates_sha256"] = bench.digest(bench.artifact_path(args.gates))
         started = time.monotonic()
         guest = control.Guest.__new__(control.Guest)
@@ -166,12 +173,16 @@ def child(args):
             client_before = time.process_time()
             started = time.monotonic()
             latency, byte_count, checked = workload(guest, tcp, name)
-            if args.long_primary:
-                while time.monotonic() - started < 10:
+            minimum = 10 if args.long_primary else args.minimum_seconds
+            batches = 1
+            if name != "idle":
+                while time.monotonic() - started < minimum:
                     more, size, _ = workload(guest, tcp, name)
                     latency.extend(more)
                     byte_count += size
-                checked["long_window_minimum_seconds"] = 10
+                    batches += 1
+            checked["verified_batches"] = batches
+            checked["window_minimum_seconds"] = minimum
             operation_seconds = time.monotonic() - started
             time.sleep(.1)
             seconds = time.monotonic() - started
@@ -227,9 +238,23 @@ def child(args):
 
 def freeze(args):
     source = bench.artifact_path(args.baselines)
-    samples = [json.loads(path.read_text()) for path in sorted(source.glob("aa-*/result.json"))]
+    paths = sorted(source.glob("aa-*/result.json"))
+    samples = [json.loads(path.read_text()) for path in paths]
     if len(samples) < 5 or any(sample["status"] != "passed" or sample["mode"] != "C00" for sample in samples):
         raise ValueError("at least five actually passing untouched functioning-control repetitions required")
+    manifests = [json.loads(path.with_name("manifest.json").read_text()) for path in paths]
+    expected_binary = bench.digest(bench.artifact_path(args.binary))
+    expected_fixture = json.loads((bench.artifact_path(args.fixture) / "fixture.json").read_text())
+    conditions = ("minimum_nonidle_seconds", "cpu_accounting", "runner_sha256",
+                  "control_sha256", "observer_sha256", "observer_object_sha256",
+                  "source_files_sha256", "cpus", "client_cpus", "vcpus", "ram_mib")
+    if any(manifest["binary_sha256"] != expected_binary or manifest["fixture"] != expected_fixture
+           or any(manifest.get(key) != manifests[0].get(key) for key in conditions)
+           for manifest in manifests):
+        raise ValueError("baseline conditions changed; do not freeze mixed A/A")
+    if any(manifest.get("minimum_nonidle_seconds", 0) < 5 or not manifest.get("cpu_accounting")
+           for manifest in manifests):
+        raise ValueError("fresh sustained nanosecond-accounted baselines required")
     noise = {}
     for name in WORKLOADS:
         rows = [next(row for row in sample["rows"] if row["name"] == name) for sample in samples]
@@ -248,6 +273,7 @@ def freeze(args):
         "fixture_sha256": bench.digest(bench.artifact_path(args.fixture) / "fixture.json"),
         "baseline_result_sha256": {str(path.relative_to(bench.ROOT)): bench.digest(path) for path in sorted(source.glob("aa-*/result.json"))},
         "primary": "disk-flush-4096", "samples": len(samples), "noise": noise, "exceeds_noise_caps": exceeds,
+        "baseline_conditions": {key: manifests[0][key] for key in conditions},
         "candidate_order": [["C10", "C01", "C11"], ["C01", "C11", "C10"], ["C11", "C10", "C01"],
                             ["C01", "C10", "C11"], ["C11", "C01", "C10"]],
         "gates": {"benefit_percent": 10, "paired_confidence": .95, "mechanism_reduction_percent": 90,
@@ -283,6 +309,7 @@ def namespace(args):
         argv += ["--gates", args.gates]
     if args.long_primary:
         argv += ["--long-primary"]
+    argv += ["--minimum-seconds", str(args.minimum_seconds)]
     child_process = subprocess.Popen(argv, cwd=bench.ROOT, preexec_fn=demote)
     try:
         return child_process.wait(timeout=330)
@@ -309,6 +336,7 @@ def main():
     parser.add_argument("--baselines")
     parser.add_argument("--gates")
     parser.add_argument("--long-primary", action="store_true")
+    parser.add_argument("--minimum-seconds", type=bench.positive_float, default=5)
     args = parser.parse_args()
     if args.freeze:
         freeze(args)

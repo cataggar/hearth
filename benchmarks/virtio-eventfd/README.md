@@ -51,7 +51,12 @@ timeout 120 flock -x /d/hearth/.perf/fleet/host.lock \
 ```
 
 Every output directory must be new/exclusive; never overwrite a baseline.
-Historical build19 hashes remain the performance pins. The shared-filter
+Historical build19 hashes remain the historical performance pins. Fresh
+post-cleanup A/A instead uses separately frozen corrected Safe d0beacf;
+current correctness-only Safe8f1ca382/Debugccd6f4fb must not relabel those
+measurements. New sustained nanosecond-accounted windows cannot pool with
+old short/tick windows. Fresh13/16-class noise failure prevents candidate
+performance collection. The shared-filter
 follow-up builds a separate binary under `.perf/eventfd/w5/shared-filter/`;
 its fresh correctness runs do not reclassify the old performance captures.
 
@@ -65,6 +70,16 @@ its fresh correctness runs do not reclassify the old performance captures.
   controller credentials, and checks every actual VMM task's enforced filter.
   TAP is admitted with the real pre-jail `--tap` argument, not permission
   widening after API configuration.
+* `mixed_scale.py`: four/eight real enforced sandboxes, each in its own private
+  TAP namespace, sharing the fixed CPU8 VMM budget and CPU1 traffic budget.
+  All sandboxes must reach verified outstanding disk/TAP/vsock barriers before
+  common release; loaded exec/PTY,128×64KiB messages per transport, pause/resume,
+  whole-disk integrity and graceful joins are mandatory. This is correctness,
+  not candidate performance, and the unchanged agent still polls every50ms.
+  For example, under a bounded fleet lock:
+  `python3 benchmarks/virtio-eventfd/mixed_scale.py --out <new-owned-directory>
+  --binary <pinned-flint> --fixture .perf/eventfd/fixtures/all-device-perf
+  --mode C00 --count 4`. No snapshot image copies or uplink/NAT are created.
 * `performance.py`:17 matched classes,60-second idle, raw operation arrays,
   all live VMM task CPU and scoped kernel IRQFD work. Collect C00 repetitions
   first; `--freeze --baselines <directory>` with the same `--binary`,

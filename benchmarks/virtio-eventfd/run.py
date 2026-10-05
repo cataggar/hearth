@@ -146,12 +146,15 @@ def thread_roster(pid):
         stat = (task / "stat").read_text()
         # comm can contain spaces and parentheses; fields start after its final ')'.
         fields = stat[stat.rfind(")") + 2 :].split()
+        scheduling = (task / "schedstat").read_text().split()
         result.append(
             {
                 "tid": tid,
                 "comm": (task / "comm").read_text().strip(),
                 "utime_ticks": int(fields[11]),
                 "stime_ticks": int(fields[12]),
+                "start_ticks": int(fields[19]),
+                "cpu_runtime_ns": int(scheduling[0]),
                 "affinity": sorted(os.sched_getaffinity(tid)),
             }
         )
@@ -162,6 +165,15 @@ def cpu_delta(before, after):
     if {row["tid"] for row in before} != {row["tid"] for row in after}:
         raise ValueError("thread roster changed during sample; invalidate, do not omit CPU")
     old = {row["tid"]: row for row in before}
+    if any("cpu_runtime_ns" in row for row in before + after):
+        if not all("cpu_runtime_ns" in row and "start_ticks" in row for row in before + after):
+            raise ValueError("mixed CPU accounting models; invalidate sample")
+        if any(row["start_ticks"] != old[row["tid"]]["start_ticks"] for row in after):
+            raise ValueError("thread generation changed during sample")
+        elapsed = [row["cpu_runtime_ns"] - old[row["tid"]]["cpu_runtime_ns"] for row in after]
+        if any(value < 0 for value in elapsed):
+            raise ValueError("owned CPU execution counter reset")
+        return sum(elapsed) / 1e9
     ticks = sum(
         row["utime_ticks"] + row["stime_ticks"]
         - old[row["tid"]]["utime_ticks"] - old[row["tid"]]["stime_ticks"]

@@ -25,9 +25,10 @@ mode, numeric gate, or default promotion had been selected in the published W0.
 The parent's continuation instruction now authorizes W1: per-device blocking
 owners are implemented in C00, with real no-heartbeat integrity/lifecycle
 evidence. The independent accelerator modes now pass focused real KVM and Linux
-integrity/lifecycle checks. Five C00 controls (85 cells) froze numeric gates
-before candidate measurements; every non-idle class exceeds a noise cap.
-Longer primary diagnostics suggest19–24% known-CPU reductions, but lack
+integrity/lifecycle checks. Historical pre-cleanup C00 controls (85 cells) froze
+numeric gates before candidate measurements; every non-idle class exceeded a
+noise cap in that historical cohort. Historical longer primary diagnostics
+suggest19–24% known-CPU reductions, but lack
 qualified paired inference and complete scheduling attribution. C10/C11 also
 show severe pause deassignment costs. Adoption gates and full stress/performance
 coverage remain incomplete; no default promotion is justified.
@@ -43,6 +44,37 @@ four modes;80 repeated active mixed fresh-process restores,64-connection/reuse
 and twelve native1/4/8-VM cells also pass. Full mixed-sandbox/performance
 qualification remains outstanding; these repairs are not eventfd acceleration. No
 performance merge or default adoption is eligible.
+
+**Fresh post-cleanup evidence (2026-10-05):** historical saturation and earlier
+candidate diagnostics are not current qualification. Five fresh C00 matrices
+pass85 integrity cells, but13/16 non-idle classes fail unchanged noise caps;
+primary FLUSH CPU/op375.383µs has17.232% CV. No fresh candidate performance
+sample was collected. Generation-checked nanosecond CPU accounting sums all
+owned tasks over sustained≥5-second non-idle cells and cannot pool with legacy
+short/tick windows. Current static-musl Safe/Debug each pass63 tests, four
+enforced-jail cases and twelve total four-mode timer-free Linux cells. Fresh
+native-only1/4/8-VM idle/concurrency checks and four IOAPIC EOI-first scenarios
+per optimization pass; they do not close mixed-device scaling or active storm
+acceptance. The linked report preserves exact pins, fresh profiles/noise,
+183 recorded absent owned PID/TID numbers and the missing helper census.
+Legacy default, fixed adoption gates and HOLD decision remain unchanged.
+
+The subsequent current-binary4/8-sandbox mixed-device correctness matrix
+passes8/8 mode/count cells (48 enforced sandboxes,12,288 checked64KiB TAP/
+vsock messages) with actual common outstanding-I/O barriers, loaded exec/PTY,
+whole-disk integrity, zero-CPU pause/resume and graceful joins. Its preserved
+failed16-message pilot is not passing; the128-message retry retains the real
+live-writer assertion. Collector/gate rejection tests pass20/20. This closes
+unrun active scaling integrity, not candidate performance/idle regressions,
+full IRQ storm/race coverage, old↔new legacy or actual save-on-halt.
+
+Actual enforced CLI save-on-halt checks now expose a mandatory failure:
+C00/C10/C01/C11 each verifies initial agent/disk/PTY integrity and reaches
+`System halted`, but fails the20-second exit/save bound with both requested
+snapshot files absent. Zero actual halt-save cases pass. Current corrected L0
+stalls in agent traffic before issuing halt and is not counted as a halt case.
+Successful API snapshots/reboot shutdown do not replace this acceptance;
+the report preserves actual flags, halt markers, errors and owned cleanup.
 
 The common restore path retains snapshot v2 and the guest reconnect policy:
 it publishes the standard `VIRTIO_VSOCK_EVENT_TRANSPORT_RESET` through the
@@ -421,6 +453,15 @@ The parent independently reported15.961/16 busy cores during a locked idle
 control, with no iowait/steal, at22:33 UTC. This is externally reported control
 evidence, not an owned baseline repetition. A quieter reserved window/host is
 still required; frozen gates remain unchanged and no default promotion occurs.
+
+The parent subsequently reports explicit user-approved cleanup of15 verified
+old orphan busy-loop shells. This is not this task's cleanup or a performance
+benefit. All earlier saturation/noisy measurements remain historical: fresh
+controlled baselines and C00 A/A must precede new gates/candidate inference.
+New short-window accounting records owned-task scheduler execution nanoseconds
+alongside legacy ticks and start times, with generation/roster/counter guards;
+nonidle cells run at least five seconds. Pin the collector/window metadata,
+and do not pool this new methodology with the old matrix.
 
 Pause also retires pending userspace MMIO/PIO through an immediate-exit
 KVM_RUN reentry before owner fences and snapshot acknowledgement. A real

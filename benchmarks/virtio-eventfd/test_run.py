@@ -11,6 +11,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+import performance
+
 SPEC = importlib.util.spec_from_file_location("eventfd_runner", Path(__file__).with_name("run.py"))
 RUNNER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RUNNER)
@@ -62,6 +64,23 @@ class EvidenceTests(unittest.TestCase):
             RUNNER.cpu_delta(before, [])
         with self.assertRaisesRegex(ValueError, "roster changed"):
             RUNNER.cpu_delta([], before)
+
+    def test_nanosecond_cpu_includes_all_threads_without_tick_quantization(self):
+        before = [
+            {"tid": 1, "start_ticks": 10, "cpu_runtime_ns": 100},
+            {"tid": 2, "start_ticks": 20, "cpu_runtime_ns": 200},
+        ]
+        after = [
+            {"tid": 1, "start_ticks": 10, "cpu_runtime_ns": 5100},
+            {"tid": 2, "start_ticks": 20, "cpu_runtime_ns": 20200},
+        ]
+        self.assertEqual(RUNNER.cpu_delta(before, after), .000025)
+        with self.assertRaisesRegex(ValueError, "generation changed"):
+            RUNNER.cpu_delta(before, [after[0], {**after[1], "start_ticks": 21}])
+        with self.assertRaisesRegex(ValueError, "counter reset"):
+            RUNNER.cpu_delta(before, [{**after[0], "cpu_runtime_ns": 99}, after[1]])
+        with self.assertRaisesRegex(ValueError, "mixed CPU accounting"):
+            RUNNER.cpu_delta(before, [{k: v for k, v in after[0].items() if k != "cpu_runtime_ns"}, after[1]])
 
     def test_framed_response_integrity(self):
         client, peer = socket.socketpair()
@@ -178,6 +197,78 @@ class EvidenceTests(unittest.TestCase):
             self.assertTrue(all(group["executed_runs"] == 1 for group in report["groups"]))
         finally:
             shutil.rmtree(root)
+
+
+class FrozenGateTests(unittest.TestCase):
+    def setUp(self):
+        self.root = RUNNER.ROOT / ".perf/eventfd/results" / f"freeze-unit-{RUNNER.os.getpid()}"
+        self.root.mkdir(parents=True, mode=0o700, exist_ok=False)
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def test_short_old_or_mixed_baselines_cannot_freeze(self):
+        binary, fixture = self.root / "binary", self.root / "fixture"
+        binary.write_bytes(b"pinned")
+        fixture.mkdir(mode=0o700)
+        RUNNER.save_json(fixture / "fixture.json", {})
+        manifest = {
+            "binary_sha256": RUNNER.digest(binary), "fixture": {},
+            "minimum_nonidle_seconds": 5, "cpu_accounting": "schedstat ns",
+            "runner_sha256": "runner", "control_sha256": "control",
+            "observer_sha256": "observer", "observer_object_sha256": "object",
+            "source_files_sha256": {}, "cpus": [8], "client_cpus": [1],
+            "vcpus": 1, "ram_mib": 512,
+        }
+        directories = [self.root / f"aa-{index}" for index in range(5)]
+        for directory in directories:
+            directory.mkdir(mode=0o700)
+            RUNNER.save_json(directory / "result.json", {"status": "passed", "mode": "C00"})
+        args = SimpleNamespace(baselines=self.root, binary=binary, fixture=fixture,
+                               out=self.root / "gates.json")
+        for update, error in (
+            ({"minimum_nonidle_seconds": 1}, "sustained"),
+            ({"cpu_accounting": None}, "sustained"),
+            ({"binary_sha256": "different"}, "conditions changed"),
+            ({"cpus": [9]}, "conditions changed"),
+        ):
+            with self.subTest(update=update):
+                for directory in directories:
+                    RUNNER.save_json(directory / "manifest.json", {
+                        **manifest, **(update if directory == directories[0] or "sustained" in error else {}),
+                    })
+                with self.assertRaisesRegex(ValueError, error):
+                    performance.freeze(args)
+                self.assertFalse(args.out.exists())
+
+    def test_noise_or_changed_conditions_reject_candidate_before_vm_start(self):
+        fixture, out = self.root / "fixture", self.root / "candidate"
+        fixture.mkdir(mode=0o700)
+        out.mkdir(mode=0o700)
+        RUNNER.save_json(fixture / "fixture.json", {})
+        gates = self.root / "gates.json"
+        args = SimpleNamespace(out=out, fixture=fixture, binary=self.root / "binary",
+                               gates=gates, mode="C10", long_primary=False, minimum_seconds=5)
+        for status, cpus, error in (
+            ("noise-inconclusive", [8], "noise gates have not passed"),
+            ("noise-provisionally-acceptable", [9], "conditions differ"),
+        ):
+            with self.subTest(status=status, cpus=cpus):
+                RUNNER.save_json(gates, {
+                    "binary_sha256": "hash", "fixture_sha256": "hash", "status": status,
+                    "baseline_conditions": {"cpus": cpus, "minimum_nonidle_seconds": 5},
+                })
+                with patch.object(performance.os, "geteuid", return_value=1000), \
+                     patch.object(performance.os, "sched_setaffinity"), \
+                     patch.object(performance.bench, "digest", return_value="hash"), \
+                     patch.object(performance.subprocess, "run", return_value=SimpleNamespace(stdout=b"commit\n")), \
+                     patch.object(performance.control.Guest, "__init__", side_effect=AssertionError("VM must not start")) as start_vm, \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(performance.child(args), 1)
+                    start_vm.assert_not_called()
+                result = json.loads((out / "result.json").read_text())
+                self.assertEqual(result["status"], "failed")
+                self.assertIn(error, result["errors"][0])
 
 
 if __name__ == "__main__":

@@ -4,6 +4,65 @@
 
 **Date**: 2026-10-04
 
+### Fresh post-cleanup continuation — 2026-10-05
+
+Execute new controlled baselines rather than reuse historical saturation
+or candidate diagnostics. Actual fresh five-block C00 A/A passes85 integrity
+cells but fails unchanged noise caps in13/16 non-idle classes; primary FLUSH
+CPU/op375.383µs has17.232% CV. No fresh candidate samples were collected.
+The nanosecond all-owned-task collector and generation guards pass18 tests;
+all non-idle windows are sustained at least five seconds. Fresh untouched-L0
+stat/stacks/supported KVM traces and decoded attribution remain separately
+heartbeat-labeled diagnostics. The unsupported scheduler CLI request failed
+before VM startup, not as a correctness result.
+
+Current static-musl Safe/Debug each pass63 tests (39 units+17 dedicated+7
+existing integrations), four jail cases, and twelve total four-mode timer-free
+Linux cells on separately pinned new executables. Four new IOAPIC EOI-first
+scenarios per optimization pass; full congestion/storm coverage stays open.
+Fresh native-only1/4/8-VM sixty-second idle/concurrency controls pass, not the
+required full mixed-device scaling matrix.
+
+The linked report's fresh seal preserves358 files, verifies26 supervisor
+cleanup receipts and183 recorded owned PID/TID numbers absent; the perf/BPF
+helper creation census was not recorded. No unrelated work was inspected,
+terminated or moved. Keep this plan active and PR draft: fresh performance
+noise, complete marginal kernel CPU, mixed-device4/8 scaling, full active IRQ
+races, old↔new legacy compatibility and actual save-on-halt remain unresolved.
+
+Next bounded correctness phase launches4/8 real enforced sandboxes for each
+mode, with one private TAP namespace and16MiB backing per sandbox. An actual
+outstanding disk/TAP/vsock barrier in every sandbox precedes a shared release;
+check loaded exec/PTY, all payloads, disk completion/checksum, pause/resume and
+graceful owner join. Record controller PID generations and teardown receipts.
+This is correctness only, uses no snapshot image copies, and does not bypass
+failed candidate performance gates or replace separate native true-HLT idle.
+
+Actual execution now passes8/8 cells across four modes ×4/8 sandboxes,
+48 enforced guests,12,288 checked64KiB payload messages, loaded exec/PTY,
+whole-disk integrity, acknowledged zero-CPU pause and graceful joins.
+The first4-C00 pilot failed its live-writer recheck when16-message batches
+drained during peer boot; the128-message retry preserves that assertion and
+passes. It is a harness correction, not a runtime gain; failed pilot retained.
+Collector/gate guard tests now pass20/20. Mixed active integrity is no longer
+unrun; matched scaling performance/idle comparison remains unqualified.
+
+Also execute the actual supported CLI `--save-on-halt --vmstate-path /state
+--mem-path /memory` flags on the current corrected legacy/control modes.
+An actual guest `/bin/busybox halt -f`, persisted block marker and kernel halt
+serial marker must precede checking file creation and bounded process exit.
+Do not infer this path from API snapshots or ordinary reboot/triple-fault
+shutdown. Preserve timeout/absent-file failures and stop only the recorded
+owned VM through its generation-checked existing teardown helper.
+
+Actual result: C00/C10/C01/C11 each reaches `System halted` after initial
+agent/disk/PTY integrity, but none exits/saves within20 seconds and both
+requested files are absent. Four actual cases fail, zero pass; current
+corrected L0 times out in initial agent traffic before halt, separately
+classified. Preserve these failures as mandatory blockers, not skips or
+accelerator-specific causation. Generation-checked owned teardown completed;
+all recorded owned process numbers are absent at the halt evidence seal.
+
 ### Parent-requested focused correctness continuation,22:33 UTC
 
 The parent independently measured **15.961/16 visible busy cores** during a
@@ -128,6 +187,38 @@ Filesystem changes from other tasks are not attributed to these cleanups.
 **Spec**: [VirtIO eventfd experiment](../../product-specs/perf-virtio-eventfd.md)
 
 ## Outcome and boundaries
+
+### Fresh qualification after approved orphan cleanup
+
+On2026-10-05 the parent reports user-approved termination of15 specifically
+revalidated pre-fleet orphan busy-loop shells. This task did not enumerate,
+inspect or terminate those unrelated resources. Historical saturation,
+baseline noise and exploratory candidate measurements remain historical;
+none establishes the current host's qualification.
+
+Resume with a new exclusive-lock, no-owned-VM aggregate host control, then
+fresh untouched L0 diagnostics and repeated functioning C00 A/A before
+freezing a new gate receipt or measuring candidates. Keep original binaries,
+fixtures, raw evidence and policy caps immutable. Capture every current
+sample's source/runner/accounting hashes and actual host conditions.
+
+The old 100Hz per-task CPU counters quantize short windows. Before new A/A,
+record owned-task `/proc/.../schedstat` execution nanoseconds alongside ticks
+and task start times, reject roster/generation/counter changes, and measure
+at least five seconds per nonidle workload. Do not silently mix the new
+accounting/windows with old samples. Test the collector before measuring;
+retain total all-owner/vCPU CPU plus scoped asynchronous kernel work and
+explicitly disclose missing kernel dispatcher/scheduler attribution.
+
+Release the fleet lock between bounded repetitions. Helpers are owned,
+recorded, joined on success/error, and never leaked into later idle controls.
+No default, performance merge or automatic gate relaxation follows cleanup.
+
+After these fresh baseline repetitions, add an actual LAPIC/IOAPIC
+EOI-before-transport-ACK oracle for edge/level across ordinary IRQ_LINE and
+IRQFD, preserving published-used observations and masked-PIC routing. Run
+both static-musl optimization suites and retain any failed oracle before a
+runtime change; do not infer active IOAPIC acceptance from PIC ordering alone.
 
 ### Parent-directed W1/W2 continuation
 

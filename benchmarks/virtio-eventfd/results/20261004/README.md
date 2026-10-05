@@ -10,11 +10,154 @@ full-window vsock buffering and a whole-VM pause fence. Initial real enforced
 timer-free integrity, active-I/O snapshot/resume and v2 new-process restore
 checks pass. C10/C01/C11 are now implemented and pass actual four-mode integrity
 and lifecycle checks, including80 actual active mixed captures/fresh restores.
-Five C00 controls (85 cells) now freeze numeric gates
-before three candidate matrices (51 cells). The frozen whole-matrix noise
-qualification fails. Longer primary windows show exploratory CPU reductions,
-not qualified speedups; ioeventfd modes also have severe pause regressions.
+Historical pre-cleanup C00 controls (85 cells) froze numeric gates
+before three candidate matrices (51 cells). That historical whole-matrix noise
+qualification failed. Historical longer primary windows showed exploratory
+CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
+regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
+
+## Fresh post-cleanup validation — 2026-10-05
+
+Historical saturation, short measurement windows and candidate diagnostics
+below are **not current qualification data**. The parent stopped only fifteen
+explicitly authorized old orphan loops; this task neither inventoried nor
+terminated unrelated work. A fresh locked five-second no-owned-VM control
+measured **5.995895 busy cores**; the parent's separate residual-load control
+reported8.733/16. Neither establishes a quiet host or attributes remaining load.
+No pre/post-cleanup comparison is claimed as an optimization.
+
+Fresh C00 A/A repetitions pass **85/85 integrity cells** across five matrices,
+but **13/16 non-idle classes fail unchanged noise caps**. Primary4096-byte
+FLUSH CPU/op averages **375.383µs**, CV17.232%; throughput averages
+9,903,250B/s, CV13.511%; p95 latency averages0.385577ms, CV11.342%.
+The receipt is `noise-inconclusive`; **zero fresh candidate performance
+samples** were collected. This is not a before/after gain or paired confidence.
+The runner now rejects candidate collection on failed frozen noise gates.
+
+Every fresh non-idle cell is sustained for at least five seconds. CPU accounting
+sums all owned backend/vCPU tasks' `schedstat` execution nanoseconds, retaining
+legacy ticks; task-generation/roster changes, decreasing counters and mixed
+accounting models fail closed. This precision correction is not a runtime
+optimization, and the new windows cannot pool with historical short windows.
+Focused collector tests pass **18/18**.
+
+Fresh untouched-L0 stat, stack and KVM/syscall trace captures use the original
+binary and separately labeled unchanged10ms diagnostic heartbeat; owned stack
+reports and trace attribution are decoded. One unsupported scheduler-event CLI
+request failed at argument parsing before VM startup; the supported KVM trace
+retry passed. PMU/non-nested limitations remain unchanged.
+
+The fifty-ping fresh L0 trace records43,693 kernel exits versus20,410
+userspace returns (20,340 PIO,70 MMIO), not interchangeable counters.
+Fourteen exact four-byte vsock queue1 notifications are attributable; eligible
+vsock IRQ_LINE calls number56, versus22,600 non-VirtIO/unattributed calls
+(GSI4 serial dominates). Trace ioctl-duration p50/p95/p99 is1/3/3.450µs,
+including tracing overhead; one entry/exit is unpaired at the window boundary.
+These are not completed-descriptor counts, unprofiled latency gates, or proof
+that eventfd can eliminate all exits/serial IRQs. The scoped cpu-clock stack
+capture has123 samples and reports zero lost samples; this short diagnostic
+does not establish full workload mechanism/marginal scheduler attribution.
+
+Fresh C00 native-only1/4/8-VM sixty-second true-HLT controls pass, with idle
+cost per sandbox **0.388178/0.325561/0.370706 one-core percentage points**.
+Each VM checks32 concurrent64KiB messages and exits gracefully with code0.
+These are not mixed-device4/8-VM qualification or candidate idle regressions.
+
+Current static-musl `zig build test eventfd-test integration-test
+-Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe|Debug --summary all` passes
+**63/63 per optimization**:39 units,17 dedicated (16 real enforced KVM plus
+one policy test), and seven existing integrations (five actual guest tests plus
+two CLI/error tests), with zero skips. Four additional actual IOAPIC scenarios
+per optimization exercise EOI before transport ACK for line/IRQFD ×edge/level.
+They do not establish full active-congestion or post-IRET storm coverage.
+New executables separately pass **four enforced-jail cases per optimization**
+and **twelve four-mode timer-free Linux cells**.
+
+Fresh A/A uses immutable Safe SHA
+`d0beacfc752f7fd2917d26c829447252490707a4c578c8f85e340f5bae2f4ea0`.
+Current correctness-only pins are Safe
+`8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e`
+and Debug
+`ccd6f4fb476925efe297aac9c21f5f30d8a0172e91a0bd35a9249a9d96955c34`;
+fresh A/A is **not relabeled as new-ELF measurement**.
+
+[Fresh receipt](post-cleanup-fresh-validation.json) and
+[358-file selected evidence](post-cleanup-fresh-validation.tar.gz) retain
+raw owned logs/results, decoded profiles, recipes and measured source.
+The seal verifies26 supervisor teardown receipts and **183 recorded owned
+PID/TID numbers absent**. Perf collectors were waited, observers completed
+STOP/closed unpinned maps/FDs, and owned TAP helpers were explicitly stopped.
+This batch did not capture every perf/BPF helper's PID creation census; it
+does not claim that stronger proof. Original private raw traces and fixtures
+are preserved, not uploaded.
+
+**Still HOLD:** fresh noise qualification, complete marginal kernel/scheduler
+CPU, full mixed-device4/8-VM acceptance, active IRQ congestion/storm races,
+old↔new legacy compatibility and actual save-on-halt remain incomplete.
+Host-glibc threaded execution remains unvalidated; static musl is the validated
+target. Gates were not relaxed, legacy stays default, and no performance
+merge/auto-merge is eligible.
+
+### Subsequent mixed-device scaling correctness
+
+The current Safe8f1ca382 executable additionally passes **8/8 actual
+four/eight-sandbox cells across C00/C10/C01/C11:48 enforced sandboxes**.
+Each sandbox has a private TAP namespace,16MiB synchronous disk and the
+unchanged agent; all share the fixed CPU8 VMM/CPU1 controller budget.
+Every sandbox must prove actual block completion and live outstanding
+TAP/vsock writers before a common release, then recheck both writer barriers.
+Loaded exec and PTY,128 numbered64KiB payloads per transport, disk producer
+completion, whole guest/host disk SHA256, zero-all-task-CPU acknowledged pause,
+resume/wake and graceful code0 owner teardown all pass.
+This checks **12,288 payload messages**, not candidate performance or true idle;
+the agent's unchanged50ms polling limitation remains explicit.
+
+The first four-C00 pilot **failed**: three sixteen-message writers drained
+while later sandboxes booted, so the assertion correctly rejected the common
+outstanding-I/O claim. Its raw failures and teardown receipts are preserved,
+not counted passing. The128-message backlog retry retains the same live-writer
+assertion. No VMM/runtime change was needed.
+
+[Mixed-scale receipt](mixed-scale-validation.json) and
+[selected evidence](mixed-scale-validation.tar.gz) supplement, rather than
+rewrite, the original fresh seal. Focused short/mixed-baseline rejection and
+failed-noise-before-VM-start tests expand the collector suite to **20/20**.
+The first mixed sealer incorrectly compared base64 PTY stdout to plain text;
+its failed diagnostic is retained and the corrected seal validates decoded
+bytes. Full active scaling integrity is now exercised; matched scaling
+performance/idle regressions, full active IRQ storm races, old↔new legacy,
+actual save-on-halt and marginal kernel CPU still prohibit adoption.
+
+### Actual CLI save-on-halt acceptance — failed, not skipped
+
+The supported CLI flags `--save-on-halt --vmstate-path /state --mem-path
+/memory` were actually executed under the enforced jail on the current
+Safe8f1ca382 executable. **C00/C10/C01/C11 each pass initial agent/PTY and
+persisted disk-marker checks, then actually reach the guest's `System halted`
+serial marker after `/bin/busybox halt -f`. All four fail the20-second CLI
+exit/save bound, with neither requested snapshot file present. Zero actual
+halt-save cases pass.** This is not inferred from successful API snapshots,
+nor specific to ioeventfd/irqfd: nonaccelerated C00 also fails.
+
+The current corrected `--virtio-mode L0` control additionally times out during
+initial agent traffic **before issuing halt**; it is not an actual halt-save
+case and is not the immutable historical L0 binary. Kernel-handled HLT does
+not itself produce the userspace `KVM_EXIT_HLT` save event. No undocumented
+guest notification or CLI/API option was invented to claim acceptance.
+
+[Halt-failure receipt](halt-acceptance-validation.json) and
+[selected actual evidence](halt-acceptance-validation.tar.gz) preserve flags,
+initial integrity, kernel halt markers, timeout/file checks and generation-
+checked owned teardown. All recorded owned processes are absent after cleanup.
+The four failures remain mandatory qualification blockers; ordinary CLI
+reboot/triple-fault shutdown and API snapshots are not substitutes.
+
+[Final current-source verification](post-cleanup-final-verification.log)
+records20/20 collector/gate tests, exact archive/receipt/ELF hashes and a clean
+diff check. The complete `SHA256SUMS` ledger is independently checked. Separate
+fresh/mixed/halt seals verify183/516/23 recorded owned PID/TID numbers absent;
+these are per-seal counts, not an asserted unique aggregate helper census.
 
 ## Parent-requested mask/reset follow-up
 
