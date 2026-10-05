@@ -51,6 +51,7 @@ REQUIRED_GAPS = [
     "actual CLI/API save-on-halt and old/new legacy compatibility",
     "matched mixed-device 4/8-sandbox performance and pure-HLT idle",
 ]
+KVM_CAPABILITIES = {"irqfd": 32, "ioeventfd": 36, "resample": 82, "immediate_exit": 136}
 
 
 class Blocked(RuntimeError):
@@ -157,6 +158,38 @@ def perf_binary():
     raise Blocked("no functional installed perf executable")
 
 
+def probe_kvm():
+    fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC)
+    try:
+        version = fcntl.ioctl(fd, 0xAE00, 0)
+        if version != 12:
+            raise Blocked("actual KVM API is not12")
+        vm_fd = fcntl.ioctl(fd, 0xAE01, 0)
+        os.close(vm_fd)
+        capabilities = {}
+        for name, number in KVM_CAPABILITIES.items():
+            try:
+                capabilities[name] = fcntl.ioctl(fd, 0xAE03, number)
+            except OSError as error:
+                raise Blocked(f"actual KVM capability {name}({number}) query failed: {error}") from error
+        return {"api_version": version, "nonroot_vm_create": True,
+                "capabilities": capabilities}
+    except OSError as error:
+        raise Blocked(f"actual KVM admission probe failed: {error}") from error
+    finally:
+        os.close(fd)
+
+
+def require_kvm_capabilities(record):
+    capabilities = record.get("capabilities", {})
+    if not isinstance(capabilities, dict):
+        raise Blocked("actual KVM capability record malformed; no downgraded candidate")
+    for name, number in KVM_CAPABILITIES.items():
+        value = capabilities.get(name)
+        if type(value) is not int or value <= 0:
+            raise Blocked(f"actual KVM capability {name}({number}) unavailable: {value!r}; no downgraded candidate")
+
+
 def host_probe():
     topology = actual_topology()
     record = {
@@ -208,19 +241,9 @@ def host_probe():
         raise Blocked("actual Azure/nesting/x86_64 identity unsuitable or unverifiable")
     if os.geteuid() == 0:
         raise Blocked("runner/controller must be nonroot")
-    fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC)
-    try:
-        version = fcntl.ioctl(fd, 0xAE00, 0)
-        if version != 12:
-            raise Blocked("actual KVM API is not12")
-        vm_fd = fcntl.ioctl(fd, 0xAE01, 0)
-        os.close(vm_fd)
-        # Numeric KVM capabilities: IRQFD32, IOEVENTFD36, IRQFD_RESAMPLE82.
-        record["kvm"] = {"api_version": version, "nonroot_vm_create": True,
-                         "capabilities": {name: fcntl.ioctl(fd, 0xAE03, number)
-                                          for name, number in (("irqfd", 32), ("ioeventfd", 36), ("resample", 82))}}
-    finally:
-        os.close(fd)
+    record["kvm"] = probe_kvm()
+    save(PUBLIC / "host.json", record)
+    require_kvm_capabilities(record["kvm"])
     perf, version = perf_binary()
     record["perf_binary_sha256"] = bench.digest(Path(perf))
     record["perf_version"] = version
@@ -237,8 +260,6 @@ def host_probe():
     record["cpu_accounting"] = {"primary": visible_cpu.SCOPE, "background_subtracted": False,
                                 "owned_detail_added": False, "owned_attribution_gaps": KERNEL_GAPS}
     save(PUBLIC / "host.json", record)
-    if not all(record["kvm"]["capabilities"].values()):
-        raise Blocked("actual KVM notification capability unavailable; no downgraded candidate")
     if record["root_perf"]["software"]["returncode"] or record["sudo_namespace"]["returncode"]:
         raise Blocked("scoped software perf or owned network namespace unavailable")
     if record["runner_environment"] != "github-hosted":

@@ -57,9 +57,38 @@ const Fixture = struct {
 };
 
 fn isolated(comptime scenario: fn () anyerror!void) !void {
+    return isolatedWithUnavailableCapability(scenario, null);
+}
+
+fn unavailableCapability(capability: u32) !void {
+    const Filter = extern struct { code: u16, jt: u8, jf: u8, k: u32 };
+    const Program = extern struct { len: u16, filter: [*]const Filter };
+    // Return0 only for the exact CHECK_EXTENSION query, then stack the
+    // production reactor filter. This models an absent host capability.
+    const filter = [_]Filter{
+        .{ .code = 0x20, .jt = 0, .jf = 0, .k = 0 },
+        .{ .code = 0x15, .jt = 0, .jf = 7, .k = @backingInt(linux.SYS.ioctl) },
+        .{ .code = 0x20, .jt = 0, .jf = 0, .k = 24 },
+        .{ .code = 0x15, .jt = 0, .jf = 5, .k = c.KVM_CHECK_EXTENSION },
+        .{ .code = 0x20, .jt = 0, .jf = 0, .k = 32 },
+        .{ .code = 0x15, .jt = 0, .jf = 3, .k = capability },
+        .{ .code = 0x20, .jt = 0, .jf = 0, .k = 36 },
+        .{ .code = 0x15, .jt = 0, .jf = 1, .k = 0 },
+        .{ .code = 0x06, .jt = 0, .jf = 0, .k = 0x00050000 },
+        .{ .code = 0x06, .jt = 0, .jf = 0, .k = 0x7fff0000 },
+    };
+    const program = Program{ .len = filter.len, .filter = &filter };
+    const privs: isize = @bitCast(linux.prctl(@backingInt(linux.PR.SET_NO_NEW_PRIVS), 1, 0, 0, 0));
+    if (privs < 0) return error.PrctlFailed;
+    const installed: isize = @bitCast(linux.seccomp(1, 0, &program));
+    if (installed < 0) return error.SeccompFailed;
+}
+
+fn isolatedWithUnavailableCapability(comptime scenario: fn () anyerror!void, capability: ?u32) !void {
     const pid: isize = @bitCast(linux.syscall0(.fork));
     if (pid < 0) return error.ForkFailed;
     if (pid == 0) {
+        if (capability) |unavailable| unavailableCapability(unavailable) catch linux.exit_group(90);
         seccomp.install(false, .reactor) catch linux.exit_group(91);
         scenario() catch |err| {
             std.debug.print("real enforced KVM scenario failed: {}\n", .{err});
@@ -72,6 +101,45 @@ fn isolated(comptime scenario: fn () anyerror!void) !void {
     std.debug.print("enforced_case child_pid={} waited={} status={}\n", .{ pid, waited, status });
     try std.testing.expectEqual(pid, waited);
     try std.testing.expectEqual(@as(i32, 0), status);
+}
+
+test "real enforced missing immediate-exit capability rejects all modes before owners" {
+    try isolatedWithUnavailableCapability(struct {
+        fn descriptors() usize {
+            var count: usize = 0;
+            for (0..128) |fd| {
+                const rc: isize = @bitCast(linux.fcntl(@intCast(fd), 1, 0));
+                if (rc >= 0) count += 1;
+            }
+            return count;
+        }
+
+        fn run() !void {
+            var fixture = try Fixture.init(&.{0xf4});
+            defer fixture.deinit();
+            for ([_]Owner.Mode{ .C00, .C10, .C01, .C11 }) |mode| {
+                var devices: [virtio.MAX_DEVICES]?Device = @splat(null);
+                devices[0] = try Device.initVsock(0x8000, 5, 43, "/unused-owned-fixture");
+                defer devices[0].?.deinit();
+                const before = descriptors();
+                var owners: Owner.Set = .{};
+                defer owners.stop();
+                try std.testing.expectError(error.EventfdCapabilityUnavailable, owners.start(
+                    &devices,
+                    1,
+                    &fixture.vm,
+                    &fixture.mem,
+                    mode,
+                    &fixture.vcpu,
+                ));
+                try std.testing.expectEqual(@as(usize, 0), owners.count);
+                try std.testing.expect(owners.vcpu == null);
+                try std.testing.expect(!owners.failed.load(.acquire));
+                try std.testing.expectEqual(before, descriptors());
+                std.debug.print("immediate_exit_unavailable mode={s} owners=0 fd_count={}\n", .{ @tagName(mode), before });
+            }
+        }
+    }.run, c.KVM_CAP_IMMEDIATE_EXIT);
 }
 
 fn notifyScenario(value: u8, narrow: bool, remove: bool) !void {

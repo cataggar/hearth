@@ -46,6 +46,11 @@ check; never clear afterwards, including API resume. Failure also wakes an
 API-paused run loop. Deterministically inject a real owner error immediately
 after admission/before KVM entry and during clear/resume for CLI/API paths;
 require bounded fatal reporting and joined owners before memory teardown.
+Every experimental C00/C10/C01/C11 owner set must require
+`KVM_CAP_IMMEDIATE_EXIT` before admitting any owner thread or resource. API12
+alone is insufficient. Hosted admission records capability136 and rejects
+zero, negative, missing or failed probes before profiling/build/workloads.
+No signal-only fallback or legacy-default admission change is allowed.
 
 Historical80-cycle receipts remain intact but no longer prove an active disk
 producer: the reviewed shell oracle can report RUNNING after a failed test.
@@ -448,8 +453,11 @@ owners and detaches registrations before closing fds, devices, VM and memory.
 Cover partial setup and failed restore; fd reuse must not turn stale events
 into notifications for another sandbox/device.
 
-Probe `KVM_CAP_IOEVENTFD`, `KVM_CAP_IRQFD` and resampling where required.
-Unsupported capabilities keep the existing path with an explicit reason.
+Probe `KVM_CAP_IMMEDIATE_EXIT` for every experimental owner set and
+`KVM_CAP_IOEVENTFD`, `KVM_CAP_IRQFD` and resampling where required.
+An explicitly requested experimental mode rejects unsupported capabilities
+with an explicit reason; it never silently falls back to legacy. Default
+legacy remains unchanged.
 Registration failures must identify request, mode, device/queue/GSI and errno;
 roll back partial assignments and diagnose permission/resource/programming
 failures, not disguise them as successful accelerated samples. Never retry

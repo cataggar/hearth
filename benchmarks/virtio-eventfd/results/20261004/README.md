@@ -20,6 +20,42 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Immediate-exit admission correction — new source, CI pending
+
+Parent accepts7aec's tested-host fatal/trigger repairs, but API12 alone
+does not prove their required `KVM_CAP_IMMEDIATE_EXIT`. Experimental
+`Set.start` now requires this capability before mutating the set or starting
+owners/resources; legacy still bypasses `Set.start`. Hosted admission records
+numeric capability136 and rejects unavailable, missing, negative/malformed
+or failed queries before profiling/build/workloads. Capability errors identify
+the exact name/number; no signal-only fallback or silently downgraded variant.
+
+The reviewed22c5 helper is already integrated asf52a487, preserving vm_cpu/
+Observer and typed exec-start-only retry; no duplicate cherry-pick or producer
+oracle is introduced. Its corrected80 epoch, current-native focused4 restores,
+original invalid80 and886's9-job CI proof remain separate historical receipts.
+
+New focused local guards execute **55/55**, skipped0, under one separately
+released bounded fleet phase (wait60s/work90s; unchanged inside-lock3GiB
+guard). Command: `python3 -m unittest discover -s benchmarks/virtio-eventfd
+-p 'test_*.py' -v`; source formatting also passes. Three new hosted cases
+exercise the actual capability query/descriptor-close path, API12-without-
+immediate-exit rejection, and contextual query failure. Final exact-CI runner,
+YAML/shell/inline-Python and10 positive/negative coverage-gate fixtures also
+pass. Private final log:
+`.perf/eventfd/immediate-exit-admission/final-local.log`; earlier actual local
+guard log remains separate.
+
+One new dedicated real-KVM regression stacks a test-only exact-capability
+query mask beneath the unchanged enforced reactor filter: return0 for136,
+then prove all four modes reject before owners/vCPU association/fd changes.
+It models an absent capability on a functioning KVM host, not a claim that
+the tested host lacks136. Ordinary isolated Safe/Debug CI now requires
+25 dedicated+7 integrations and all55 focused guards without skips/caches.
+Native compilation/execution for this new source is **pending**, not inferred
+from the local Python guards or886's older24-case CI. No hosted performance
+label/run, measurements, default change, new lifecycle qualification or merge.
+
 ## Ordinary correctness CI — dedicated coverage, not qualification
 
 The earlier eight green checks omitted `eventfd-test`. Existing ephemeral

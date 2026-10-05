@@ -33,6 +33,40 @@ def matrices():
 
 
 class HostedGuards(unittest.TestCase):
+    def test_kvm_probe_records_immediate_exit_and_closes_owned_descriptors(self):
+        with patch.object(hosted.os, "open", return_value=41), \
+                patch.object(hosted.os, "close") as close, \
+                patch.object(hosted.fcntl, "ioctl", side_effect=[12, 42, 1, 1, 1, 1]) as ioctl:
+            record = hosted.probe_kvm()
+        self.assertEqual(record["capabilities"]["immediate_exit"], 1)
+        self.assertEqual(ioctl.call_args_list[-1].args, (41, 0xAE03, 136))
+        self.assertEqual([call.args for call in close.call_args_list], [(42,), (41,)])
+        hosted.require_kvm_capabilities(record)
+
+    def test_api12_without_immediate_exit_cannot_admit_host(self):
+        for unavailable in (0, -1, None, True, "1"):
+            with self.subTest(value=unavailable):
+                record = {"api_version": 12, "nonroot_vm_create": True,
+                          "capabilities": {name: 1 for name in hosted.KVM_CAPABILITIES}}
+                if unavailable is None:
+                    del record["capabilities"]["immediate_exit"]
+                else:
+                    record["capabilities"]["immediate_exit"] = unavailable
+                with self.assertRaisesRegex(hosted.Blocked, r"immediate_exit\(136\)"):
+                    hosted.require_kvm_capabilities(record)
+        with self.assertRaisesRegex(hosted.Blocked, "malformed"):
+            hosted.require_kvm_capabilities({"capabilities": []})
+
+    def test_kvm_capability_query_failure_is_blocked_and_closes_fd(self):
+        failure = OSError("injected capability query failure")
+        with patch.object(hosted.os, "open", return_value=41), \
+                patch.object(hosted.os, "close") as close, \
+                patch.object(hosted.fcntl, "ioctl", side_effect=[12, 42, 1, 1, 1, failure]):
+            with self.assertRaisesRegex(hosted.Blocked, r"immediate_exit\(136\).*capability query failure") as caught:
+                hosted.probe_kvm()
+        self.assertIs(caught.exception.__cause__, failure)
+        self.assertEqual([call.args for call in close.call_args_list], [(42,), (41,)])
+
     def test_affinity_excludes_smt_siblings_in_both_directions(self):
         topology = {
             0: {"core": [0, 0], "siblings": [0, 1]},

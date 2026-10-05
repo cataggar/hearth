@@ -417,6 +417,7 @@ pub const Set = struct {
     failure_wait: ?FailureWait = null,
 
     pub fn start(self: *Set, devices: *[virtio.MAX_DEVICES]?Device, count: usize, vm: *const Vm, mem: *Memory, mode: Mode, vcpu: *Vcpu) !void {
+        try Accelerator.require(vm, abi.c.KVM_CAP_IMMEDIATE_EXIT);
         self.vcpu = vcpu;
         errdefer self.stop();
         for (devices[0..count]) |*optional| {

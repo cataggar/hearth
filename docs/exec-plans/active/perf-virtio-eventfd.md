@@ -4,6 +4,25 @@
 
 **Date**: 2026-10-04
 
+### Immediate-exit capability admission — 2026-10-05
+
+Parent accepts the actual fixed-host7aec fatal/trigger proof but identifies
+an admission gap: API12 does not establish `KVM_CAP_IMMEDIATE_EXIT`.
+Require it in experimental `Set.start` before threads/resources, and record/
+require numeric capability136 in hosted admission before further phases.
+Preserve default legacy, ordered persistent failure, strict capability error
+handling, vm_cpu/Observer and already integrated22c5 helperf52. Do not replay
+the historical cherry-pick or create another producer/provenance oracle.
+
+Add a real enforced KVM regression that masks only this capability query to
+return0 and proves all four modes reject before owners/fd mutation. Focused
+hosted tests must exercise actual query/descriptor cleanup and reject missing,
+zero, negative/malformed/error results without downstream admission.
+Extend ordinary isolated Safe/Debug CI to execute these guards and the new
+dedicated case; preserve886's successful9-job epoch as historical, not proof
+of this change. Validation/publication is pending. No parent performance label,
+measurements, default change or merge authorization.
+
 ### Dedicated ephemeral correctness CI — 2026-10-05
 
 Parent found existing eight green checks omit `eventfd-test`; add it and the

@@ -287,7 +287,7 @@ jobs:
               if name == "eventfd":
                   policy = pathlib.Path("src/devices/virtio/accelerator.zig").read_text()
                   count += len(re.findall(r'^\s*test "', policy, re.MULTILINE))
-              minimum = 7 if name == "integration" else 24
+              minimum = 7 if name == "integration" else 25
               if count < minimum:
                   raise SystemExit(f"Missing required {name} test cases: {count} < {minimum}")
               pattern = rf"(?m)^\+- run test {count} pass \({count} total\) (?!cached\b)"
@@ -309,10 +309,10 @@ jobs:
           import json
           import unittest
 
-          suite = unittest.defaultTestLoader.discover("benchmarks/virtio-eventfd", pattern="test_run.py")
+          suite = unittest.defaultTestLoader.discover("benchmarks/virtio-eventfd", pattern="test_*.py")
           expected = suite.countTestCases()
-          if expected < 32:
-              raise SystemExit(f"Required focused regression coverage missing: {expected} < 32")
+          if expected < 55:
+              raise SystemExit(f"Required focused regression coverage missing: {expected} < 55")
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           if (not result.wasSuccessful() or result.testsRun != expected or result.skipped
                   or result.expectedFailures or result.unexpectedSuccesses):
