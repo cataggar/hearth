@@ -134,6 +134,20 @@ directory or compiler/test/VM. Zero accepted cases, no owned resource or held
 lock. `canonical-bridge-storage-attempt4.json` preserves this direct proof;
 the missing prerequisite is durable capacity, not a runtime repair or assumed
 quieter machine. Do not weaken512MiB correctness or4GiB/3GiB measurement guards.
+The next available v5 window actually completes all four static
+Debug/safe×LLVM/native cells:32 forced units+7 real KVM+3 standalone enforced
+API/CLI cases each, no skips/cached execution (128/28/12 total). All24 recorded
+standalone PID paths are gone; private nodes/sockets removed. Commands/rosters/
+cleanup are in `postcleanup-summary/canonical-v5-final.json`; different cache
+histories make these test-build timings unsuitable for a compilation-speedup
+comparison. The four earlier storage failures are not relabelled passing.
+Own fresh locked5s control is6.4877 busy cores/0steal/0.01s iowait, not quiet
+acceptance or the peer's1.64-core control. SMT8-9/client0-1 is freshly checked.
+Fresh v7 current-source guest/stat preparation fails actual Err28 at manifest
+directory creation under the fleet lock, before any manifest/VM/runtime row.
+Completed v5 correctness remains valid; no backend rejection or runtime pass
+is inferred. All owned phases end. Durable profile/measurement storage remains
+necessary, with unchanged3GiB guard and separate new identities/epochs.
 Retained deny cases are BPF-evaluator assertions in the32-unit suite, not
 real-kernel negative child executions. The separate three-case fixture supplies
 actual enforced API/CLI permissions/disk/all-task-identity acceptance.

@@ -224,6 +224,34 @@ This confirms the missing durable capacity rather than merely relying on an
 outside-lock observation. The exact result is retained in
 `postcleanup-summary/canonical-bridge-storage-attempt4.json`; no phase/helper,
 socket or lock remains, and no guard is relaxed.
+
+A subsequently available **v5** window completes fresh own execution against
+the exact canonical runtime: all four Debug/safe×LLVM/LLD/native/native cells
+pass **32 forced unit + all7 real KVM +3 standalone enforced-jail cases each**
+(128 unit,28 KVM,12 standalone total), with no skips/cached-test acceptance.
+Standalone API/CLI disk/fsync/read/hash, umask077 private nodes and all-task
+credential/filter checks pass for native safe as well as Debug. All24 recorded
+standalone supervisor/VMM PID paths are gone; private nodes/sockets are removed.
+The denied cases remain BPF unit evidence, not borrowed real-kernel negatives.
+
+Each cell uses the existing named immutable ELF and unchanged static target/
+compiler flags; the exact commands, results, rosters and cleanup are indexed in
+`postcleanup-summary/canonical-v5-final.json`. Forced-build/test timings use
+different existing cache histories and are **not** a cold/warm build comparison
+or native speedup. Earlier zero-row storage failures remain retained.
+
+The independent fresh own locked5s no-owned-VM aggregate control observes
+**6.4877 busy cores** (32.44CPU-s/5.00025s),0.01s iowait and0steal, with
+4,039,909,376 free bytes at that instant. Current SMT confirms client1 shares
+0-1 and VMM8 shares8-9. This is neither this task's attributable runtime CPU nor
+a quiet-window certificate; the peer's separately reported1.64-core control
+is not substituted for it. Frozen numerical gates, storage guards and native
+size rejection remain unchanged. The fresh v7 guest/stat attempt then fails
+actual **Err28 while creating its manifest directory under the fleet lock**,
+before any runtime manifest/VM/guest row exists. This does not invalidate the
+completed v5 correctness or count as a backend failure. All owned phases end;
+resume profiles/measurement only with durable artifact capacity, with new
+current-script identities and no automatic pooling of earlier epochs.
 The denied-syscall/argument cases in the32-unit suite are **BPF-evaluator unit
 assertions**, not real-kernel negative child executions. Actual enforced-filter
 API/CLI permission, disk and all-task identity acceptance comes separately from
