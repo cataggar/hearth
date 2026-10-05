@@ -12,3 +12,8 @@ agent/.zig-cache/
 agent/zig-out/
 vmm/.zig-cache/
 vmm/zig-out/
+agent/zig-pkg/
+vmm/zig-pkg/
+.perf-zig-native/
+scripts/__pycache__/
+tools/perf/__pycache__/

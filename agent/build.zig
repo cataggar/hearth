@@ -1,8 +1,27 @@
 const std = @import("std");
 const Translator = @import("translate_c").Translator;
 
+const Codegen = enum { auto, llvm, native };
+const Linker = enum { auto, lld, native };
+
+fn artifactOptions(artifact: *std.Build.Step.Compile, codegen: Codegen, linker: Linker) void {
+    artifact.use_llvm = switch (codegen) {
+        .auto => null,
+        .llvm => true,
+        .native => false,
+    };
+    artifact.use_lld = switch (linker) {
+        .auto => null,
+        .lld => true,
+        .native => false,
+    };
+}
+
 pub fn build(b: *std.Build) void {
     const optimize = b.option(std.lang.Optimize, "optimize", "Optimization mode (default: safe)") orelse .safe;
+    const codegen = b.option(Codegen, "agent-codegen", "Artifact code generator (default: auto)") orelse .auto;
+    const linker = b.option(Linker, "agent-linker", "Artifact linker (default: auto)") orelse .auto;
+    const force_test_run = b.option(bool, "perf-force-test-run", "Execute tests even when cached") orelse false;
     var target_query = b.standardTargetOptionsQueryOnly(.{
         .default_target = .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .musl },
     });
@@ -37,6 +56,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    artifactOptions(agent, codegen, linker);
 
     b.installArtifact(agent);
 
@@ -51,6 +71,11 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    artifactOptions(tests, codegen, linker);
+    const run_tests = b.addRunArtifact(tests);
+    run_tests.has_side_effects = force_test_run;
+    b.step("test-build", "Build POSIX tests without running")
+        .dependOn(&tests.step);
     b.step("test", "Test blocking POSIX and translated libc bindings")
-        .dependOn(&b.addRunArtifact(tests).step);
+        .dependOn(&run_tests.step);
 }
