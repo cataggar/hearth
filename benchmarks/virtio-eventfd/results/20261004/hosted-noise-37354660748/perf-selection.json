@@ -1,0 +1,9 @@
+[
+  {
+    "path": "/usr/bin/perf",
+    "name": "perf-version-0",
+    "returncode": 0,
+    "stdout_sha256": "c3e20cd8f7c7ec7e2abfbaec586a6c12a2b9ff25d645ad0df87816bf02b9e01b",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

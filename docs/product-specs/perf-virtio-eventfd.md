@@ -1,6 +1,46 @@
 # Product Spec: VirtIO ioeventfd/irqfd Performance Experiment
 
-**Status**: Blocked qualification — four controlled modes implemented; f52's corrected80-cycle restore epoch retained separately; current producer admission tightened; original80-cycle oracle invalid; frozen performance gates unmet
+**Status**: Blocked qualification — fifth hosted epoch completes85 integrity cells but fails five frozen noise classes; no candidate samples or performance eligibility; measurements on hold
+
+### Terminal complete-control noise refusal
+
+Fifth hosted37354660748, attempt1, measures exact
+`300dea5bb7c6f5407ea87d3c3fe9b53c444a9942` on new nested AMD/svm Azure
+Standard_D4ads_v6, not earlier v5/v7 or Intel hosts. Debug/Safe71/71/no skips,
+jail/probes and actual perf ACK admission pass. All five C00 A/A matrices
+complete17 classes/85 integrity cells with clean supervision. The common
+patched agent completes PTY workload in all five:5184,5120,5216,5248,5216
+operations. Preserve this correctness scope separately from native repair
+CI37351334979 (native4/4 plus focused real-KVM completion/channel proof).
+
+The unchanged frozen noise admission rejects five classes, n5 each:
+disk-write-4096 throughput CV28.33938%, disk-flush-4096 throughput10.00057%
+and disk-write-1048576 throughput6.35927% against5%; tap-64 visible-host
+CPU/operation11.66190% and concurrent p95 latency17.40151% against10%.
+Gate status is `noise-inconclusive`; decision
+`negative-hosted-noise-decision`, eligibilityfalse, candidate performance
+observedfalse. There are zero candidate/profile/paired-speedup samples.
+This is a faithful environmental admission refusal, not a demonstrated
+optimization gain/loss or a new runtime failure requiring a microfix.
+
+Background upper0.037483678732890324 of one core is not subtracted. Owned CPU
+detail is not added to the all-visible-host primary. Physical Azure
+hypervisor CPU/placement is unobserved and non-nested comparison unavailable.
+Do not change gates, budgets, heartbeat, workload set or accounting to admit
+these controls. Keep all five hosted epochs separate and terminal; no top-up
+or borrowing the quieter earlier Intel controls. Parent removed the trigger
+label and holds measurement for genuinely controlled CPU/storage/placement;
+no sixth random-host reroll.
+
+Retain the19 allowlisted original JSONs and18-receipt seal at
+[`results/20261004/hosted-noise-37354660748`](../../benchmarks/virtio-eventfd/results/20261004/hosted-noise-37354660748/),
+with a separate
+[decision receipt](../../benchmarks/virtio-eventfd/results/20261004/hosted-noise-decision-receipt.json).
+The evidence publication is docs/data only, not a new measured source epoch.
+Keep L0 default, draft/noauto PR and full issue blocked until mandatory
+correctness/lifecycle/legacy/scaling/kernel-cost and paired performance gates
+are actually met. Earlier sections retain historical implementation/diagnosis
+scopes, not instructions to restart superseded phases.
 
 ### Repeated PTY correctness, separate from qualification
 

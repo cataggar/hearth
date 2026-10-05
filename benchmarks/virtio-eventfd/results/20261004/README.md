@@ -1,8 +1,8 @@
 # VirtIO eventfd W0–W3 results — 2026-10-04
 
-**Decision: HOLD / INCONCLUSIVE / NOT PERFORMANCE-MERGE ELIGIBLE.**
+**Decision: HOLD / TERMINAL NEGATIVE-NOISE ADMISSION / NOT PERFORMANCE-MERGE ELIGIBLE.**
 
-Issue [#3](https://github.com/cataggar/hearth/issues/3) is **in progress, not complete**.
+Issue [#3](https://github.com/cataggar/hearth/issues/3) is **blocked, not complete**.
 The published W0 and its original failures remain frozen. Following the actual
 parent's continuation instruction, common-control C00 now has per-device
 blocking readiness owners, selected-queue validation/publication barriers,
@@ -19,6 +19,75 @@ qualification failed. Historical longer primary windows showed exploratory
 CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
+
+## Fifth hosted epoch — complete controls, terminal negative noise decision
+
+[37354660748](https://github.com/cataggar/hearth/actions/runs/37354660748),
+attempt1, measured exact source
+`300dea5bb7c6f5407ea87d3c3fe9b53c444a9942`. The qualification job fails after
+18m19s because the complete controls exceed frozen noise gates, **not because
+of another runtime/harness failure or an observed optimization regression**.
+Actual new nested AMD/svm Azure Standard_D4ads_v6, Linux6.17.0-1022-azure,
+four visible logical CPUs/two SMT pairs; VM0/client2. This is neither the
+fourth D4ads_v7 nor the second Intel/vmx D4ds_v5 host. Non-nested comparison
+is unavailable; hidden physical-host placement/CPU is not measured.
+
+Debug and Safe each execute71/71, no skips; both jail phases, agent/native/
+disk/observer builds and host probes pass. Actual perf6.17.13 admission
+completes disable/enable/disable epochs1/2/3 with ACK`61636b0a00`; capability
+136 and the other required capabilities pass. All five unprofiled C00 A/A
+matrices complete all17 classes: **85/85 passed integrity cells**, with all
+five supervision receipts passed/controller0/no survivors/errors/unsafe.
+The common patched agent completes each interactive cell without a timeout:
+5184,5120,5216,5248,5216 validated PTY operations respectively. This supports
+the repair for this source/fixture/host scope, not full lifecycle acceptance
+or performance benefit.
+
+Frozen A/A gate status is `noise-inconclusive`; each distribution has n5:
+
+| Class | Failing metric | CV | Unchanged cap |
+| --- | --- | --- | --- |
+| disk-write-4096 | throughput | 28.33938% | 5% |
+| disk-flush-4096 | throughput | 10.00057% | 5% |
+| disk-write-1048576 | throughput | 6.35927% | 5% |
+| tap-64 | visible-host CPU/operation | 11.66190% | 10% |
+| concurrent | p95 latency | 17.40151% | 10% |
+
+Decision is `negative-hosted-noise-decision`, eligibilityfalse,
+candidate_performance_observedfalse: **zero candidate, mechanism-profile,
+paired-gain or speedup samples**. Admission perf probes are not workload
+profiles. Background upper bound is0.037483678732890324 of one core, with
+neither floor/background subtraction nor addition of owned CPU detail.
+Primary CPU remains all visible-host user/nice/system/IRQ/softirq, including
+backend/deferred work and peers, not physical Azure hypervisor CPU.
+
+All19 original allowlisted JSONs are retained byte-for-byte in
+[hosted-noise-37354660748](hosted-noise-37354660748/).
+[sha256sums.json](hosted-noise-37354660748/sha256sums.json) seals18 receipts;
+its own SHA256 is
+`8e228480947d87690347c067ee34f211645019d8c5bf5c7a8f05676ebcc93a66`.
+All18 receipt digests,31 native/agent and8 runner source digests match the
+measured source; preregistration/pins/gates match, including sorted-JSON pins
+SHA`6bd5ed82b95a66328f9111a38de58a0b0f0e026834c92e60fbcc9274b71251e1`.
+[The summary receipt](hosted-noise-decision-receipt.json) records exact scope.
+No images, raw traces, guest data, inventories or credentials were added.
+
+Native PTY repair proof remains separate: ordinary
+[37351334979](https://github.com/cataggar/hearth/actions/runs/37351334979)
+at300dea5 passes9/9 jobs, native4/4 and enforced all-device C00
+7936 execs/15 slow-reader/4096 normal PTYs/four early-terminal-close cases/
+following exec on the original single connection, with clean shutdown/custody.
+Those correctness results do not become performance samples.
+
+**All five hosted epochs remain separate and terminal.** No control reuse,
+top-up, threshold/budget/heartbeat/workload change or sixth random-host retry.
+The parent removed the trigger label and holds measurement until CPU, storage
+and placement are genuinely more controlled, not until a lucky A/A reroll.
+This final phase only persists evidence/docs; runtime and runner are unchanged.
+Full legacy/lifecycle/restore/save-on-halt/congestion/scaling/idle/kernel-CPU
+and paired performance qualification remain incomplete. No default adoption,
+performance merge or auto-merge. Earlier sections retain historical scopes;
+they are not instructions to resume superseded measurement/repair phases.
 
 ## Fourth hosted epoch and bounded PTY cause reproduction
 

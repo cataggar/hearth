@@ -1,0 +1,123 @@
+{
+  "schema": "virtio-eventfd-hosted-negative-noise-v1",
+  "run_id": 37354660748,
+  "run_attempt": 1,
+  "measured_source": "300dea5bb7c6f5407ea87d3c3fe9b53c444a9942",
+  "qualification_job": 111913891929,
+  "qualification_job_seconds": 1099,
+  "status": "terminal-independent-negative-hosted-noise-epoch",
+  "decision": "negative-hosted-noise-decision",
+  "gate_status": "noise-inconclusive",
+  "reason": "complete controls exceed unchanged frozen noise caps; not an observed optimization gain/loss or a new runtime failure",
+  "host": {
+    "azure_size": "Standard_D4ads_v6",
+    "nested": true,
+    "virtualization": "AMD/svm",
+    "kernel": "6.17.0-1022-azure",
+    "visible_logical_cpus": 4,
+    "visible_smt_pairs": [[0, 1], [2, 3]],
+    "vm_cpu": 0,
+    "client_cpu": 2,
+    "non_nested_comparison": "unavailable",
+    "physical_hypervisor_CPU_and_placement": "not observed",
+    "same_as_fourth_v7_or_second_Intel_v5": false,
+    "kvm_api": 12,
+    "capabilities": {"32": 1, "36": 1, "82": 1, "136": 1}
+  },
+  "native": {
+    "Debug": {"test_counts": [[71, 71]], "skip_detected": false},
+    "ReleaseSafe": {"test_counts": [[71, 71]], "skip_detected": false},
+    "jail_agent_native_disk_observer_and_host_probes": "passed"
+  },
+  "actual_perf_control_admission": {
+    "version": "6.17.13",
+    "binary_sha256": "2d0953085bf720a25efbe24f853e97d27b1f12f18a398255ff82cbafde254dad",
+    "status": "passed",
+    "commands": ["disable", "enable", "disable"],
+    "epochs": [1, 2, 3],
+    "ack_hex": "61636b0a00",
+    "supervision": "passed; controller0; no survivors/errors/unsafe"
+  },
+  "aa": {
+    "mode": "C00",
+    "matrices": 5,
+    "classes": 17,
+    "complete_passed_integrity_cells": 85,
+    "samples_per_class": 5,
+    "interactive_operations_by_matrix": [5184, 5120, 5216, 5248, 5216],
+    "PTY_scope": "all five complete matrices on the common patched agent; not full lifecycle or performance-benefit acceptance",
+    "all_five_supervisions": "passed; controller0; no survivors/errors/unsafe"
+  },
+  "failed_noise_metrics": [
+    {"class": "disk-write-4096", "metric": "throughput", "n": 5, "cv_percent": 28.339381101573025, "cap_percent": 5},
+    {"class": "disk-flush-4096", "metric": "throughput", "n": 5, "cv_percent": 10.00057086705937, "cap_percent": 5},
+    {"class": "disk-write-1048576", "metric": "throughput", "n": 5, "cv_percent": 6.359265942549241, "cap_percent": 5},
+    {"class": "tap-64", "metric": "visible_host_cpu_per_operation", "n": 5, "cv_percent": 11.661903789690598, "cap_percent": 10},
+    {"class": "concurrent", "metric": "p95_ms", "n": 5, "cv_percent": 17.401509915755277, "cap_percent": 10}
+  ],
+  "frozen_gates": {
+    "benefit_percent": 10,
+    "paired_confidence": 0.95,
+    "mechanism_reduction_percent": 90,
+    "max_throughput_regression_percent": 3,
+    "max_cpu_latency_lifecycle_regression_percent": 5,
+    "max_noise_cpu_latency_cv_percent": 10,
+    "max_noise_throughput_cv_percent": 5,
+    "idle_extra_core_percentage_points_per_sandbox": 0.1
+  },
+  "cpu_accounting": {
+    "primary": "all visible-host user+nice+system+IRQ+softirq, including backend/deferred work and peers; not physical Azure hypervisor CPU",
+    "background_upper_one_core": 0.037483678732890324,
+    "background_control_observations": 10,
+    "floor_or_background_subtracted": false,
+    "owned_detail_added": false
+  },
+  "candidate_performance_observed": false,
+  "candidate_samples": 0,
+  "workload_profile_samples": 0,
+  "paired_speedup_samples": 0,
+  "performance_merge_eligible": false,
+  "separate_native_repair_proof": {
+    "source": "300dea5bb7c6f5407ea87d3c3fe9b53c444a9942",
+    "ordinary_ci_run": 37351334979,
+    "successful_jobs": [9, 9],
+    "native_tests": [4, 4],
+    "targeted_enforced_C00": {
+      "prelude_batches": 11,
+      "exec": 7936,
+      "slow_reader": 15,
+      "normal_PTY": 4096,
+      "early_terminal_close_PTY": 4,
+      "following_original_connection_exec": true,
+      "control_connections": 1,
+      "shutdown_exit_code": 0,
+      "supervision": "passed; controller0; no survivors/errors/unsafe"
+    },
+    "is_performance_sample": false
+  },
+  "custody": {
+    "directory": "hosted-noise-37354660748",
+    "original_allowlisted_JSONs": 19,
+    "original_JSON_bytes": 14431214,
+    "byte_identical_copy": true,
+    "seal": "hosted-noise-37354660748/sha256sums.json",
+    "seal_sha256": "8e228480947d87690347c067ee34f211645019d8c5bf5c7a8f05676ebcc93a66",
+    "receipt_digests_verified": 18,
+    "native_and_agent_source_digests_verified": 31,
+    "runner_source_digests_verified": 8,
+    "preregister_pins_gates_verified": true,
+    "sorted_JSON_pins_sha256": "6bd5ed82b95a66328f9111a38de58a0b0f0e026834c92e60fbcc9274b71251e1",
+    "raw_traces_images_guest_data_credentials_published": false
+  },
+  "disposition": {
+    "all_five_hosted_epochs": "separate and terminal; no reuse/top-up/retrospective relabeling",
+    "runtime_or_runner_changed_by_publication": false,
+    "gates_budgets_heartbeat_workloads_changed": false,
+    "sixth_random_host_retry": false,
+    "parent_trigger_label_removed": true,
+    "measurements": "HOLD until genuinely more controlled CPU/storage/placement, not lucky A/A reroll",
+    "full_issue": "blocked: mandatory lifecycle/restore/legacy/save-on-halt/congestion/scaling/true-idle/kernel-cost and paired performance coverage incomplete",
+    "default": "L0",
+    "PR": "draft/noauto; no performance merge recommendation"
+  }
+}

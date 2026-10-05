@@ -1,8 +1,52 @@
 # Execution Plan: Profile VirtIO ioeventfd/irqfd
 
-**Status**: Blocked qualification — controlled implementation/stress executed; frozen performance gates unmet
+**Status**: Blocked qualification — fifth complete85-cell control epoch fails frozen noise admission; no candidates; measurement stopped pending controlled environment
 
 **Date**: 2026-10-04
+
+### Fifth hosted epoch — final evidence persistence, no further measurement
+
+Parent-triggered37354660748, attempt1, exact measured source
+`300dea5bb7c6f5407ea87d3c3fe9b53c444a9942`, is terminal after18m19s.
+Actual new nested AMD/svm Azure Standard_D4ads_v6, not fourthv7/priorv5.
+Debug/Safe each71/71/no skips, jail/builds/probes/actual ACK pass. All five
+C00 A/A matrices complete17 classes/85 integrity cells with clean custody.
+Common patched-agent PTYs complete through all five (5184,5120,5216,5248,
+5216 operations); there is no new timeout or runnerbug in this scope.
+
+Frozen noise fails five classes, n5 each:
+disk-write-4096 throughput CV28.33938%, disk-flush-4096 throughput10.00057%,
+disk-write-1048576 throughput6.35927% (cap5%);
+tap-64 visible-host CPU/operation11.66190% and concurrent p95latency17.40151%
+(cap10%). `noise-inconclusive` and `negative-hosted-noise-decision` faithfully
+reject admission, eligibilityfalse and zero candidate/profile/gain samples.
+Background upper0.037483678732890324 of one core, no subtraction or owned
+CPU addition. This is not measured optimization loss/gain or another repair.
+
+Final authorized work is complete-control evidence/docs publication only:
+retain19 byte-identical allowlisted JSONs under existing results, preserve
+18-receipt SHA seal, verify31 native/agent+8 runner digests against300dea5,
+preregistration and sorted-JSON pins/gates; record exact host/cells/CVs/
+zero candidates in existing spec/results/PR and blocked issue/session state.
+Do not alter runtime/runner/gates/budgets/heartbeat/workloads, start builds,
+VMs/perf, trigger labels, retries/top-ups or a sixth random-host run. Small
+evidence persistence does not waive the unchanged local heavy-execution
+capacity guard or remove original/foreign artifacts.
+
+Native repair acceptance is separate ordinaryCI37351334979 at300dea5:
+9/9 jobs, native4/4 and actual all-device C007936exec15slow4096normalPTY+
+four terminal-close cases+following original-connection exec/clean custody.
+These are correctness tests, not performance samples. All five hosted epochs
+and each failed reproduction remain separate terminal evidence; do not reuse
+the earlier quieter Intel A/A or reinterpret the historical AMD branch trace.
+
+Parent removed the trigger label and holds measurement until CPU/storage/
+placement are genuinely controlled. PR9 remains draft/noauto, L0 default,
+full qualification blocked: lifecycle/restore/legacy/save-on-halt/congestion/
+scaling/true-idle/kernel-cost and paired performance coverage unmet.
+Retain this plan in active because the issue is incomplete; no new planning
+file/phase or default/performance-merge recommendation. Earlier sections are
+retained historical scopes, not pending execution instructions.
 
 ### Fourth hosted epoch — bounded repeated-PTY root-cause attempt
 
