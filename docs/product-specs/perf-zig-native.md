@@ -262,6 +262,12 @@ The original512MiB source hash remains pristine. Exact errors/manifests are
 indexed by `postcleanup-summary/postcanonical-v8-capacity-refusals.json`;
 no old/new recorder pooling, unsupported-backend classification, peer Azure/
 runtime evidence, default change or guard relaxation is inferred.
+V9 retries the identical v8 manifests after a peer reports its A/A completion
+and increased space; that report is not substituted for owned launch capacity.
+Both guards again refuse before any VM/build row. Original source remains
+pristine and both phases end. Exact v9 refusals are separately retained in
+`postcleanup-summary/postcanonical-v9-capacity-refusals.json`; no peer cache/
+writeback regime, measurements, outlier removal or threshold adjustment occurs.
 The denied-syscall/argument cases in the32-unit suite are **BPF-evaluator unit
 assertions**, not real-kernel negative child executions. Actual enforced-filter
 API/CLI permission, disk and all-task identity acceptance comes separately from

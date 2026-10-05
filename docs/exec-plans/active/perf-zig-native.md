@@ -155,6 +155,10 @@ guards refuse before any VM/build row. Original512MiB source remains pristine.
 `postcanonical-v8-capacity-refusals.json` retains exact errors; do not call zero
 new rows a zero-cost/cached profile, unsupported backend or complete execution.
 No #3 Azure/runtime/host measurement or other peer evidence is inherited.
+V9 repeats identical v8 inputs after a peer-reported release/space increase;
+actual3GiB/4GiB guards still refuse, zero new rows and pristine source. Both
+phases end; exact diagnostics are in `postcanonical-v9-capacity-refusals.json`.
+Peer capacity/control/cache/writeback regimes are not treated as own evidence.
 Retained deny cases are BPF-evaluator assertions in the32-unit suite, not
 real-kernel negative child executions. The separate three-case fixture supplies
 actual enforced API/CLI permissions/disk/all-task-identity acceptance.
