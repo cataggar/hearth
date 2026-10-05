@@ -13,6 +13,8 @@ const boot_params = @import("boot/params.zig");
 const api = @import("api.zig");
 const snapshot = @import("snapshot.zig");
 const jail = @import("jail.zig");
+const NetDispatch = @import("net_dispatch.zig");
+var net_options: NetDispatch.Options = .{};
 const seccomp = @import("seccomp.zig");
 
 const log = std.log.scoped(.flint);
@@ -44,6 +46,9 @@ pub const VmRuntime = struct {
     // The API thread polls this after setting paused=true to confirm the
     // vCPU is safe to inspect.
     ack_paused: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    ack_resumed: std.atomic.Value(bool) = std.atomic.Value(bool).init(true),
+    net_dispatch: bool = false,
+    net_failure: ?anyerror = null,
     // Set by the run loop when the guest exits (halt/shutdown/error).
     // Tells the API thread to stop accepting connections.
     exited: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
@@ -75,6 +80,7 @@ const CliArgs = struct {
     @"api-sock": ?[*:0]const u8 = null,
     disk: ?[*:0]const u8 = null,
     tap: ?[*:0]const u8 = null,
+    @"net-backend": ?[*:0]const u8 = null,
     @"vsock-cid": ?[*:0]const u8 = null,
     @"vsock-uds": ?[*:0]const u8 = null,
 
@@ -139,6 +145,14 @@ pub fn main(init: std.process.Init) !void {
             initrd_path = arg;
             got_initrd = true;
         }
+    }
+
+    if (cli.@"net-backend") |mode| {
+        const text = std.mem.span(mode);
+        net_options = .{
+            .enabled = true,
+            .mode = std.meta.stringToEnum(NetDispatch.Mode, text) orelse return error.InvalidNetBackend,
+        };
     }
 
     // Jail setup runs before anything else — after this, the process is
@@ -222,14 +236,29 @@ pub fn main(init: std.process.Init) !void {
             .io_mbps = io_mbps,
             .disk_major = disk_major,
             .disk_minor = disk_minor,
-            .need_tun = cli.tap != null,
+            .need_tun = cli.tap != null or net_options.enabled,
+            .need_vhost_net = net_options.enabled and net_options.mode != .userspace,
         });
+    }
+
+    // Capture after privilege drop; the enforced filter forbids identity changes.
+    if (net_options.enabled) {
+        const uid = std.os.linux.getuid();
+        const effective_uid = std.os.linux.geteuid();
+        net_options.owner_uid = if (uid == 0 or effective_uid == 0) 0 else @intCast(effective_uid);
+        if (net_options.mode != .userspace and net_options.owner_uid.? == 0)
+            return error.VhostRequiresPrivilegeDrop;
+        if (cli.jail != null) {
+            const groups: isize = @bitCast(std.os.linux.syscall2(.getgroups, 0, 0));
+            if (groups < 0) return error.NetJailGroupVerificationFailed;
+            if (groups != 0) return error.NetJailInheritedGroups;
+        }
     }
 
     // Seccomp filter — installed after jail (jail needs mount/mknod/setuid)
     // but before any guest interaction
     if (cli.jail != null or cli.@"seccomp-audit") {
-        try seccomp.install(cli.@"seccomp-audit");
+        try seccomp.installForNet(cli.@"seccomp-audit", net_options.enabled);
     }
 
     if (cli.restore and cli.@"api-sock" != null) {
@@ -274,6 +303,7 @@ pub fn main(init: std.process.Init) !void {
         try bootVm(kp, initrd_path, cmdline, cli.disk, cli.tap, cli.@"vsock-cid", cli.@"vsock-uds", DEFAULT_MEM_SIZE / (1024 * 1024), snap_opts);
     } else {
         std.debug.print("usage: flint <kernel> [initrd] [--disk <path>] [--tap <name>] [cmdline]\n", .{});
+        std.debug.print("       --net-backend userspace|vhost|auto (explicit net-only dispatcher)\n", .{});
         std.debug.print("       flint --restore [--vmstate-path <path>] [--mem-path <path>]\n", .{});
         std.debug.print("       flint --api-sock <path>\n", .{});
         std.debug.print("       --jail <dir> --jail-uid <uid> --jail-gid <gid> [--jail-cgroup <name>]\n", .{});
@@ -441,6 +471,7 @@ fn bootVmWithApi(
         .devices = &c_.devices,
         .device_count = c_.device_count,
         .snap_opts = .{},
+        .net_dispatch = net_options.enabled,
     };
 
     log.info("entering VM run loop (API mode)", .{});
@@ -454,6 +485,7 @@ fn bootVmWithApi(
     };
 
     thread.join();
+    if (runtime.net_failure) |err| return err;
 }
 
 /// Restore a VM from snapshot files instead of booting a kernel.
@@ -488,6 +520,9 @@ fn restoreVm(
     // 2. Re-create device backends from CLI args.
     // The snapshot tells us what device types/slots existed, but backends
     // hold OS resources (fds) that must be opened fresh.
+    var mem: Memory = undefined;
+    var memory_loaded = false;
+    defer if (memory_loaded) mem.deinit();
     var devices: [virtio.MAX_DEVICES]?VirtioMmio = @splat(null);
     var device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path);
 
@@ -503,7 +538,7 @@ fn restoreVm(
     // 4. Load snapshot — registers memory with KVM, restores vCPU/VM state,
     // device transport state, and serial registers
     var serial = Serial.init(1);
-    var mem = try snapshot.load(
+    mem = try snapshot.load(
         vmstate_path,
         mem_snap_path,
         &vcpu,
@@ -512,7 +547,7 @@ fn restoreVm(
         &devices,
         &device_count,
     );
-    defer mem.deinit();
+    memory_loaded = true;
 
     // 5. Enter run loop — guest resumes execution from where it was paused
     log.info("entering VM run loop (restored)", .{});
@@ -546,6 +581,9 @@ fn restoreVmWithApi(
     try vm.createIrqChip();
     try vm.createPit2();
 
+    var mem: Memory = undefined;
+    var memory_loaded = false;
+    defer if (memory_loaded) mem.deinit();
     var devices: [virtio.MAX_DEVICES]?VirtioMmio = @splat(null);
     var device_count = try initDevices(&devices, disk_path, tap_name, vsock_cid_str, vsock_uds_path);
     defer for (&devices) |*d| {
@@ -557,8 +595,8 @@ fn restoreVmWithApi(
     defer vcpu.deinit();
 
     var serial = Serial.init(1);
-    var mem = try snapshot.load(vmstate_path, mem_snap_path, &vcpu, &vm, &serial, &devices, &device_count);
-    defer mem.deinit();
+    mem = try snapshot.load(vmstate_path, mem_snap_path, &vcpu, &vm, &serial, &devices, &device_count);
+    memory_loaded = true;
 
     var runtime = VmRuntime{
         .vcpu = &vcpu,
@@ -568,6 +606,7 @@ fn restoreVmWithApi(
         .devices = &devices,
         .device_count = device_count,
         .snap_opts = .{},
+        .net_dispatch = net_options.enabled,
     };
 
     log.info("entering VM run loop (restored, API mode)", .{});
@@ -581,6 +620,7 @@ fn restoreVmWithApi(
     };
 
     thread.join();
+    if (runtime.net_failure) |err| return err;
 }
 
 // Memory layout for boot structures (all below boot_params at 0x7000)
@@ -818,12 +858,26 @@ fn runLoopThread(runtime: *VmRuntime) void {
         runtime,
     ) catch |err| {
         log.err("run loop exited with error: {}", .{err});
+        if (runtime.net_dispatch) runtime.net_failure = err;
     };
     runtime.exited.store(true, .release);
 }
 
 fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *DeviceArray, device_count: u32, snap_opts: SnapshotOpts, runtime: ?*VmRuntime) !void {
     const linux = std.os.linux;
+    var net_service: ?NetDispatch = null;
+    if (net_options.enabled) {
+        installKickSignal();
+        var net_device: ?*VirtioMmio = null;
+        for (devices[0..device_count]) |*dev_opt| {
+            if (dev_opt.*) |*dev| {
+                if (dev.device_id == virtio.DEVICE_ID_NET) net_device = dev;
+            }
+        }
+        net_service = try NetDispatch.init(net_options, mem, net_device orelse return error.NetBackendRequiresTap, vm, vcpu);
+    }
+    defer if (net_service) |*service| service.deinit();
+    if (net_service) |*service| try service.start();
 
     // Set up epoll for efficient device fd polling. Instead of blind-polling
     // every device fd after each KVM exit, we use epoll_wait(timeout=0) to
@@ -839,6 +893,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
     if (epoll_fd >= 0) {
         for (0..device_count) |i| {
             if (devices[i]) |dev| {
+                if (net_service != null and dev.device_id == virtio.DEVICE_ID_NET) continue;
                 const poll_fd = dev.getPollFd();
                 if (poll_fd >= 0) {
                     var ev = linux.epoll_event{
@@ -853,11 +908,14 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
 
     var exit_count: u64 = 0;
     while (true) {
+        // Reenter after IO/MMIO even when paused: KVM must finish pending
+        // emulation before the Interrupted path can acknowledge migration.
         const exit_reason = vcpu.run() catch |err| {
             // KVM_RUN returns EINTR when interrupted by a signal. This happens
             // when: (a) immediate_exit was set, or (b) SIGUSR1 kicked us out
             // of a blocking HLT. Check if this was a pause request.
             if (err == error.Interrupted) {
+                if (net_service) |*service| try service.check();
                 if (runtime) |rt| {
                     // Check if we were signaled to exit (e.g., SendCtrlAltDel)
                     if (rt.exited.load(.acquire)) {
@@ -865,6 +923,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
                         return;
                     }
                     if (rt.paused.load(.acquire)) {
+                        if (net_service) |*service| try service.pause();
                         rt.ack_paused.store(true, .release);
                         log.info("vCPU paused by API request", .{});
                         var spin_count: u32 = 0;
@@ -882,7 +941,9 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
                             }
                         }
                         log.info("vCPU resumed", .{});
-                        vcpu.kvm_run.immediate_exit = 0;
+                        @atomicStore(u8, &vcpu.kvm_run.immediate_exit, 0, .release);
+                        if (net_service) |*service| try service.start();
+                        rt.ack_resumed.store(true, .release);
                         continue;
                     }
                 }
@@ -893,6 +954,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
             return err;
         };
         exit_count +%= 1;
+        if (net_service) |*service| try service.check();
         if (exit_count <= 5) log.info("exit #{}: reason={}", .{ exit_count, exit_reason });
 
         // Flush pending vsock write buffers
@@ -920,6 +982,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
             // Vsock connections have dynamic fds not in epoll — still poll them
             for (devices[0..device_count]) |*dev_opt| {
                 if (dev_opt.*) |*dev| {
+                    if (net_service != null and dev.device_id == virtio.DEVICE_ID_NET) continue;
                     if (dev.getPollFd() < 0) {
                         if (dev.pollRx(mem)) {
                             injectIrq(vm, dev.irq);
@@ -930,6 +993,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
         } else {
             for (devices[0..device_count]) |*dev_opt| {
                 if (dev_opt.*) |*dev| {
+                    if (net_service != null and dev.device_id == virtio.DEVICE_ID_NET) continue;
                     if (dev.pollRx(mem)) {
                         injectIrq(vm, dev.irq);
                     }
@@ -964,6 +1028,31 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
                     if (dev_opt.*) |*dev| {
                         if (dev.matchesAddr(mmio.phys_addr)) {
                             const offset = mmio.phys_addr - dev.mmio_base;
+                            if (net_service) |*service| {
+                                if (service.dev == dev) {
+                                    const lifecycle = mmio.is_write and len == 4 and NetDispatch.lifecycleWrite(offset);
+                                    if (lifecycle) try service.pause();
+                                    service.lock();
+                                    if (mmio.is_write) {
+                                        const data: [8]u8 = mmio.data;
+                                        if (offset == virtio.MMIO_QUEUE_NOTIFY and len == 4 and
+                                            std.mem.readInt(u32, data[0..4], .little) >= 2)
+                                        {
+                                            service.unlock();
+                                            return error.InvalidNetQueueNotify;
+                                        }
+                                        dev.handleWrite(offset, data[0..len]);
+                                    } else {
+                                        var data: [8]u8 = @splat(0);
+                                        dev.handleRead(offset, data[0..len]);
+                                        vcpu.kvm_run.unnamed_0.mmio.data = data;
+                                    }
+                                    service.unlock();
+                                    if (lifecycle) try service.start();
+                                    if (mmio.is_write) try service.notify();
+                                    break;
+                                }
+                            }
                             if (mmio.is_write) {
                                 const data: [8]u8 = mmio.data;
                                 dev.handleWrite(offset, data[0..len]);
@@ -986,6 +1075,7 @@ fn runLoop(vcpu: *Vcpu, serial: *Serial, vm: *const Vm, mem: *Memory, devices: *
             },
             c.KVM_EXIT_HLT => {
                 log.info("guest halted after {} exits", .{exit_count});
+                if (net_service) |*service| try service.pause();
                 if (snap_opts.vmstate_path) |sp| {
                     // vCPU is stopped (just exited KVM_RUN), safe to snapshot
                     snapshot.save(sp, snap_opts.mem_path.?, vcpu, vm, mem, serial, devices, device_count) catch |err| {

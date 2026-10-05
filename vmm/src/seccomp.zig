@@ -2,10 +2,13 @@
 // Whitelists the minimum syscalls needed to run a KVM VM with
 // virtio devices and an API socket. Everything else kills the process.
 //
-// Three syscalls have argument-level filtering:
+// Six syscalls have argument-level filtering:
 //   clone  — only thread-creation flags (blocks CLONE_NEWUSER escape)
 //   socket — only AF_UNIX (blocks network exfiltration)
 //   mprotect — blocks PROT_EXEC (no shellcode execution)
+//   sched_getaffinity — only the calling thread
+//   epoll_pwait — only a null signal mask, as emitted by linux.epoll_wait
+//   poll — only the existing nonblocking vsock check
 
 const std = @import("std");
 const linux = std.os.linux;
@@ -25,6 +28,7 @@ const DATA_OFF_NR: u32 = 0;
 const DATA_OFF_ARCH: u32 = 4;
 const DATA_OFF_ARG0: u32 = 16; // after nr(4) + arch(4) + instruction_pointer(8)
 const DATA_OFF_ARG2: u32 = 32;
+const DATA_OFF_ARG4: u32 = 48;
 
 // Classic BPF structs (not in Zig stdlib)
 const SockFilter = extern struct {
@@ -62,16 +66,20 @@ fn bpf_jump(code: u16, k: u32, jt: u8, jf: u8) SockFilter {
 const AF_UNIX: u32 = 1;
 const PROT_EXEC: u32 = 4;
 // Thread-creation clone flags (everything else is blocked — especially CLONE_NEWUSER)
-const ALLOWED_CLONE_FLAGS: u32 = 0x003D0F00;
+const ALLOWED_CLONE_FLAGS: u32 = 0x007D0F00;
 // CLONE_VM|FS|FILES|SIGHAND|THREAD|SYSVSEM|SETTLS|PARENT_SETTID|CHILD_CLEARTID
+// Zig also emits CLONE_DETACHED, which Linux UAPI marks unused/ignored.
 
 // Syscall numbers for argument-filtered calls
 const SYS_MPROTECT: u32 = 10;
 const SYS_SOCKET: u32 = 41;
 const SYS_CLONE: u32 = 56;
+const SYS_SCHED_GETAFFINITY: u32 = 204;
+const SYS_EPOLL_PWAIT: u32 = 281;
+const SYS_POLL: u32 = 7;
 
 // Simple whitelist — allowed unconditionally (no argument checks).
-// clone, socket, mprotect are excluded; they have argument-level filters below.
+// Argument-filtered syscalls are excluded; their checks are below.
 const simple_syscalls = [_]u32{
     // Core I/O
     0, // read
@@ -101,6 +109,8 @@ const simple_syscalls = [_]u32{
     42, // connect (vsock UDS)
     44, // sendto
     45, // recvfrom
+    46, // sendmsg (Zig Unix API stream writer)
+    47, // recvmsg (Zig Unix API stream reader)
     49, // bind
     50, // listen
     288, // accept4
@@ -146,19 +156,21 @@ const simple_syscalls = [_]u32{
 /// Build the BPF filter at comptime. Layout:
 ///   [0-3]      header: load arch, verify x86_64, load nr
 ///   [4..4+N-1] simple syscall checks (unconditional allow)
-///   [4+N..+2]  filtered syscall dispatch (jump to arg check blocks)
-///   [4+N+3]    default KILL
-///   [4+N+4..]  argument check blocks for clone, socket, mprotect
+///   [4+N..+5]  filtered syscall dispatch (jump to arg check blocks)
+///   [4+N+6]    default KILL
+///   [4+N+7..]  argument check blocks
 ///   [last]      ALLOW
-fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simple.len + 20]SockFilter {
+fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simple.len + 35]SockFilter {
     const N = simple.len;
-    // Total: 4 header + N simple + 3 dispatch + 1 kill + 4 clone + 3 socket + 4 mprotect + 1 allow = N+20
-    const ALLOW_POS = N + 19;
-    const CLONE_BLK = 4 + N + 4;
-    const SOCKET_BLK = 4 + N + 8;
-    const MPROT_BLK = 4 + N + 11;
+    const ALLOW_POS = N + 34;
+    const CLONE_BLK = N + 11;
+    const SOCKET_BLK = N + 15;
+    const MPROT_BLK = N + 18;
+    const AFFINITY_BLK = N + 22;
+    const EPOLL_BLK = N + 25;
+    const POLL_BLK = N + 31;
 
-    var f: [N + 20]SockFilter = undefined;
+    var f: [N + 35]SockFilter = undefined;
 
     // Header: verify arch, load syscall nr
     f[0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARCH);
@@ -175,9 +187,12 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
     f[4 + N + 0] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_CLONE, @intCast(CLONE_BLK - (4 + N + 0) - 1), 0);
     f[4 + N + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_SOCKET, @intCast(SOCKET_BLK - (4 + N + 1) - 1), 0);
     f[4 + N + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_MPROTECT, @intCast(MPROT_BLK - (4 + N + 2) - 1), 0);
+    f[4 + N + 3] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_SCHED_GETAFFINITY, @intCast(AFFINITY_BLK - (4 + N + 3) - 1), 0);
+    f[4 + N + 4] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_EPOLL_PWAIT, @intCast(EPOLL_BLK - (4 + N + 4) - 1), 0);
+    f[4 + N + 5] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_POLL, @intCast(POLL_BLK - (4 + N + 5) - 1), 0);
 
     // Default: kill (or log)
-    f[4 + N + 3] = bpf_stmt(BPF_RET | BPF_K, default_action);
+    f[4 + N + 6] = bpf_stmt(BPF_RET | BPF_K, default_action);
 
     // Clone check: only allow thread-creation flags (block CLONE_NEWUSER etc.)
     f[CLONE_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
@@ -196,6 +211,22 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
     f[MPROT_BLK + 2] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (MPROT_BLK + 2) - 1), 0);
     f[MPROT_BLK + 3] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 
+    f[AFFINITY_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
+    f[AFFINITY_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (AFFINITY_BLK + 1) - 1), 0);
+    f[AFFINITY_BLK + 2] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+
+    // Check both halves of the signal-mask pointer, not just its low word.
+    f[EPOLL_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG4);
+    f[EPOLL_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, 0);
+    f[EPOLL_BLK + 2] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+    f[EPOLL_BLK + 3] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG4 + 4);
+    f[EPOLL_BLK + 4] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (EPOLL_BLK + 4) - 1), 0);
+    f[EPOLL_BLK + 5] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+
+    f[POLL_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG2);
+    f[POLL_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (POLL_BLK + 1) - 1), 0);
+    f[POLL_BLK + 2] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+
     // ALLOW
     f[ALLOW_POS] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
 
@@ -205,19 +236,60 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
 pub const kill_filter = buildFilter(&simple_syscalls, SECCOMP_RET_KILL_PROCESS);
 pub const log_filter = buildFilter(&simple_syscalls, SECCOMP_RET_LOG);
 
+fn withNetEvents(comptime base: anytype) [base.len + 11]SockFilter {
+    var filter: [base.len + 11]SockFilter = undefined;
+    @memcpy(filter[0..4], base[0..4]);
+    filter[4] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 290, 0, 6); // eventfd2
+    filter[5] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
+    filter[6] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 2);
+    filter[7] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0 + 8);
+    filter[8] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK, 1, 0);
+    filter[9] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+    filter[10] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
+    @memcpy(filter[11..], &base);
+    return filter;
+}
+
+fn withNetPoll(comptime base: anytype) [base.len + 13]SockFilter {
+    var filter: [base.len + 13]SockFilter = undefined;
+    @memcpy(filter[0..4], base[0..4]);
+    filter[4] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, SYS_POLL, 0, 8);
+    filter[5] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG2);
+    filter[6] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0xffffffff, 0, 6);
+    filter[7] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0 + 8);
+    // Wake only, wake/TAP, or wake plus both queue CALL/ERR eventfds.
+    filter[8] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 1, 3, 0);
+    filter[9] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 2, 2, 0);
+    filter[10] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 5, 1, 0);
+    filter[11] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+    filter[12] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
+    @memcpy(filter[13..], &base);
+    return filter;
+}
+
+pub const net_kill_filter = withNetPoll(withNetEvents(kill_filter));
+const net_log_filter = withNetPoll(withNetEvents(log_filter));
+
 /// Install the seccomp BPF filter. After this, unlisted syscalls kill
 /// the process (or log in audit mode for development).
 pub fn install(audit: bool) !void {
+    return installForNet(audit, false);
+}
+
+pub fn installForNet(audit: bool, enabled: bool) !void {
     const rc1: isize = @bitCast(linux.prctl(@backingInt(linux.PR.SET_NO_NEW_PRIVS), 1, 0, 0, 0));
     if (rc1 < 0) {
         log.err("prctl(NO_NEW_PRIVS) failed: {}", .{rc1});
         return error.PrctlFailed;
     }
 
-    const filter = if (audit) &log_filter else &kill_filter;
+    const filter: []const SockFilter = if (enabled)
+        (if (audit) &net_log_filter else &net_kill_filter)
+    else
+        (if (audit) &log_filter else &kill_filter);
     const prog = SockFprog{
         .len = @intCast(filter.len),
-        .filter = filter,
+        .filter = filter.ptr,
     };
 
     const rc2: isize = @bitCast(linux.seccomp(SECCOMP_SET_MODE_FILTER, 0, &prog));
@@ -229,6 +301,82 @@ pub fn install(audit: bool) !void {
     if (audit) {
         log.warn("seccomp in AUDIT mode — violations logged, not killed", .{});
     } else {
-        log.info("seccomp filter installed ({} syscalls whitelisted)", .{simple_syscalls.len + 3});
+        log.info("seccomp filter installed ({} syscalls whitelisted)", .{simple_syscalls.len + 6});
+    }
+}
+
+test "explicit net filter confines eventfd2 and blocked readiness poll" {
+    const cases = [_]struct {
+        enabled: bool,
+        action: u8,
+        killed: bool,
+        count: u32 = 1,
+        timeout: i32 = -1,
+    }{
+        .{ .enabled = false, .action = 0, .killed = true },
+        .{ .enabled = true, .action = 0, .killed = false },
+        .{ .enabled = true, .action = 1, .killed = true },
+        .{ .enabled = true, .action = 2, .killed = true },
+        .{ .enabled = true, .action = 3, .killed = true },
+        .{ .enabled = true, .action = 4, .killed = true },
+        .{ .enabled = true, .action = 5, .killed = true },
+        .{ .enabled = false, .action = 6, .killed = true },
+        .{ .enabled = true, .action = 6, .killed = false },
+        .{ .enabled = true, .action = 6, .killed = false, .count = 2 },
+        .{ .enabled = true, .action = 6, .killed = false, .count = 5 },
+        .{ .enabled = true, .action = 6, .killed = true, .count = 0 },
+        .{ .enabled = true, .action = 6, .killed = true, .count = 3 },
+        .{ .enabled = true, .action = 6, .killed = true, .count = 6 },
+        .{ .enabled = true, .action = 6, .killed = true, .timeout = 1 },
+        .{ .enabled = true, .action = 6, .killed = false, .timeout = 0 },
+        .{ .enabled = false, .action = 6, .killed = false, .timeout = 0 },
+    };
+    for (cases) |case| {
+        const child: isize = @bitCast(linux.fork());
+        if (child < 0) return error.TestForkFailed;
+        if (child == 0) {
+            var ready: linux.fd_t = -1;
+            if (case.action == 6) {
+                const rc: isize = @bitCast(linux.eventfd(1, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK));
+                if (rc < 0) linux.exit(92);
+                ready = @intCast(rc);
+                // Bound an accidentally allowed zero-descriptor infinite wait.
+                _ = linux.syscall1(.alarm, 2);
+            }
+            installForNet(false, case.enabled) catch linux.exit(90);
+            switch (case.action) {
+                0 => {
+                    const rc: isize = @bitCast(linux.eventfd(0, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK));
+                    if (rc < 0) linux.exit(91);
+                    _ = linux.close(@intCast(rc));
+                },
+                1 => _ = linux.eventfd(0, 0),
+                2 => _ = linux.socket(linux.AF.INET, linux.SOCK.STREAM, 0),
+                3 => _ = linux.mprotect(@ptrFromInt(4096), 4096, .{ .EXEC = true }),
+                4 => _ = linux.eventfd(1, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK),
+                5 => _ = linux.syscall5(.clone, linux.CLONE.NEWUSER, 0, 0, 0, 0),
+                6 => {
+                    var pollfds: [6]linux.pollfd = undefined;
+                    for (&pollfds) |*fd| fd.* = .{ .fd = ready, .events = linux.POLL.IN, .revents = 0 };
+                    const rc: isize = @bitCast(linux.poll(&pollfds, case.count, case.timeout));
+                    if (rc != case.count) linux.exit(93);
+                    _ = linux.close(ready);
+                },
+                else => unreachable,
+            }
+            linux.exit(0);
+        }
+        var status: i32 = 0;
+        while (true) {
+            const rc: isize = @bitCast(linux.waitpid(@intCast(child), &status, 0));
+            if (rc == -@as(isize, @backingInt(linux.E.INTR))) continue;
+            if (rc != child) return error.TestWaitFailed;
+            break;
+        }
+        if (case.killed) {
+            try std.testing.expectEqual(@as(i32, 31), status & 0x7f);
+        } else {
+            try std.testing.expectEqual(@as(i32, 0), status);
+        }
     }
 }

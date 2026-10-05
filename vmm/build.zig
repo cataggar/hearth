@@ -47,7 +47,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_tests.step);
 
     // Integration tests: spawn flint binary and test end-to-end behavior.
-    // Requires /dev/kvm and a kernel at /tmp/vmlinuz-minimal.
+    // Requires /dev/kvm and FLINT_TEST_KERNEL (legacy default: /tmp/vmlinuz-minimal).
     // Run with: zig build integration-test
     // Compile without prerequisites: zig build integration-test-build
     const integration_tests = b.addTest(.{
