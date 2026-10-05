@@ -1,5 +1,67 @@
 # VirtIO eventfd experiment tools
 
+## Label-only ephemeral hosted alternative
+
+`.github/workflows/perf-virtio-eventfd.yml` is a separate, bounded hosted
+experiment, not ordinary push CI. Only the **parent** applies
+`perf-qualify-virtio-eventfd` to same-repository PR9 on
+`copilot/perf-virtio-eventfd-20261004`. `pull_request:labeled` is its only
+trigger; immutable head checkout, read-only contents permission and
+`persist-credentials: false` exclude fork/untrusted/persistent-runner paths.
+Do not apply the label from this runner or enable auto-merge.
+
+`hosted.py` rejects mismatched/dirty source and verifies actual scalar Azure
+IMDS identity (only `vmSize`/`azEnvironment`, no IDs/tags/IPs), nesting,
+nonroot KVM API12/VM creation and notification capabilities. Available
+guest-exposed package/core/SMT topology selects independent VMM/client CPUs;
+hidden physical host placement and quietness are not assumed. User/root
+software/PMU/trace probes and private network namespace availability are
+recorded. Missing identity, resources or tools is blocked, never skipped.
+
+The signed Zig0.17 install and hash-checked5.10.245 kernel match existing CI.
+Both Debug/Safe must actually execute66 current Zig tests and three full-jail
+cases each; no cached/skipped subset satisfies the counts. All measurements
+then use **one** Safe static-musl binary, fixed deterministic combined/native
+fixtures, default compiler choice and private caches. No sibling backend,
+compiler override, cache drop or host security/NIC setting is imported.
+The ordinary-jail fixture sleeps and is not timer-free liveness evidence.
+
+Preregister unchanged gates and five paired blocks, then run five complete
+17-class C00 A/A matrices (nonidle≥5s, idle60s). Noise failure stops candidates.
+Only after a frozen noise-provisionally-acceptable receipt run primary C00
+stat/stacks/trace, five C00+rotated-C10/C01/C11 blocks and matched candidate
+profiles. Report p50/p95/p99, throughput, generation-checked all-task CPU,
+tagged asynchronous IRQ function CPU and paired95% log-ratio intervals.
+Separate eligible userspace notify returns/IRQ ioctls from kernel exits and
+non-VirtIO serial; event loss/missing owned samples rejects attribution.
+
+As the bounded resources permit, perform one active mixed snapshot/fresh
+restore per mode and1/4/8-sandbox pure-native60s HLT-idle/wake/concurrency
+cells. These are actual partial acceptance, not20 captures/mode, old/new
+compatibility, full mixed scaling, save-on-halt or storm qualification.
+Dispatcher/scheduler/softirq outside owned task/tagged function intervals
+remains **unmeasured**, not zero or complete affected CPU. The runner therefore
+cannot declare adoption from a known-CPU gain: all outstanding required
+coverage stays explicit. A completed noise rejection or demonstrated
+regression is negative evidence; incomplete execution stays blocked.
+
+The hosted job has a120-minute ceiling,105-minute outer experiment bound,
+100-minute internal deadline and4GiB build/3GiB workload capacity guards.
+Every VM/control/collector is bounded and owned. Local validation still uses
+the shared vm31e fleet lock; hosted execution uses an isolated ephemeral VM,
+not the shared filesystem/runner. No qualified result is yet available:
+**workflow ready is not execution**; parent labeling remains a prerequisite.
+
+Only `.perf/eventfd-hosted/public/*.json` is uploaded (14-day retention).
+Receipts contain pins, sanitized operations/counters/owned rosters, phase
+counts and failure hashes, owned stack symbol reports and decoded attribution.
+Private raw perf/serial/VM files are not uploaded; neither are guest memory/
+disks, environment dumps, cloud resource identifiers or foreign inventories.
+`sha256sums.json` seals the receipt set even after interruption/setup failure.
+The job deliberately returns nonzero for negative/incomplete qualification;
+successful individual cells never mean default/merge eligibility.
+Historical vm31e archives are unchanged and must not pool with this epoch.
+
 `run.py` preserves historical **untouched L0** collectors. New controlled
 runners implement C00/C10/C01/C11 on one binary; current Flint is never relabelled
 as the untouched baseline. Failed operations/profiling return nonzero; a timeout

@@ -25,7 +25,7 @@ spec.loader.exec_module(support)
 
 
 class Guest(support.OwnedVm):
-    def __init__(self, out, binary, mode, fixture, restore=None, disk=False, tap=None, restore_api=False, cli_only=False, accept_native=True):
+    def __init__(self, out, binary, mode, fixture, restore=None, disk=False, tap=None, restore_api=False, cli_only=False, accept_native=True, vm_cpu=8):
         super().__init__(out / "j")
         self.listener = None
         self.connection = None
@@ -60,7 +60,7 @@ class Guest(support.OwnedVm):
         for source, name in ((kernel, "bzImage"), (initrd, "initrd.cpio.gz")):
             shutil.copyfile(source, self.path / name)
         argv = [
-            "sudo", "-n", "taskset", "-c", "8", str(binary),
+            "sudo", "-n", "taskset", "-c", str(vm_cpu), str(binary),
             "--jail", str(self.path), "--jail-uid", str(os.getuid()), "--jail-gid", str(os.getgid()),
             "--virtio-mode", mode,
         ]

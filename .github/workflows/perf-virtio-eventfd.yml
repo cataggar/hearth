@@ -1,0 +1,111 @@
+name: VirtIO eventfd hosted qualification
+
+on:
+  pull_request:
+    types: [labeled]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-virtio-eventfd-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  qualification:
+    if: >-
+      github.event.label.name == 'perf-qualify-virtio-eventfd' &&
+      github.repository == 'cataggar/hearth' &&
+      github.event.pull_request.number == 9 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'copilot/perf-virtio-eventfd-20261004'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      TMPDIR: ${{ github.workspace }}/.perf/eventfd-hosted/scratch
+      ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.perf/eventfd-hosted/cache/global
+      ZIG_LOCAL_CACHE_DIR: ${{ github.workspace }}/.perf/eventfd-hosted/cache/local
+      PERF_BUILDID_DIR: ${{ github.workspace }}/.perf/eventfd-hosted/perf-buildids
+    steps:
+      - name: Check out the immutable approved PR head
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Create private owned artifact directories
+        run: |
+          umask 077
+          mkdir -p .perf/eventfd-hosted/{scratch,raw,public,cache}
+      - name: Install only missing task prerequisites and join kvm
+        id: prerequisites
+        run: |
+          set -euo pipefail
+          umask 077
+          missing=()
+          for package in build-essential libc6-dev linux-libc-dev acl curl python3 \
+                         libarchive-tools gzip busybox-static clang libbpf-dev; do
+            if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -qx 'install ok installed'; then
+              missing+=("$package")
+            fi
+          done
+          if ! perf --version >/dev/null 2>&1; then
+            missing+=(linux-tools-common linux-tools-generic)
+          fi
+          if ((${#missing[@]})); then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends "${missing[@]}"
+          fi
+          test -c /dev/kvm
+          sudo usermod --append --groups kvm "$(id -un)"
+      - name: Install signed exact Zig using the existing CI trust key
+        id: zig
+        uses: cataggar/ghr/actions/install@v0.6.1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tools: |
+            cataggar/zig@v0.17.0 RWSGOq2NVecA2UPNdBUZykf1CCb147pkmdtYxgb3Ti+JO/wCYvhbAb/U
+      - name: Install and verify the existing exact guest kernel
+        id: kernel
+        run: |
+          set -euo pipefail
+          umask 077
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/joshuaisaact/hearth/releases/download/kernel-5.10.245/bzImage \
+            --output .perf/eventfd-hosted/bzImage
+          echo "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208  .perf/eventfd-hosted/bzImage" | sha256sum --check
+          test "$(zig version)" = 0.17.0
+      - name: Verify host and execute the bounded fail-closed experiment
+        id: measure
+        shell: sg kvm -c "bash --noprofile --norc -e -o pipefail {0}"
+        env:
+          EVENTFD_APPROVED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+          timeout --signal=TERM --kill-after=60s 105m \
+            python3 benchmarks/virtio-eventfd/hosted.py qualify \
+              --expected-sha "$EVENTFD_APPROVED_SHA"
+      - name: Seal a sanitized receipt even after prerequisite failure
+        if: always() && steps.checkout.outcome == 'success'
+        env:
+          EVENTFD_APPROVED_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENTFD_PREREQUISITES_OUTCOME: ${{ steps.prerequisites.outcome }}
+          EVENTFD_ZIG_OUTCOME: ${{ steps.zig.outcome }}
+          EVENTFD_KERNEL_OUTCOME: ${{ steps.kernel.outcome }}
+          EVENTFD_MEASURE_OUTCOME: ${{ steps.measure.outcome }}
+        run: |
+          umask 077
+          python3 benchmarks/virtio-eventfd/hosted.py receipt \
+            --expected-sha "$EVENTFD_APPROVED_SHA"
+      - name: Preserve allowlisted receipts, never VM images or raw inventories
+        if: always() && steps.checkout.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: virtio-eventfd-hosted-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .perf/eventfd-hosted/public/*.json
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: error

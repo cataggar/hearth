@@ -126,31 +126,52 @@ class Outstanding:
 
 
 class Observer:
-    def __init__(self, guest):
+    def __init__(self, guest, object_path=None):
         self.handle = (guest.out / "irqfd-observer.stderr").open("wb")
         self.process = subprocess.Popen([
             "sudo", "-n", "timeout", "--kill-after=5", "400", "python3",
             str(bench.ROOT / "tools/perf/irqfd_cpu.py"),
             "--pid", str(guest.pid), "--start-ticks", str(guest.pid_start_ticks),
-            "--object", str(bench.ROOT / ".perf/eventfd/w2/irqfd_cpu.bpf.o"),
+            "--object", str(bench.artifact_path(object_path) if object_path is not None
+                            else bench.ROOT / ".perf/eventfd/w2/irqfd_cpu.bpf.o"),
         ], cwd=bench.ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.handle, text=True)
-        if not select.select([self.process.stdout], [], [], 8)[0]:
-            self.process.stdin.close()
-            self.process.wait(timeout=5)
-            raise RuntimeError("bounded kernel CPU observer did not become ready")
-        line = self.process.stdout.readline()
-        if not line:
-            self.process.wait(timeout=5)
-            raise RuntimeError("scoped kernel CPU observer failed; inspect preserved verifier diagnostics")
-        self.ready = json.loads(line)
-        if not self.ready.get("ready"):
-            raise RuntimeError(f"kernel CPU observer not ready: {self.ready}")
+        try:
+            if not select.select([self.process.stdout], [], [], 8)[0]:
+                raise RuntimeError("bounded kernel CPU observer did not become ready")
+            line = self.process.stdout.readline()
+            if not line:
+                raise RuntimeError("scoped kernel CPU observer failed; inspect preserved verifier diagnostics")
+            self.ready = json.loads(line)
+            if not self.ready.get("ready"):
+                raise RuntimeError(f"kernel CPU observer not ready: {self.ready}")
+        except BaseException:
+            self.abort()
+            raise
+
+    def abort(self):
+        if self.process.stdin is not None:
+            try:
+                self.process.stdin.close()
+            except BrokenPipeError:
+                pass
+        try:
+            self.process.wait(timeout=8)
+        except subprocess.TimeoutExpired:
+            subprocess.run(["sudo", "-n", "kill", "-TERM", str(self.process.pid)], check=True, timeout=5)
+            self.process.wait(timeout=8)
+        finally:
+            self.handle.close()
 
     def finish(self):
-        self.process.stdin.write("STOP\n")
-        self.process.stdin.flush()
-        stdout, _ = self.process.communicate(timeout=8)
-        self.handle.close()
+        try:
+            self.process.stdin.write("STOP\n")
+            self.process.stdin.flush()
+            stdout, _ = self.process.communicate(timeout=8)
+        except BaseException:
+            self.abort()
+            raise
+        finally:
+            self.handle.close()
         result = json.loads(stdout)
         if self.process.returncode != 0 or result["status"] != "passed":
             raise RuntimeError(f"incomplete kernel work accounting: {result}")

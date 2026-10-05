@@ -4,6 +4,42 @@
 
 **Date**: 2026-10-04
 
+### Parent-directed ephemeral Azure alternative — 2026-10-05
+
+Assigned todo `measure-eventfd-ephemeral-azure`. Add a minimal, separate
+label-only hosted workflow scoped to same-repository PR9/exact own branch,
+read-only token, nonpersistent checkout and immutable event head. Reuse CI's
+signed exact Zig install, pinned guest kernel and nonroot kvm-group setup.
+Install only missing required fixture/profiler dependencies. Record actual
+Azure/nesting/KVM, allowed topology/SMT, resources and profiler capability;
+adapt independent affinities and reject unsuitable hosts honestly.
+
+Do not reuse hardcoded CPU8/1 or vm31e identity in hosted measurements.
+Keep one Safe static-musl production binary/fixtures/cache policy for all
+modes; run current Debug/Safe real KVM/mask/reset and full-jail acceptance.
+Preregister unchanged gates, execute five new C00 A/A matrices, and freeze
+noise before any paired candidate samples. Collect bounded primary profiles,
+17 workload classes, paired control/candidates, idle/lifecycle and supported
+scaling. Exact asynchronous IRQ-function CPU is a scoped component, not full
+dispatcher/scheduler/softirq coverage; incomplete accounting cannot qualify.
+
+Keep private raw execution separate from allowlisted sanitized uploads.
+Record missing/unexecuted requirements, failures, time/space guards and
+generation-safe owned teardown. Preserve all earlier epochs/default/draft
+state. Validate runner guards and workflow locally under the fleet lock,
+commit/push only this branch, and tell the parent exact SHA/workflow/label.
+The parent alone labels the PR. Todo stays blocked awaiting that execution,
+or a specific hosted prerequisite; no results are inferred from workflow
+readiness or existing CI's KVM successes.
+
+Source preparation executed under the fleet lock:29 Python collector/hosted
+guard tests pass; all changed Python parses, workflow YAML scope and every
+shell block validate. No new local compiler/VM/profile/image phase ran.
+PR9 was verified draft, auto-merge null and labels empty before publication.
+The new label-only source is ready for the parent's trigger, not measured.
+The runner explicitly retains incomplete affected-kernel CPU/lifecycle
+qualification and cannot turn a partial positive result into adoption.
+
 ### Parent-directed pause attribution and post-IRET acceptance
 
 Investigate the published exploratory pause regressions without changing

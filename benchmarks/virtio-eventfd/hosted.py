@@ -1,0 +1,961 @@
+#!/usr/bin/env python3
+"""Label-approved ephemeral qualification; private raw data, allowlisted receipts."""
+
+import argparse
+import fcntl
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import shutil
+import signal
+import socket
+import statistics
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
+from types import SimpleNamespace
+
+import analyze_trace
+import control
+import matrix
+import performance
+import restore_stress
+import run as bench
+import tap_probe
+
+HOME = bench.ROOT / ".perf/eventfd-hosted"
+PUBLIC = HOME / "public"
+RAW = HOME / "raw"
+MODES = ("C00", "C10", "C01", "C11")
+GATES = {
+    "benefit_percent": 10, "paired_confidence": .95,
+    "mechanism_reduction_percent": 90, "max_throughput_regression_percent": 3,
+    "max_cpu_latency_lifecycle_regression_percent": 5,
+    "max_noise_cpu_latency_cv_percent": 10, "max_noise_throughput_cv_percent": 5,
+    "idle_extra_core_percentage_points_per_sandbox": .1,
+}
+KERNEL_GAPS = [
+    "irqfd workqueue dispatcher and scheduler outside the tagged function intervals",
+    "marginal TAP/softirq and resample scheduling outside owned task/function intervals",
+]
+REQUIRED_GAPS = [
+    "100 reset transitions and full active IRQ congestion",
+    "20 active fresh cross-mode snapshots per mode/device mix",
+    "10 failure-teardown cycles and 64-connection credit stress",
+    "actual CLI/API save-on-halt and old/new legacy compatibility",
+    "matched mixed-device 4/8-sandbox performance and pure-HLT idle",
+]
+
+
+class Blocked(RuntimeError):
+    pass
+
+
+def save(path, value):
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    bench.save_json(path, value)
+
+
+def cpulist(text):
+    values = set()
+    for part in text.strip().split(","):
+        bounds = list(map(int, part.split("-")))
+        if len(bounds) > 2 or bounds[0] > bounds[-1]:
+            raise ValueError("invalid CPU topology")
+        values.update(range(bounds[0], bounds[-1] + 1))
+    return values
+
+
+def independent_cpus(topology):
+    for vm in sorted(topology):
+        for client in sorted(topology):
+            if (client not in topology[vm]["siblings"] and vm not in topology[client]["siblings"]
+                    and topology[vm]["core"] != topology[client]["core"]):
+                return vm, client
+    raise Blocked("fewer than two available independent physical cores")
+
+
+def actual_topology():
+    result = {}
+    for cpu in sorted(os.sched_getaffinity(0)):
+        root = Path(f"/sys/devices/system/cpu/cpu{cpu}/topology")
+        result[cpu] = {
+            "core": [int((root / "physical_package_id").read_text()),
+                     int((root / "core_id").read_text())],
+            "siblings": sorted(cpulist((root / "thread_siblings_list").read_text())),
+        }
+    return result
+
+
+def owned_command(argv, name, seconds, cwd=bench.ROOT, environment=None):
+    RAW.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (RAW / f"{name}.stdout").open("wb") as output, (RAW / f"{name}.stderr").open("wb") as errors:
+        process = subprocess.Popen(
+            ["timeout", "--signal=TERM", "--kill-after=30s", str(seconds), *map(str, argv)],
+            cwd=cwd, stdout=output, stderr=errors, env=environment,
+        )
+        try:
+            code = process.wait(timeout=seconds + 35)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=35)
+    record = {"name": name, "returncode": code,
+              "stdout_sha256": bench.digest(RAW / f"{name}.stdout"),
+              "stderr_sha256": bench.digest(RAW / f"{name}.stderr")}
+    save(RAW / f"{name}.command.json", {"argv": list(map(str, argv)), "cwd": str(cwd), **record})
+    return record
+
+
+def output(name):
+    return (RAW / f"{name}.stdout").read_text(errors="replace")
+
+
+def check_space(minimum):
+    free = shutil.disk_usage(bench.ROOT).free
+    if free < minimum:
+        raise Blocked(f"owned phase capacity guard: {free} bytes available, {minimum} required")
+    return free
+
+
+def perf_binary():
+    paths = [shutil.which("perf"), *sorted(Path("/usr/lib/linux-tools").glob("*/perf"), reverse=True)]
+    attempts = []
+    for index, candidate in enumerate(paths):
+        if candidate and Path(candidate).is_file():
+            name = f"perf-version-{index}"
+            record = owned_command([candidate, "--version"], name, 5)
+            attempts.append({"path": str(candidate), **record})
+            save(PUBLIC / "perf-selection.json", attempts)
+            if record["returncode"] == 0:
+                return str(candidate), output(name).strip()
+    raise Blocked("no functional installed perf executable")
+
+
+def host_probe():
+    topology = actual_topology()
+    record = {
+        "kernel": os.uname().release, "architecture": os.uname().machine,
+        "uid": os.getuid(), "gid": os.getgid(),
+        "topology": topology, "topology_scope": "actual guest-exposed package/core/SMT; hidden host placement is not assumed",
+        "available_bytes": shutil.disk_usage(bench.ROOT).free,
+        "azure": {"verified": False}, "nesting": {"verified": False},
+        "non_nested_comparison": "not available; no persistent resource requested",
+    }
+    save(PUBLIC / "host.json", record)
+    vm, client = independent_cpus(topology)
+    record.update(vm_cpu=vm, client_cpu=client)
+    check_space(4 * 1024**3)
+    flags = next(line.split(":", 1)[1].split() for line in Path("/proc/cpuinfo").read_text().splitlines()
+                 if line.startswith("flags"))
+    record["nesting"] = {"verified": "hypervisor" in flags,
+                         "hypervisor_flag": "hypervisor" in flags,
+                         "virtualization_flag": next((x for x in ("vmx", "svm") if x in flags), None)}
+    record["dmi"] = {
+        name: (Path("/sys/class/dmi/id") / name).read_text().strip()
+        for name in ("sys_vendor", "product_name")
+    }
+    # Read only the two nonidentifying scalar IMDS fields; no instance document,
+    # IDs, tags, IPs, proxy environment or redirects are read/uploaded.
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *_):
+            return None
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    try:
+        fields = {}
+        for field in ("vmSize", "azEnvironment"):
+            request = urllib.request.Request(
+                f"http://169.254.169.254/metadata/instance/compute/{field}"
+                "?api-version=2021-02-01&format=text", headers={"Metadata": "true"})
+            with opener.open(request, timeout=2) as response:
+                value = response.read(256).decode().strip()
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", value):
+                raise ValueError("unrecognized scalar IMDS response")
+            fields[field] = value
+        record["azure"] = {"verified": fields["azEnvironment"].startswith("Azure"), **fields}
+    except (OSError, ValueError):
+        record["azure"]["reason"] = "bounded scalar Azure IMDS unavailable"
+    save(PUBLIC / "host.json", record)
+    if (record["architecture"] != "x86_64" or not record["azure"]["verified"]
+            or not record["nesting"]["verified"]):
+        raise Blocked("actual Azure/nesting/x86_64 identity unsuitable or unverifiable")
+    if os.geteuid() == 0:
+        raise Blocked("runner/controller must be nonroot")
+    fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC)
+    try:
+        version = fcntl.ioctl(fd, 0xAE00, 0)
+        if version != 12:
+            raise Blocked("actual KVM API is not12")
+        vm_fd = fcntl.ioctl(fd, 0xAE01, 0)
+        os.close(vm_fd)
+        # Numeric KVM capabilities: IRQFD32, IOEVENTFD36, IRQFD_RESAMPLE82.
+        record["kvm"] = {"api_version": version, "nonroot_vm_create": True,
+                         "capabilities": {name: fcntl.ioctl(fd, 0xAE03, number)
+                                          for name, number in (("irqfd", 32), ("ioeventfd", 36), ("resample", 82))}}
+    finally:
+        os.close(fd)
+    perf, version = perf_binary()
+    record["perf_binary_sha256"] = bench.digest(Path(perf))
+    record["perf_version"] = version
+    for privilege, prefix in (("user", []), ("root", ["sudo", "-n"])):
+        record[privilege + "_perf"] = {}
+        for kind, events in (("software", "task-clock,context-switches,cpu-migrations"),
+                             ("pmu", "cycles,instructions"),
+                             ("trace", "kvm:kvm_exit,kvm:kvm_userspace_exit,syscalls:sys_enter_ioctl,sched:sched_switch")):
+            result = owned_command([*prefix, perf, "stat", "-e", events, "--",
+                                    sys.executable, "-c", "sum(range(1000000))"], f"probe-{privilege}-{kind}", 10)
+            record[privilege + "_perf"][kind] = result
+    record["sudo_namespace"] = owned_command(["sudo", "-n", "unshare", "--net", "--", "true"],
+                                             "probe-netns", 5)
+    record["full_kernel_accounting"] = {"complete": False, "unmeasured": KERNEL_GAPS}
+    save(PUBLIC / "host.json", record)
+    if not all(record["kvm"]["capabilities"].values()):
+        raise Blocked("actual KVM notification capability unavailable; no downgraded candidate")
+    if record["root_perf"]["software"]["returncode"] or record["sudo_namespace"]["returncode"]:
+        raise Blocked("scoped software perf or owned network namespace unavailable")
+    return record, perf
+
+
+def require_execution(name, argv, seconds, phases, cwd=bench.ROOT, environment=None, tests=None):
+    check_space(4 * 1024**3)
+    record = owned_command(argv, name, seconds, cwd, environment)
+    record["argv"] = list(map(str, argv))
+    if tests is not None:
+        text = output(name) + (RAW / f"{name}.stderr").read_text(errors="replace")
+        counts = [tuple(map(int, pair)) for pair in re.findall(r"(\d+)/(\d+) tests passed", text)]
+        record["test_counts"] = counts
+        record["skip_detected"] = bool(re.search(r"\bskip(?:ped)?\b", text, re.I))
+        if (record["skip_detected"] or sum(total for _, total in counts) < tests
+                or any(passed != total for passed, total in counts)):
+            record["coverage_rejected"] = True
+    phases.append(record)
+    save(PUBLIC / "phases.json", phases)
+    if record["returncode"] or record.get("coverage_rejected"):
+        raise Blocked(f"{name} failed or actual coverage incomplete; see sanitized phase receipt")
+
+
+def build_inputs(phases, source):
+    zig = shutil.which("zig")
+    if not zig or subprocess.check_output([zig, "version"], text=True).strip() != "0.17.0":
+        raise Blocked("signed exact Zig0.17 compiler unavailable")
+    pins = {"source": source, "compiler_sha256": bench.digest(Path(zig).resolve()),
+            "target": "x86_64-linux-musl", "compiler_backend": "existing default; no override",
+            "kernel_sha256": bench.digest(HOME / "bzImage"),
+            "cache_policy": "one private cache; build all inputs once before any matrix",
+            "backends": "synchronous block/userspace TAP/unchanged agent; no async/vhost/native override",
+            "agent_interactive_poll_ms": 50, "heartbeat_ms": 0, "production_mode_default": "L0"}
+    pins["source_files_sha256"] = {
+        str(path.relative_to(bench.ROOT)): bench.digest(path)
+        for folder in ("vmm/src", "agent/src") for path in sorted((bench.ROOT / folder).rglob("*.zig"))}
+    save(PUBLIC / "pins.json", pins)
+    if pins["kernel_sha256"] != bench.KERNEL_SHA256:
+        raise Blocked("guest kernel differs from the CI signed/hash-checked input")
+    for optimize in ("Debug", "ReleaseSafe"):
+        require_execution(f"zig-{optimize}", [
+            zig, "build", "install", "test", "eventfd-test", "integration-test",
+            "-Dtarget=x86_64-linux-musl", f"-Doptimize={optimize}",
+            f"-Dintegration-kernel={HOME / 'bzImage'}", "--summary", "all", "--color", "off",
+        ], 600, phases, bench.ROOT / "vmm", tests=66)
+        binary = HOME / f"flint-{optimize}"
+        shutil.copyfile(bench.ROOT / "vmm/zig-out/bin/flint", binary)
+        binary.chmod(0o700)
+        pins[optimize + "_sha256"] = bench.digest(binary)
+        environment = dict(os.environ, FLINT_JAIL_TEST_BINARY=str(binary),
+                           FLINT_JAIL_TEST_KERNEL=str(HOME / "bzImage"), FLINT_JAIL_TEST_REVISION=source)
+        require_execution(f"jail-{optimize}", [
+            sys.executable, "-m", "unittest", "discover", "-s", "tools/perf",
+            "-p", "test_jail_baseline.py", "-v"], 180, phases, environment=environment)
+        if "Ran 3 tests" not in (RAW / f"jail-{optimize}.stderr").read_text():
+            raise Blocked("standalone full-jail coverage did not actually execute three cases")
+    require_execution("agent", [zig, "build", "-Dtarget=x86_64-linux-musl", "-Doptimize=safe"],
+                      300, phases, bench.ROOT / "agent")
+    require_execution("native-probes", [
+        zig, "build", "eventfd-guest-probe", "eventfd-tcp-probe",
+        "-Dtarget=x86_64-linux-musl", "-Doptimize=ReleaseSafe"], 300, phases, bench.ROOT / "vmm")
+    require_execution("disk-probe", [
+        zig, "cc", "-target", "x86_64-linux-musl", "-O2",
+        bench.ROOT / "benchmarks/virtio-eventfd/disk_probe.c", "-o", HOME / "disk-probe"], 120, phases)
+    require_execution("irqfd-observer-build", [
+        "/usr/bin/clang", "-target", "bpf", "-O2", "-g", "-c",
+        bench.ROOT / "tools/perf/irqfd_cpu.bpf.c", "-o", HOME / "irqfd_cpu.bpf.o"], 60, phases)
+    matrix.prepare(SimpleNamespace(out=HOME / "fixture", kernel=HOME / "bzImage",
+                   agent=bench.ROOT / "agent/zig-out/bin/hearth-agent",
+                   native=bench.ROOT / "vmm/zig-out/bin/eventfd-guest-probe",
+                   tcp=bench.ROOT / "vmm/zig-out/bin/eventfd-tcp-probe",
+                   disk_probe=HOME / "disk-probe", profile_only=False, vsock_only=False))
+    bench.prepare(SimpleNamespace(out=HOME / "native-fixture", kernel=HOME / "bzImage",
+                  agent=bench.ROOT / "agent/zig-out/bin/hearth-agent", probe=bench.ROOT / "vmm/zig-out/bin/eventfd-guest-probe",
+                  busybox="/usr/bin/busybox", heartbeat_ms=0))
+    for fixture in ("fixture", "native-fixture"):
+        metadata_path = HOME / fixture / "fixture.json"
+        metadata = json.loads(metadata_path.read_text())
+        metadata["boot_args"] = "console=ttyS0 nokaslr reboot=t panic=1 pci=off nomodules"
+        save(metadata_path, metadata)
+    pins["fixture"] = json.loads((HOME / "fixture/fixture.json").read_text())
+    pins["native_fixture"] = json.loads((HOME / "native-fixture/fixture.json").read_text())
+    pins["observer_object_sha256"] = bench.digest(HOME / "irqfd_cpu.bpf.o")
+    pins["bpf_compiler_sha256"] = bench.digest(Path("/usr/bin/clang").resolve())
+    pins["runner_files_sha256"] = {name: bench.digest(Path(module.__file__))
+                                  for name, module in (("hosted", sys.modules[__name__]), ("control", control),
+                                                       ("matrix", matrix), ("performance", performance), ("run", bench))}
+    save(PUBLIC / "pins.json", pins)
+    return pins
+
+
+def row_projection(row):
+    names = ("name", "status", "latency_ms", "latency", "operations", "bytes", "operation_seconds",
+             "owned_all_task_cpu_seconds", "owned_irqfd_function_cpu_seconds",
+             "known_scoped_cpu_seconds", "known_scoped_cpu_per_operation", "bytes_per_second",
+             "threads_before", "threads_after", "kernel_work_before", "kernel_work_after",
+             "client_cpu_seconds", "host_noise", "idle_wake_ms", "batches")
+    result = {key: row[key] for key in names if key in row}
+    for name in ("threads_before", "threads_after"):
+        if name in result:
+            result[name] = [{key: task[key] for key in ("tid", "comm", "utime_ticks", "stime_ticks",
+                                                       "start_ticks", "cpu_runtime_ns", "affinity") if key in task}
+                            for task in result[name]]
+    for name in ("kernel_work_before", "kernel_work_after"):
+        if name in result:
+            result[name] = kernel_projection(result[name])
+    return result
+
+
+def kernel_projection(record):
+    result = {name: record[name] for name in ("status", "kernel_irqfd_cpu_seconds",
+                                             "incomplete_work_at_boundary") if name in record}
+    result["kernel_work"] = {
+        name: {key: record["kernel_work"][name][key] for key in ("cpu_ns", "jobs")}
+        for name in ("anomalies", "inject", "shutdown") if name in record.get("kernel_work", {})}
+    return result
+
+
+def validate_pins():
+    pins = json.loads((PUBLIC / "pins.json").read_text())
+    if (bench.digest(HOME / "flint-ReleaseSafe") != pins["ReleaseSafe_sha256"]
+            or bench.digest(HOME / "bzImage") != pins["kernel_sha256"]
+            or json.loads((HOME / "fixture/fixture.json").read_text()) != pins["fixture"]
+            or json.loads((HOME / "native-fixture/fixture.json").read_text()) != pins["native_fixture"]
+            or bench.digest(HOME / "irqfd_cpu.bpf.o") != pins["observer_object_sha256"]):
+        raise Blocked("frozen binary/kernel/fixture/accounting inputs changed")
+
+
+def sample(guest, tcp, observer, name):
+    before = bench.thread_roster(guest.pid)
+    kernel_before = observer.read()
+    host_before = Path("/proc/stat").read_text()
+    client_before = time.process_time()
+    started = time.monotonic()
+    latency, byte_count, _ = performance.workload(guest, tcp, name)
+    batches = 1
+    if name != "idle":
+        while time.monotonic() - started < 5:
+            more, size, _ = performance.workload(guest, tcp, name)
+            latency.extend(more)
+            byte_count += size
+            batches += 1
+    operation_seconds = time.monotonic() - started
+    time.sleep(.1)
+    after = bench.thread_roster(guest.pid)
+    kernel_after = observer.read()
+    cpu = bench.cpu_delta(before, after)
+    kernel_cpu = kernel_after["kernel_irqfd_cpu_seconds"] - kernel_before["kernel_irqfd_cpu_seconds"]
+    if kernel_cpu < 0 or cpu < 0 or not latency:
+        raise ValueError("invalid CPU/count boundary")
+    result = {
+        "name": name, "status": "passed", "latency_ms": latency, "latency": performance.summary(latency),
+        "operations": len(latency), "bytes": byte_count, "operation_seconds": operation_seconds,
+        "owned_all_task_cpu_seconds": cpu, "owned_irqfd_function_cpu_seconds": kernel_cpu,
+        "known_scoped_cpu_seconds": cpu + kernel_cpu,
+        "known_scoped_cpu_per_operation": (cpu + kernel_cpu) / len(latency),
+        "bytes_per_second": byte_count / operation_seconds,
+        "threads_before": before, "threads_after": after,
+        "kernel_work_before": kernel_before, "kernel_work_after": kernel_after,
+        "client_cpu_seconds": time.process_time() - client_before,
+        "batches": batches,
+        "host_noise": bench.host_cpu_delta(host_before, Path("/proc/stat").read_text(), time.monotonic() - started),
+    }
+    if name == "idle":
+        result["idle_wake_ms"] = {}
+        for kind, connection in (("vsock", guest.native_connection), ("tap", tcp)):
+            began = time.monotonic()
+            bench.native_echo(connection, 700, 64)
+            result["idle_wake_ms"][kind] = 1000 * (time.monotonic() - began)
+            if result["idle_wake_ms"][kind] > 1000:
+                raise RuntimeError("timer-free idle wake exceeded one second")
+    return row_projection(result)
+
+
+def profile(guest, observer, args, result):
+    perf = args.perf
+    roster = bench.thread_roster(guest.pid)
+    tids = ",".join(str(row["tid"]) for row in roster)
+    path = bench.artifact_path(args.out)
+    events = ["kvm:kvm_entry", "kvm:kvm_exit", "kvm:kvm_userspace_exit", "kvm:kvm_mmio",
+              "kvm:kvm_set_irq", "syscalls:sys_enter_ioctl", "syscalls:sys_exit_ioctl",
+              "syscalls:sys_enter_read", "syscalls:sys_exit_read", "syscalls:sys_enter_write",
+              "syscalls:sys_exit_write", "syscalls:sys_enter_epoll_pwait", "sched:sched_switch"]
+    if args.profile == "stat":
+        command = [perf, "stat", "-t", tids, "-e", "task-clock,context-switches,cpu-migrations,page-faults",
+                   "-o", path / "stat.txt"]
+    else:
+        command = [perf, "record", "-t", tids, "-m", "2048", "-o", path / "profile.data"]
+        command += (["-e", "cpu-clock", "-F", "99", "-g", "--call-graph", "dwarf,8192"]
+                    if args.profile == "stacks" else [item for event in events for item in ("-e", event)])
+    errors = (path / "perf.stderr").open("wb")
+    ready = path / "recording-ready"
+    process = subprocess.Popen(["sudo", "-n", "env", f"PERF_BUILDID_DIR={HOME / 'perf-buildids'}",
+                                "timeout", "--kill-after=5s", "30",
+                                *map(str, command), "--", sys.executable, "-c",
+                                "from pathlib import Path; import sys,time; "
+                                "Path(sys.argv[1]).touch(); time.sleep(15)", str(ready)], stderr=errors)
+    before = observer.read()
+    operations = 0
+    try:
+        limit = time.monotonic() + 5
+        while not ready.exists():
+            if process.poll() is not None or time.monotonic() > limit:
+                raise Blocked("scoped collector did not enable counters before the workload")
+            time.sleep(.01)
+        began = time.monotonic()
+        while time.monotonic() - began < 12:
+            data = json.loads(matrix.rpc_exec(guest, "/disk-probe flush 4096 128", 20))
+            if data["operations"] != 128:
+                raise ValueError("profile operation integrity/count changed")
+            operations += 128
+        if process.wait(timeout=20) != 0:
+            raise Blocked("actual scoped profile collection unavailable")
+    finally:
+        if process.poll() is None:
+            subprocess.run(["sudo", "-n", "kill", "-TERM", str(process.pid)], check=False, timeout=5)
+            process.wait(timeout=10)
+        errors.close()
+    result["operations"] = operations
+    after = bench.thread_roster(guest.pid)
+    result["profiled_owned_all_task_cpu_seconds"] = bench.cpu_delta(roster, after)
+    result["threads_before"] = roster
+    result["threads_after"] = after
+    result["kernel_work_before"] = kernel_projection(before)
+    result["kernel_work_after"] = kernel_projection(observer.read())
+    text = (path / "perf.stderr").read_text()
+    if re.search(r"(lost|dropped)\s+[1-9][0-9]*|[1-9][0-9]*\s+(lost|dropped)", text, re.I):
+        raise Blocked("profile loss detected; never qualifying attribution")
+    if args.profile == "stat":
+        result["owned_perf_stat"] = subprocess.check_output(
+            ["sudo", "-n", "cat", str(path / "stat.txt")], text=True, timeout=5)
+    else:
+        decode = subprocess.run(["sudo", "-n", "env", f"PERF_BUILDID_DIR={HOME / 'perf-buildids'}",
+                                 perf, "report" if args.profile == "stacks" else "script",
+                                 "-f", *(["--stdio"] if args.profile == "stacks" else []),
+                                 "-i", str(path / "profile.data")], capture_output=True, timeout=45)
+        (path / "decoded.txt").write_bytes(decode.stdout)
+        if decode.returncode:
+            raise Blocked("owned profile decoding failed")
+        if args.profile == "stacks":
+            report = decode.stdout.decode(errors="replace")
+            if not re.search(r"\bflint\b", report) or not re.search(r"Samples:\s*[1-9]", report):
+                raise Blocked("no identifiable owned Flint stack samples")
+            # Perf report contains symbols/counts, not its DWARF stack bytes.
+            result["owned_stack_report"] = report
+        else:
+            devices = [{"kind": kind, "mmio_base": int(address, 16), "gsi": int(gsi)}
+                       for kind, address, gsi in re.findall(
+                           r"virtio-(blk|net|vsock) at MMIO 0x([\da-f]+) IRQ (\d+)",
+                           (path / "vmm.stderr").read_text())]
+            if not devices:
+                raise Blocked("actual device attribution unavailable")
+            result["attribution"] = analyze_trace.analyze(decode.stdout.decode().splitlines(), devices)
+            if not result["attribution"]["events"].get("kvm:kvm_exit", 0):
+                raise Blocked("no observable kernel exits in the scoped trace")
+            if args.mode == "C00" and (
+                    not sum(result["attribution"]["attributed_notify_userspace_returns"].values())
+                    or not sum(value for key, value in result["attribution"]["completed_irq_line_ioctl_calls"].items()
+                               if key != "non-virtio-or-unattributed")):
+                raise Blocked("functioning C00 trace lacks eligible notification/IRQ attribution")
+
+
+def cell(args):
+    if os.geteuid() == 0:
+        raise Blocked("backend/controller execution must be nonroot")
+    out = bench.artifact_path(args.out)
+    host = json.loads((PUBLIC / "host.json").read_text())
+    validate_pins()
+    os.sched_setaffinity(0, {host["client_cpu"]})
+    if args.scale_count:
+        return native_scale(args, host)
+    if args.lifecycle:
+        result = restore_stress.cycle(
+            SimpleNamespace(binary=HOME / "flint-ReleaseSafe", fixture=HOME / "fixture",
+                            mode=args.mode, vm_cpu=host["vm_cpu"]), out / "cycle")
+        error_hashes = [hashlib.sha256(error.encode()).hexdigest() for error in result.get("errors", [])]
+        result = {key: result[key] for key in ("status", "mode", "snapshot", "snapshot_sha256",
+                                             "paused_all_task_cpu_seconds", "source_exit", "restore_exit",
+                                             "restored_disk_bytes_verified", "bulky_images_removed_after_verified_restore",
+                                             "outstanding_sources_at_capture") if key in result}
+        result["classification"] = "one actual active mixed fresh v2 restore, not20/old-new/full lifecycle"
+        result["failure_message_sha256"] = error_hashes
+        result["performance_merge_eligible"] = False
+        save(out / "result.json", result)
+        return 0 if result["status"] == "passed" else 1
+    result = {"status": "failed", "mode": args.mode, "rows": [],
+              "classification": "profiled" if args.profile else "unprofiled matched matrix",
+              "full_kernel_accounting": False, "unmeasured_kernel_work": KERNEL_GAPS,
+              "performance_merge_eligible": False}
+    guest, tcp, observer = None, None, None
+    try:
+        guest = control.Guest.__new__(control.Guest)
+        guest.__init__(out, HOME / "flint-ReleaseSafe", args.mode, HOME / "fixture",
+                       disk=True, tap="hef3tap0", vm_cpu=host["vm_cpu"])
+        tcp = socket.create_connection(("192.0.2.2", 11000), timeout=8)
+        tcp.settimeout(10)
+        observer = matrix.Observer(guest, HOME / "irqfd_cpu.bpf.o")
+        control.agent(guest, True)
+        for connection in (tcp, guest.native_connection):
+            bench.native_echo(connection, 600, 64)
+        time.sleep(1)
+        if args.profile:
+            profile(guest, observer, args, result)
+        else:
+            for name in performance.WORKLOADS:
+                result["rows"].append(sample(guest, tcp, observer, name))
+                save(out / "result.json", result)
+        checksum = matrix.rpc_exec(guest, "/bin/busybox sha256sum /dev/vda", 20).decode().split()[0]
+        if checksum != bench.digest(guest.path / "disk"):
+            raise ValueError("whole real disk guest/host integrity failure")
+        result["shutdown_exit_code"] = guest.shutdown()
+        result["kernel_work_final"] = kernel_projection(observer.finish())
+        observer = None
+        result["status"] = "passed"
+    except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
+        result["failure_type"] = type(error).__name__
+        if isinstance(error, Blocked):
+            result["reason"] = str(error)
+        if isinstance(error, OSError):
+            result["errno"] = error.errno
+        result["failure_message_sha256"] = hashlib.sha256(str(error).encode()).hexdigest()
+    finally:
+        if observer is not None:
+            try:
+                observer.finish()
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+                observer.abort()
+                result["observer_cleanup_failed"] = True
+        if tcp is not None:
+            tcp.close()
+        if guest is not None:
+            try:
+                guest.close()
+                result["cleanup"] = json.loads((out / "teardown.json").read_text())
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+                result["cleanup_failed"] = True
+                result["status"] = "failed"
+        save(out / "result.json", result)
+    return 0 if result["status"] == "passed" else 1
+
+
+def native_scale(args, host):
+    count = args.scale_count
+    available = int(next(line.split()[1] for line in Path("/proc/meminfo").read_text().splitlines()
+                         if line.startswith("MemAvailable:"))) * 1024
+    out = bench.artifact_path(args.out)
+    result = {"status": "failed", "mode": args.mode, "count": count,
+              "classification": "pure-native1/4/8 idle/concurrency; not mixed-device scaling performance",
+              "full_kernel_accounting": False, "unmeasured_kernel_work": KERNEL_GAPS,
+              "performance_merge_eligible": False, "guest_agent_present": False, "heartbeat_ms": 0}
+    result["available_memory_bytes"] = available
+    result["required_memory_bytes"] = (count * 512 + 1024) * 1024**2
+    if available < result["required_memory_bytes"]:
+        result.update(status="blocked", reason="actual available memory insufficient for complete native scaling cell")
+        save(out / "result.json", result)
+        return 1
+    guests, observers, workers = [], [], []
+    try:
+        for index in range(count):
+            directory = out / f"g{index}"
+            directory.mkdir(mode=0o700)
+            guest = control.Guest.__new__(control.Guest)
+            guests.append(guest)
+            guest.__init__(directory, HOME / "flint-ReleaseSafe", args.mode, HOME / "native-fixture",
+                           vm_cpu=host["vm_cpu"])
+            observers.append(matrix.Observer(guest, HOME / "irqfd_cpu.bpf.o"))
+            bench.native_echo(guest.connection, 0, 4096)
+        time.sleep(.2)
+        before = [bench.thread_roster(guest.pid) for guest in guests]
+        for guest, roster in zip(guests, before):
+            channels = [subprocess.check_output(
+                ["sudo", "-n", "cat", f"/proc/{guest.pid}/task/{task['tid']}/wchan"],
+                text=True, timeout=5).strip() for task in roster]
+            if "kvm_vcpu_block" not in channels:
+                raise Blocked("pure-native guest is not verified in actual KVM HLT")
+        kernel_before = [observer.read() for observer in observers]
+        started = time.monotonic()
+        time.sleep(60)
+        seconds = time.monotonic() - started
+        after = [bench.thread_roster(guest.pid) for guest in guests]
+        kernel_after = [observer.read() for observer in observers]
+        cpu = sum(bench.cpu_delta(a, b) for a, b in zip(before, after))
+        irq = sum(b["kernel_irqfd_cpu_seconds"] - a["kernel_irqfd_cpu_seconds"]
+                  for a, b in zip(kernel_before, kernel_after))
+        result["idle"] = {
+            "seconds": seconds, "owned_all_task_cpu_seconds": cpu, "owned_irqfd_function_cpu_seconds": irq,
+            "known_scoped_core_percentage_points_per_sandbox": 100 * (cpu + irq) / seconds / count,
+            "threads_before": before, "threads_after": after,
+            "kernel_before": [kernel_projection(x) for x in kernel_before],
+            "kernel_after": [kernel_projection(x) for x in kernel_after],
+        }
+        result["wake_ms"] = []
+        for guest in guests:
+            started = time.monotonic()
+            bench.native_echo(guest.connection, 1, 64)
+            result["wake_ms"].append(1000 * (time.monotonic() - started))
+            if result["wake_ms"][-1] > 1000:
+                raise Blocked("true-idle wake exceeds one second")
+        latencies, errors = {}, []
+        def traffic(index, guest):
+            values = []
+            try:
+                for number in range(64):
+                    started = time.monotonic()
+                    bench.native_echo(guest.connection, number, 65536)
+                    values.append(1000 * (time.monotonic() - started))
+                latencies[index] = values
+            except (OSError, ValueError, RuntimeError, EOFError):
+                errors.append(index)
+        for index, guest in enumerate(guests):
+            worker = threading.Thread(target=traffic, args=(index, guest))
+            workers.append(worker)
+            worker.start()
+        for worker in workers:
+            worker.join(timeout=30)
+        if errors or any(worker.is_alive() for worker in workers):
+            raise Blocked("actual native scaling traffic did not complete with integrity")
+        result["concurrent_latency_ms"] = latencies
+        result["shutdown_exit_codes"] = [guest.shutdown() for guest in guests]
+        result["kernel_final"] = [kernel_projection(observer.finish()) for observer in observers]
+        observers = []
+        result["status"] = "passed"
+    except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
+        result["failure_type"] = type(error).__name__
+        if isinstance(error, Blocked):
+            result["reason"] = str(error)
+    finally:
+        for observer in observers:
+            try:
+                observer.finish()
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+                observer.abort()
+                result["status"] = "failed"
+        for guest in guests:
+            if guest.connection is not None and any(worker.is_alive() for worker in workers):
+                try:
+                    guest.connection.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+            try:
+                guest.close()
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+                result["cleanup_failed"] = True
+                result["status"] = "failed"
+        for worker in workers:
+            worker.join(timeout=5)
+        save(out / "result.json", result)
+    return 0 if result["status"] == "passed" else 1
+
+
+def namespace(args):
+    tap_probe.require_private_namespace()
+    uid, gid = int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"])
+    if uid <= 0 or gid <= 0:
+        raise Blocked("namespace bootstrap must originate from nonroot")
+    out = bench.artifact_path(args.out)
+    out.mkdir(mode=0o700)
+    os.chown(out, uid, gid)
+    tap_probe.setup_tap(uid)
+    def demote():
+        os.setgroups([])
+        os.setgid(gid)
+        os.setuid(uid)
+    argv = [sys.executable, str(Path(__file__)), "cell", "--out", str(out), "--mode", args.mode]
+    if args.profile:
+        argv += ["--profile", args.profile, "--perf", args.perf]
+    if args.scale_count:
+        argv += ["--scale-count", str(args.scale_count)]
+    if args.lifecycle:
+        argv += ["--lifecycle"]
+    process = subprocess.Popen(argv, cwd=bench.ROOT, preexec_fn=demote)
+    try:
+        return process.wait(timeout=330)
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=25)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+
+
+def run_cell(name, mode, phases, deadline, profile_kind=None, perf=None, scale_count=None, lifecycle=False):
+    if time.monotonic() + 360 > deadline:
+        raise Blocked("bounded hosted time reserve exhausted before a complete cell")
+    check_space(3 * 1024**3)
+    out = RAW / name
+    argv = ["sudo", "-n", "unshare", "--net", "--", sys.executable, str(Path(__file__)),
+            "namespace", "--out", str(out), "--mode", mode]
+    if profile_kind:
+        argv += ["--profile", profile_kind, "--perf", perf]
+    if scale_count:
+        argv += ["--scale-count", str(scale_count)]
+    if lifecycle:
+        argv += ["--lifecycle"]
+    record = owned_command(argv, name, 360)
+    phases.append(record)
+    save(PUBLIC / "phases.json", phases)
+    result = json.loads((out / "result.json").read_text()) if (out / "result.json").exists() else {
+        "status": "blocked", "mode": mode, "reason": "cell did not produce an actual receipt",
+        "performance_merge_eligible": False}
+    save(PUBLIC / f"{name}.json", result)
+    if record["returncode"] or result["status"] != "passed":
+        raise Blocked(f"{name} failed; no zero CPU or skipped-as-pass replacement")
+    return result
+
+
+def freeze(samples, pins):
+    if len(samples) != 5 or any(sample["status"] != "passed" or sample["mode"] != "C00"
+                                or len(sample["rows"]) != len(performance.WORKLOADS)
+                                or {row["name"] for row in sample["rows"]} != set(performance.WORKLOADS)
+                                for sample in samples):
+        raise Blocked("five complete passing C00 matrices required before candidates")
+    noise = {}
+    for name in performance.WORKLOADS:
+        rows = [next(row for row in sample["rows"] if row["name"] == name) for sample in samples]
+        if any(row["status"] != "passed"
+               or not isinstance(row["known_scoped_cpu_per_operation"], (int, float))
+               or not math.isfinite(row["known_scoped_cpu_per_operation"])
+               or row["known_scoped_cpu_per_operation"] < 0
+               or (name != "idle" and row["known_scoped_cpu_per_operation"] == 0)
+               or not math.isfinite(row["latency"]["p95"]) or row["latency"]["p95"] <= 0
+               or not math.isfinite(row["bytes_per_second"]) or row["bytes_per_second"] < 0
+               or (row["bytes"] and row["bytes_per_second"] == 0)
+               or (name != "idle" and row["operation_seconds"] < 5) for row in rows):
+            raise Blocked("CPU unavailable/zero or sustained baseline incomplete")
+        noise[name] = {
+            "known_scoped_cpu_per_operation": performance.summary([row["known_scoped_cpu_per_operation"] for row in rows]),
+            "p95_ms": performance.summary([row["latency"]["p95"] for row in rows]),
+            "throughput": performance.summary([row["bytes_per_second"] for row in rows]) if rows[0]["bytes"] else None,
+        }
+    exceeds = [name for name, data in noise.items() if name != "idle" and
+               (data["known_scoped_cpu_per_operation"]["cv"] > .1 or data["p95_ms"]["cv"] > .1
+                or (data["throughput"] and data["throughput"]["cv"] > .05))]
+    return {"status": "noise-inconclusive" if exceeds else "noise-provisionally-acceptable",
+            "candidate_performance_observed": False, "pins_sha256": hashlib.sha256(json.dumps(pins, sort_keys=True).encode()).hexdigest(),
+            "gates": GATES, "noise": noise, "exceeds_noise_caps": exceeds,
+            "cpu_scope": "known all-task plus tagged IRQFD function work; not complete marginal kernel CPU",
+            "full_kernel_accounting": False, "unmeasured_kernel_work": KERNEL_GAPS}
+
+
+def paired_interval(control_values, candidates):
+    if len(control_values) != 5 or len(candidates) != 5 or any(
+            not math.isfinite(value) or value <= 0 for value in control_values + candidates):
+        raise Blocked("five complete positive finite pairs required; missing CPU is not zero")
+    logs = [math.log(candidate / baseline) for baseline, candidate in zip(control_values, candidates)]
+    center = statistics.mean(logs)
+    width = 2.776445105 * statistics.stdev(logs) / math.sqrt(5)
+    return {"paired_n": 5, "confidence": .95, "model": "paired log-ratio Student-t(df4), preregistered",
+            "mean_ratio": math.exp(center), "lower_ratio": math.exp(center - width),
+            "upper_ratio": math.exp(center + width)}
+
+
+def compare(blocks):
+    result = {"status": "blocked-incomplete-qualification", "performance_merge_eligible": False,
+              "full_kernel_accounting": False, "unmeasured_kernel_work": KERNEL_GAPS,
+              "unexecuted_required_coverage": REQUIRED_GAPS, "contrasts": {}}
+    result["diagnostic_gate_checks"] = {}
+    for candidate, baseline in (("C10", "C00"), ("C01", "C00"), ("C11", "C00"),
+                                ("C11", "C01"), ("C11", "C10")):
+        contrast = {}
+        for name in performance.WORKLOADS:
+            if name == "idle":
+                differences = []
+                for block in blocks:
+                    pair = [next(row for row in block[mode]["rows"] if row["name"] == name)
+                            for mode in (baseline, candidate)]
+                    differences.append(100 * (pair[1]["known_scoped_cpu_seconds"] / pair[1]["operation_seconds"]
+                                              - pair[0]["known_scoped_cpu_seconds"] / pair[0]["operation_seconds"]))
+                contrast[name] = {"known_cpu_extra_core_pp": differences, "complete_idle_cpu": False}
+                continue
+            values = {}
+            for metric in ("known_scoped_cpu_per_operation", "p95_ms", "bytes_per_second"):
+                arrays = [[next(row for row in block[mode]["rows"] if row["name"] == name) for block in blocks]
+                          for mode in (baseline, candidate)]
+                extract = lambda row: row["latency"]["p95"] if metric == "p95_ms" else row[metric]
+                if metric == "bytes_per_second" and not arrays[0][0]["bytes"]:
+                    continue
+                values[metric] = paired_interval(*[[extract(row) for row in rows] for rows in arrays])
+            contrast[name] = values
+        result["contrasts"][f"{candidate}/{baseline}"] = contrast
+        if baseline == "C00":
+            regressions = []
+            for name, metrics in contrast.items():
+                if name == "idle":
+                    if any(value > .1 for value in metrics["known_cpu_extra_core_pp"]):
+                        regressions.append({"name": name, "metric": "known idle CPU"})
+                    continue
+                for metric, interval in metrics.items():
+                    if ((metric == "bytes_per_second" and interval["upper_ratio"] < .97)
+                            or (metric != "bytes_per_second" and interval["lower_ratio"] > 1.05)):
+                        regressions.append({"name": name, "metric": metric, "paired95": interval})
+            result["diagnostic_gate_checks"][candidate] = {
+                "known_primary_benefit_95_lower_at_least_10_percent":
+                    contrast["disk-flush-4096"]["known_scoped_cpu_per_operation"]["upper_ratio"] <= .9,
+                "demonstrated_regressions": regressions,
+                "full_cpu_benefit": "unavailable; incomplete affected kernel CPU",
+                "qualified": False}
+    result["all_candidates_have_demonstrated_regression"] = all(
+        result["diagnostic_gate_checks"][mode]["demonstrated_regressions"] for mode in MODES[1:])
+    return result
+
+
+def mechanism(profiles):
+    baseline = profiles["C00"]
+    def rates(profile):
+        if profile["status"] != "passed" or profile["operations"] <= 0:
+            raise Blocked("complete actual primary trace operations required")
+        attribution = profile["attribution"]
+        return {
+            "notify_userspace_returns_per_operation": sum(
+                attribution["attributed_notify_userspace_returns"].values()) / profile["operations"],
+            "eligible_irq_line_ioctls_per_operation": sum(
+                value for name, value in attribution["completed_irq_line_ioctl_calls"].items()
+                if name != "non-virtio-or-unattributed") / profile["operations"]}
+    control_rates = rates(baseline)
+    if any(value <= 0 for value in control_rates.values()):
+        raise Blocked("baseline eligible mechanism denominator unavailable, not infinite improvement")
+    result = {"classification": "profiled mechanism ratios; not unprofiled CPU/latency gain",
+              "C00": control_rates, "performance_merge_eligible": False}
+    for mode in MODES[1:]:
+        values = rates(profiles[mode])
+        values["reduction_percent"] = {
+            name: 100 * (1 - value / control_rates[name]) for name, value in values.items()}
+        result[mode] = values
+    return result
+
+
+def receipt(expected):
+    PUBLIC.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if not (PUBLIC / "decision.json").exists():
+        save(PUBLIC / "decision.json", {
+            "status": "blocked-before-complete-execution", "expected_source": expected,
+            "reason": "prerequisite step failed, job cancelled, or bounded experiment interrupted",
+            "setup_outcomes": {name: os.environ.get(f"EVENTFD_{name.upper()}_OUTCOME", "unavailable")
+                               for name in ("prerequisites", "zig", "kernel", "measure")},
+            "performance_merge_eligible": False, "default": "legacy", "auto_merge": False})
+    save(PUBLIC / "sha256sums.json", {
+        path.name: bench.digest(path) for path in sorted(PUBLIC.glob("*.json"))
+        if path.name != "sha256sums.json"})
+
+
+def qualify(expected):
+    if not re.fullmatch(r"[0-9a-f]{40}", expected):
+        raise Blocked("invalid immutable source SHA")
+    source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=bench.ROOT, text=True).strip()
+    if (source != expected or os.environ.get("GITHUB_REPOSITORY") != "cataggar/hearth"
+            or os.environ.get("GITHUB_ACTIONS") != "true"):
+        raise Blocked("not the approved exact-source ephemeral hosted job")
+    if subprocess.run(["git", "diff", "--quiet", "HEAD"], cwd=bench.ROOT).returncode:
+        raise Blocked("tracked working source differs from the approved immutable head")
+    deadline = time.monotonic() + 100 * 60
+    phases = []
+    decision = {"status": "blocked", "source": source, "performance_merge_eligible": False,
+                "default": "legacy", "auto_merge": False}
+    try:
+        host, perf = host_probe()
+        pins = build_inputs(phases, source)
+        preregister = {"gates": GATES, "source": source, "pins": pins,
+                       "vmm_cpu": host["vm_cpu"], "client_cpu": host["client_cpu"],
+                       "aa_repetitions": 5, "paired_blocks": 5, "minimum_nonidle_seconds": 5,
+                       "primary": "disk-flush-4096", "idle_seconds": 60,
+                       "candidate_order": [["C10", "C01", "C11"], ["C01", "C11", "C10"], ["C11", "C10", "C01"],
+                                           ["C01", "C10", "C11"], ["C11", "C01", "C10"]],
+                       "paired_model": "paired log-ratio Student-t(df4), two-sided95%",
+                       "qualification_requires_complete_kernel_accounting": True,
+                       "unmeasured_kernel_work": KERNEL_GAPS, "required_coverage": REQUIRED_GAPS}
+        save(PUBLIC / "preregister.json", preregister)
+        samples = [run_cell(f"aa-{index}", "C00", phases, deadline) for index in range(5)]
+        gates = freeze(samples, pins)
+        save(PUBLIC / "gates.json", gates)
+        if gates["status"] != "noise-provisionally-acceptable":
+            decision["status"] = "negative-hosted-noise-decision"
+            decision["reason"] = "actual complete A/A exceeds unchanged gates; zero candidate samples"
+        else:
+            trace_profiles = {}
+            for kind in ("stat", "stacks", "trace"):
+                profile_result = run_cell(f"profile-{kind}-C00", "C00", phases, deadline, kind, perf)
+                if kind == "trace":
+                    trace_profiles["C00"] = profile_result
+            blocks = []
+            for index, order in enumerate(preregister["candidate_order"]):
+                block = {"C00": run_cell(f"pair-{index}-C00", "C00", phases, deadline)}
+                for mode in order:
+                    block[mode] = run_cell(f"pair-{index}-{mode}", mode, phases, deadline)
+                blocks.append(block)
+            comparison = compare(blocks)
+            save(PUBLIC / "paired.json", comparison)
+            if comparison["all_candidates_have_demonstrated_regression"]:
+                decision.update(status="negative-proven-required-regressions",
+                                reason="each candidate has a demonstrated mandatory paired regression")
+            for kind in ("stat", "stacks", "trace"):
+                for mode in MODES[1:]:
+                    profile_result = run_cell(f"profile-{kind}-{mode}", mode, phases, deadline, kind, perf)
+                    if kind == "trace":
+                        trace_profiles[mode] = profile_result
+            save(PUBLIC / "mechanism.json", mechanism(trace_profiles))
+            for mode in MODES:
+                run_cell(f"active-restore-{mode}", mode, phases, deadline, lifecycle=True)
+            for count in (1, 4, 8):
+                for mode in MODES:
+                    run_cell(f"native-scale-{count}-{mode}", mode, phases, deadline, scale_count=count)
+            decision["status"] = ("negative-proven-required-regressions"
+                                  if comparison["all_candidates_have_demonstrated_regression"]
+                                  else "blocked-incomplete-kernel-lifecycle-scaling-qualification")
+            decision["unmeasured_kernel_work"] = KERNEL_GAPS
+            decision["unexecuted_required_coverage"] = REQUIRED_GAPS
+            decision["reason"] = ("each candidate has a demonstrated mandatory paired regression"
+                                  if comparison["all_candidates_have_demonstrated_regression"]
+                                  else "paired diagnostics are not full affected-CPU or complete adoption evidence")
+    except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
+        decision["reason"] = str(error) if isinstance(error, Blocked) else type(error).__name__
+    finally:
+        save(PUBLIC / "decision.json", decision)
+        receipt(expected)
+        print(json.dumps(decision))
+    return 1
+
+
+def main():
+    os.umask(0o077)
+    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(Blocked("bounded owned phase interrupted")))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("phase", choices=("qualify", "namespace", "cell", "receipt"))
+    parser.add_argument("--expected-sha")
+    parser.add_argument("--out")
+    parser.add_argument("--mode", choices=MODES)
+    parser.add_argument("--profile", choices=("stat", "stacks", "trace"))
+    parser.add_argument("--perf")
+    parser.add_argument("--scale-count", type=int, choices=(1, 4, 8))
+    parser.add_argument("--lifecycle", action="store_true")
+    args = parser.parse_args()
+    if args.phase == "qualify":
+        return qualify(args.expected_sha)
+    if args.phase == "receipt":
+        receipt(args.expected_sha)
+        return 0
+    return namespace(args) if args.phase == "namespace" else cell(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

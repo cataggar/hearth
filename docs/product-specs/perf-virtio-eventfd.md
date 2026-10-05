@@ -8,6 +8,40 @@
 
 **Execution plan**: [VirtIO eventfd experiment](../exec-plans/active/perf-virtio-eventfd.md)
 
+### Ephemeral hosted qualification alternative
+
+Shared-host noise is not a terminal experiment result. A separate
+`ubuntu-24.04` GitHub-hosted job may collect a **new**, unpooled epoch, only
+when the parent applies `perf-qualify-virtio-eventfd` to same-repository PR9
+from `copilot/perf-virtio-eventfd-20261004`. Only `pull_request:labeled`
+triggers it: no pushes, manual dispatch, fork code, persistent runner,
+write permission, credential persistence or `pull_request_target`.
+The event's exact head SHA, signed Zig0.17, verified5.10.245 kernel,
+static-musl target, one production Safe binary and deterministic fixtures
+are fixed across modes; no compiler/backend optimization is imported.
+
+The job must verify Azure identity, nesting, functional nonroot KVM,
+available independent physical cores/SMT, space and profiling privileges.
+Do not assume the hosted VM is quiet or suitable. Choose VMM/client affinity
+from the actual allowed topology, not vm31e CPU8/1. Run current real KVM/
+mask/reset and full-jail checks, fresh five-repeat C00 A/A, then freeze the
+unchanged numeric/noise gates **before** any candidate performance sample.
+Collect matched paired controls, primary stat/stacks/exit attribution,
+latency/throughput, all backend task CPU and scoped asynchronous IRQ work,
+lifecycle/idle/scaling where resources permit. Missing kernel dispatcher,
+scheduler or softirq attribution remains an explicit qualification blocker,
+never a zero or a complete-CPU claim. A bounded partial experiment cannot
+claim adoption or turn unexecuted required coverage into a pass.
+
+Only an explicit allowlist of sanitized receipts is uploaded: no guest
+memory/disks, raw global traces, foreign process inventories, cloud resource
+identifiers, environment dumps or secrets. Preserve failed/inconclusive
+summaries and owned cleanup. The single run is bounded by time/storage;
+unsuitable identity/resources and unavailable collection are actual blocked
+outcomes. Parent applies the label only after source is published; until
+then this alternative is **awaiting execution**, not a measured result.
+Legacy default, draft/HOLD, prior evidence and all existing gates remain.
+
 The [canonical jail correctness prerequisite](perf-jail-baseline.md) is reused
 from `7dfee42` (`85e6f3b` provenance). Own exact bare canonical Debug/Safe each
 pass32 units+3 actual enforced cases; this experiment each passes63+3.

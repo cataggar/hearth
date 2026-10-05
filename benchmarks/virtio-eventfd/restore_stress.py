@@ -89,7 +89,8 @@ def cycle(args, out):
     try:
         binary, fixture = bench.artifact_path(args.binary), bench.artifact_path(args.fixture)
         source = control.Guest.__new__(control.Guest)
-        source.__init__(out, binary, args.mode, fixture, disk=True, tap="hef3tap0")
+        source.__init__(out, binary, args.mode, fixture, disk=True, tap="hef3tap0",
+                        vm_cpu=getattr(args, "vm_cpu", 8))
         result["before"] = control.agent(source, True)
         tcp = connect_tcp()
         matrix.rpc_exec(source, "/bin/busybox touch /bench/run-disk; /bin/sh /disk-load >/dev/null 2>&1 & printf STARTED")
@@ -132,7 +133,8 @@ def cycle(args, out):
         destination.mkdir(mode=0o700)
         restored = control.Guest.__new__(control.Guest)
         restored.__init__(destination, binary, args.mode, fixture, out, disk=True,
-                          tap="hef3tap0", restore_api=True, accept_native=False)
+                          tap="hef3tap0", restore_api=True, accept_native=False,
+                          vm_cpu=getattr(args, "vm_cpu", 8))
         # v2 intentionally does not serialize live host connections. The
         # unchanged agent reconnects; the fixture explicitly restarts its two
         # native apps rather than promising transparent stream preservation.

@@ -17,6 +17,41 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## New hosted alternative: source ready, execution pending
+
+The parent requested a concrete quiet-environment alternative, not abandonment
+because vm31e is shared. Separate workflow
+`.github/workflows/perf-virtio-eventfd.yml` and `hosted.py` now provide a
+label-only, exact-own-branch/same-repository PR9 ephemeral `ubuntu-24.04` path.
+Only the parent applies `perf-qualify-virtio-eventfd`; it was still absent
+at source-readiness verification. Immutable head checkout, read-only token,
+no credential persistence,120-minute ceiling and private caches/artifacts
+do not add any main/default/auto-merge action.
+
+**Actually executed here:**29 Python tests (20 prior collector guards +9 new
+hosted/observer guards), Python AST, YAML scope and all Bash syntax checks,
+under the common exclusive fleet lock. No new VM/compiler/profile/image
+phase and **zero hosted measurements** have executed. Private commands/logs:
+`.perf/eventfd/hosted-prepare/{final-tests,final-validation}.log`.
+These are source-preparation tests, not KVM/performance acceptance.
+
+The new runner must verify actual Azure/nesting/KVM/topology/resources/tools,
+adapt independent affinities, rerun current real KVM/full jail acceptance,
+and preregister unchanged gates before five fresh17-class C00 A/A matrices.
+Failed noise prevents candidates. Passing noise admits matched paired
+controls/candidates, primary software stacks/stat/exit attribution, then
+bounded active fresh restore and pure-native1/4/8 HLT-idle/concurrency cells.
+See the [runner contract](../../README.md#label-only-ephemeral-hosted-alternative)
+for exact sequencing and allowlisted receipts.
+
+Tagged IRQ function CPU is still a scoped component, not complete marginal
+dispatcher/scheduler/softirq CPU. Positive partial diagnostics cannot qualify;
+missing full lifecycle/mixed scaling/storm coverage remains explicit.
+The workflow may yield an actual unsupported/blocked/noisy/negative outcome,
+never skipped-as-pass or fabricated zero CPU. Old epochs/pins remain unchanged
+and unpooled. `measure-eventfd-ephemeral-azure` awaits the parent-applied label
+and actual artifacts; no quiet/Azure suitability or gain is presumed.
+
 ## Staged post-IRET/mask/reset acceptance and pause attribution
 
 The parent's frozen `6c218b0` review trees were not accessed or modified.
