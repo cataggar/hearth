@@ -26,8 +26,18 @@ exhaustion errors across the same2 tests; owned children resume/join in finally.
 Initial negative-control checker wrongly expected only2 failures and stopped
 before corrected execution; its failed log remains separate. Corrected
 accounting then runs all actual tests successfully. Both bounded local phases
-release the fleet lock with the unchanged3GiB guard. Source/isolated current-head
-CI publication is pending; no local performance matrix or parent label.
+release the fleet lock with the unchanged3GiB guard.
+
+Published source2399ba7/tree1df37ab actually completes CI37303602881,9/9 jobs.
+Safe/Debug independently execute57 focused/skip0 including both new oracle
+controls,25 dedicated+7 integrations,4 jail (2 real API+2 mocked cleanup);
+static39 units per optimization/26 fork controls remain passing. Existing24
+fatal/8 actual KVM EINTR/four-mode unavailable136 and masked/IRET-HLT scenarios
+run again. None substitutes for current full guest-active restore acceptance.
+Raw metadata/logs/ZIPs remain private;15 selected actual/local/source members
+are sealed under a separately bounded lease and durably published with SHA.
+Evidence-only follow-up changes no tested source/workflow byte.
+No local performance matrix or parent label/new lifecycle qualification.
 
 ### Immediate-exit capability admission — 2026-10-05
 

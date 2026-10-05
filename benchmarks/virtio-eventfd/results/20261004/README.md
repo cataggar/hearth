@@ -20,7 +20,7 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
-## Stopped producer admission — new harness epoch, CI pending
+## Stopped producer admission — actual source correctness, separate epoch
 
 Current `disk_running` rejects proc `T`/`t` before accepting command/identity
 or classifying an exec-start transition. Valid PID/start-generation and
@@ -45,8 +45,35 @@ Native/hosted capability136 admission remains4939 unchanged and already
 actual CI-validated at05fc; no duplicate repair, helper/oracle or default
 change is introduced. Reviewed vm_cpu/Observer and explicit exec-start retry
 remain. f52's80,2dcb's4, original invalid80 and05fc's CI are separate source
-epochs, **not new-source restore proof**. Isolated exact-head correctness CI
-will execute all57 guards; new-source CI is pending at initial publication.
+epochs, **not new-source restore proof**. At initial publication new-source CI
+was pending, not inferred from those epochs.
+
+[CI37303602881](https://github.com/cataggar/hearth/actions/runs/37303602881)
+subsequently actually completes **9/9 successful jobs** at exact source
+`2399ba70897a6e5a45f0746f93430a1f33d2913c`, tree
+`1df37abe2b09d5194f3fe8017cea7aa4000d3e7a`.
+
+| Actual job | ID | Executed coverage |
+|---|---|---|
+| KVM ReleaseSafe |111741897629|25 dedicated+7 integrations,57 focused/skip0,4 jail (2 real API+2 mocked cleanup) |
+| KVM Debug |111741897609|Same actual coverage, independently compiled/run |
+| Static units |111741897207|39 per optimization,26 real policy fork controls each |
+
+Both57-case runners actually execute the owned SIGSTOP/SIGCONT and trace-stop/
+pre-exec no-retry regressions. These are host-side harness oracle controls,
+not new guest-active restore proof. Existing native masked/IRET-HLT controls,
+four-mode unavailable136 rejection and24 fatal/8 consumed-signal→actual KVM
+EINTR cases per optimization execute again. No skips/caches/partial coverage
+or expected negative-control failures are relabeled as positive acceptance.
+
+Raw current-source logs/metadata/ZIPs11342413063 (Safe),11342637500 (Debug)
+remain private. The [stopped-producer-admission-validation.tar.gz](stopped-producer-admission-validation.tar.gz)
+contains15 sanitized actual/local/source/failed-control members,20,756B;
+SHA256 `fecf09ddd8a6499df0f38217d09367b582dd8b9eb19cf046acdd021ade9c3ce5`
+is in [stopped-producer-admission-SHA256SUMS](stopped-producer-admission-SHA256SUMS).
+Network retrieval holds no host lease; verification/sealing uses a separate
+bounded fleet phase/unchanged3GiB guard. Watcher/local phases end and release.
+Evidence-only follow-up changes no tested source/workflow bytes.
 No full active restore/lifecycle rerun, local performance matrix, parent
 label/hosted measurements, new performance qualification or merge.
 
