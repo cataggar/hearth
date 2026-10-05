@@ -24,9 +24,17 @@ The standalone `tools/perf/test_jail_baseline.py` does not import the performanc
 runner or async worker. It checks real enforced API receive/send, umask077
 directory/node ownership/access, empty groups/caps and all actual VMM task
 filters, plus real CLI/API guest disk write/fsync/read/hash and unchanged host
-KVM metadata. There are three cases; missing prerequisites fail, not skip.
+KVM metadata. There are four cases; missing prerequisites fail, not skip.
 Its small serial fixture is synchronous correctness, not a throughput,
 interactive, timer-free wake or snapshot performance acceptance.
+
+Cleanup evidence persistence is not a prerequisite for resource teardown.
+An injected ENOSPC while saving the exited child's cleanup record must still
+close both logs and remove its private device directory/node and API socket;
+the evidence error propagates. The fourth case exercises this on a real
+enforced API child, checks all recorded PID paths are gone, and writes a
+separately identified fault audit after teardown. This is an injected write
+failure, not a claim that the host was full during validation.
 
 ## Reproduction
 
@@ -59,3 +67,22 @@ in a public PR.
 
 Passing this prerequisite does not authorize a native-size waiver, quieter
 host assumption, async/vhost/eventfd adoption, performance merge or auto-merge.
+
+## Cleanup follow-up acceptance
+
+An actual unchanged-helper negative control reproduces joined-child logs,
+private device and socket retained after an injected cleanup-evidence ENOSPC.
+The hardened helper explicitly recovers that same owned launch. The corrected
+fixture then executes LLVM static Debug/Safe **4/4 cases each, 8/8 total**,
+including four CLI/API guest disk boots and two injected-failure API children.
+All nine launch records have no live PID paths, private nodes or sockets.
+The initial import failure executes zero tests and remains separately retained.
+No VMM runtime/syscall/compiler/guest feature or performance gate changes.
+
+Private evidence is under `.perf/blk-io/canonical-prerequisite/`:
+`check-cleanup-fault.py`, `check-cleanup-fault.log`,
+`cleanup-current-{debug,safe}.log`, `cleanup-current-results.json` and
+`cleanup-acceptance-manifest.json`. The actual bounded phase uses the common
+exclusive fleet lock and rechecks at least256MiB before each mode/control.
+These are canonical helper tests, not native/GNU or sibling backend/full
+production application-state acceptance.
