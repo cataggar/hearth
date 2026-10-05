@@ -37,6 +37,15 @@ now pass against that ELF; lifecycle errors are fatal exits with no API ACK,
 snapshot or surviving owned task, not live fallback.14 focused Python tests
 pass, including timeout-versus-fatal-rejection and resource cleanup.
 
+A later fixture-only canonical follow-up98b10c21 is adopted as `bd4eb41`:
+cleanup-evidence ENOSPC no longer skips mandatory log/device/socket teardown.
+The own new enforced API fault case actually passes1/1 Debug and1/1 Safe,
+FD5→5 each and all four recorded owned IDs/resources gone. No guest boots,
+net traffic, runtime changes, rebuild or old-suite/new performance counts
+follow; prior three canonical cases are not rerun. The separate34-file custody
+seal and exact scope are in the results. This maintenance does not repair or
+waive the independently rejected masked-level IRQ contract.
+
 The complete installed guest-tool closure now passes4/4 TCP/UDP direction
 smokes per backend; three-second samples are not deciding performance or idle
 acceptance. Earlier overlong/missing-input/fatal-disconnect fixture failures,

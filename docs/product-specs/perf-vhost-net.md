@@ -116,6 +116,14 @@ before creating the second fence. Preserve owner/mode and original bytes on
 copy failure. This is neither a runtime memory backend nor a timed performance
 variant; never use it to claim lower snapshot latency or shared restore RAM.
 
+Optional evidence persistence must never gate mandatory owned teardown.
+The standalone common jail fixture now closes logs and removes its private
+device directory/node and socket even when saving cleanup evidence raises
+ENOSPC, preserving the error. Own new Debug/Safe enforced API regressions pass
+1/1 each with unchanged runtime pins and FD5→5; this is injected failure
+handling, not host-full, guest/net lifecycle or performance acceptance.
+Earlier canonical-suite counts remain their original execution epochs.
+
 A separate complete installed iperf closure includes its actually required
 conditional pthread-cancellation library, with fixture-relative/private state.
 Both backends pass four three-second TCP/UDP direction smokes; UDP receiver
