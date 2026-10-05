@@ -73,6 +73,7 @@ def child(args):
             result["phase"] = "post-closed-pty-connection"
             if matrix.rpc_exec(guest, "printf EXEC") != b"EXEC":
                 raise ValueError("post-PTY original connection exec integrity failed")
+            result["post_closed_pty_exec_verified"] = True
         result["shutdown_exit_code"] = guest.shutdown()
         result["status"] = "passed"
     except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:

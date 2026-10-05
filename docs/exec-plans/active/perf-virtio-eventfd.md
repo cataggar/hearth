@@ -49,6 +49,17 @@ and marks the control connection stale; this focused old-source counterexample
 must fail before a surgical correction. Do not alter existing stale/kill/poll
 timeouts or frame format.
 
+Actual cause regression37350209559/fd4878a: native test runs3/4, expected exit7
+but receives exit-1 from the real child/openpty/socketpair path. Enforced
+all-device C00 separately completes7936 execs/15 slow-reader/4096 normal PTYs,
+then fails the first deliberate terminal-close command at PTY exit validation;
+custody is clean. Failed native and real-KVM scopes remain terminal.
+Correct only the demonstrated HUP branch: mark its pollfd ignored rather than
+returning false, so existing50ms waitpid/input handling observes true completion
+without persistent-HUP spin. Preserve wire, output, flags, idle/kill/disconnect,
+credits and whole-VM fences. Current exact-source CI must run native4/4 and
+all-device4096+4+following exec without reconnect. Do not trigger qualification.
+
 ### Third hosted epoch — bounded empty-frame timeout attribution
 
 Preserve14 original JSONs/13 hashes from37337531285/8a30. Pre-build actual

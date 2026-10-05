@@ -20,6 +20,48 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Fourth hosted epoch and bounded PTY cause reproduction
+
+[37345716921](https://github.com/cataggar/hearth/actions/runs/37345716921)/94c7
+remains terminal FAILURE6m17s on new nested AMD/svm D4ads_v7, not priorv5.
+Native Debug/Safe71/71/no skips, jail/probes and real perf control ACKs pass.
+aa-0 retains13 complete prior rows through exec7936, then records actual matrix
+interactive batch41/op8, pty-stream/receive-header, empty-header timeoutc1da153e.
+Custody passes/controller1/cleanup.000459113s/no survivors/errors/unsafe.
+No complete A/A/gate freeze/profile/candidate/gain; all four hosted epochs are
+preserved, never topped up or relabeled. The original14 safe JSONs remain private.
+
+Three distinct bounded correctness scopes, **not hosted measurements**:
+
+| Source / ordinary CI | Actual result |
+| --- | --- |
+| d2c2d68 / [37347514253](https://github.com/cataggar/hearth/actions/runs/37347514253) | Reduced no-TAP C00:7936 execs,15 native slow-reader,4096 normal PTYs pass, one connection. L0 first exec batch is incomplete/empty-header timeout; partial commands not counted. Overall CI FAILED; both cleanup scopes pass. |
+| 4bbfc44 / [37348871497](https://github.com/cataggar/hearth/actions/runs/37348871497) | All-device C00:11 disk/TAP/vsock prelude batches,7936 execs/15 slow-reader,74 complete32-PTY batches, then SAME timeout at batch74/op11. TWO control connections prove an unsolicited reconnect. Clean custody. |
+| fd4878a / [37350209559](https://github.com/cataggar/hearth/actions/runs/37350209559) | Focused real native child/openpty/socketpair test fails: expected eventual exit7, observed exit-1; native3/4. Separately real-KVM normal4096 PTYs pass, then deliberate early terminal closure fails its first exit validation. Clean custody. |
+
+The source conflates PTY HUP before waitpid readiness with a stale control
+channel: it kills the child and forces reconnect. A raced natural child exit
+can still produce successful exit0, leaving the next request on the old socket.
+The native counterexample deterministically keeps the child alive after closing
+its terminal; the all-device counterexample reproduces the same observed header
+failure/reconnect without modifying the production agent.
+
+The surgical correction stops polling that persistently hung-up PTY, retains
+its fd for final drain and continues the existing50ms waitpid/input loop. No
+busy spin, new timer/heartbeat, timeout/retry, protocol/output/credit change,
+whole-VM fence change or default-mode change. Existing genuinely stale/kill/
+disconnect reconnect policy stays unchanged. Native regression checks eventual
+exit7, all PTY bytes, original flags and no forced reconnect. Real-KVM CI requires
+4096 normal PTYs plus four early-terminal-close commands and a following exec
+on the original connection after preceding all-device/exec/slow-reader load.
+
+Corrected-source CI is pending at initial publication. Actual branch tracing is
+not present in the fourth historical AMD receipt; the demonstrated cause comes
+from the separate controlled reproductions, not a reconstructed old trace.
+Unchanged local3GiB guard blocks heavy execution. No fifth qualification or
+label change; parent alone reviews. Performance/lifecycle eligibility remains
+false regardless of these correctness results.
+
 ## Third hosted epoch — partial A/A empty-frame timeout, unresolved runtime cause
 
 [37337531285](https://github.com/cataggar/hearth/actions/runs/37337531285)

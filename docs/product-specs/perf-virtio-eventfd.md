@@ -27,6 +27,25 @@ The local3GiB storage guard still prevents heavy execution; ordinary isolated
 CI is authorized. Parent alone reviews any demonstrated fix before a fifth
 fresh qualification; no worker label or measurement trigger.
 
+Actual all-device C00 attempt37348871497/4bbfc44 reproduces the same empty-header
+timeout at batch74/op11 after the prescribed load, with TWO agent control
+connections. The previous reduced C004096-PTY attempt passed, and its L0
+comparison failed during the first exec batch; neither is borrowed acceptance.
+Old-runtime native37350209559/fd4878a executes3/4 tests: a child that closes its
+PTY before exiting is killed, producing exit-1 instead of its eventual7.
+The same source's real-KVM normal4096 PTYs pass, then the deliberate terminal
+closure fails at exit validation. This demonstrates HUP-before-reap conflation.
+
+A drained PTY is not a stale control connection or a child exit. Disable polling
+of the persistently hung-up master while retaining its fd for final drain;
+continue the existing50ms waitpid/input loop until actual child completion.
+Preserve all output, eventual exit status, original control-channel reuse and
+blocking flags. Do not busy-spin on HUP or change existing idle/kill/disconnect
+reconnect rules, socket deadlines, protocol, credits or whole-VM fences.
+Corrected real-KVM proof must complete normal4096 and four early-terminal-close
+commands plus a following exec on the same connection. The fourth historical
+AMD snapshot itself does not contain a branch trace; preserve that distinction.
+
 ### Hosted prerequisite failure diagnostics
 
 For workload failures, record the source-allowlisted active workload, batch,

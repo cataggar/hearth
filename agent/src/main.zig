@@ -410,7 +410,8 @@ fn interactivePollLoop(sock: posix.fd_t, master_fd: posix.fd_t, child_pid: posix
             if (n > 0) {
                 sendStreamChunk(sock, "stdout", spawn_chunk[0..n]) catch break;
             } else if (pfds[0].revents & posix.POLL.HUP != 0) {
-                break;
+                // Terminal EOF may precede child exit; do not spin on persistent HUP.
+                pfds[0].fd = -1;
             }
         }
 
