@@ -1070,3 +1070,30 @@ pub fn main() !void {
         posix.nanosleep(0, 100_000_000); // 100ms
     }
 }
+
+test "PTY hangup before child reap preserves output exit status and control connection" {
+    var sockets: [2]posix.fd_t = undefined;
+    const rc: isize = @bitCast(linux.syscall4(
+        .socketpair,
+        linux.AF.UNIX,
+        linux.SOCK.STREAM | linux.SOCK.CLOEXEC,
+        0,
+        @intFromPtr(&sockets),
+    ));
+    try std.testing.expectEqual(@as(isize, 0), rc);
+    defer posix.close(sockets[0]);
+    defer posix.close(sockets[1]);
+    force_reconnect = false;
+    defer force_reconnect = false;
+
+    handleInteractiveSpawn(sockets[0], "printf PTY; exec 0<&- 1>&- 2>&-; sleep 0.1; exit 7", 80, 24);
+    var message: [1024]u8 = undefined;
+    const output = try recvMsg(sockets[1], &message);
+    try std.testing.expectEqualStrings("stdout", jsonStr(output, "type").?);
+    try std.testing.expectEqualStrings("UFRZ", jsonStr(output, "data").?);
+    const exit = try recvMsg(sockets[1], &message);
+    try std.testing.expectEqualStrings("{\"type\":\"exit\",\"code\":7}", exit);
+    try std.testing.expect(!force_reconnect);
+    const flags = linux.fcntl(sockets[0], linux.F.GETFL, @as(u32, 0));
+    try std.testing.expectEqual(@as(usize, 0), flags & 0x800);
+}

@@ -36,6 +36,19 @@ before finishing. This targets the source's HUP-before-reap/stale-connection
 conflation; no fix is claimed until actual failure proves it. C00-only targeted
 CI does not erase L0's failed first receipt or satisfy legacy qualification.
 
+Actual second37348871497/4bbfc44 reproduces the SAME empty-header timeout in
+all-device C00:7936 execs/15 slow-reader,2368 whole-batch normal PTYs, failure
+batch74/op11 pty-stream/receive-header/c1da153e. Private source-prefix counts
+show TWO agent control connections, versus one in the reduced passing attempt.
+This fails before the closed-terminal case; custody passes with no survivors/
+errors/unsafe. It establishes an unsolicited reconnect during normal PTYs,
+not a cause reconstructed for the older fourth host.
+Add a real native socketpair/openpty/child regression: child emits PTY, closes
+terminal fds, remains alive100ms, then exits7. The existing HUP branch kills it
+and marks the control connection stale; this focused old-source counterexample
+must fail before a surgical correction. Do not alter existing stale/kill/poll
+timeouts or frame format.
+
 ### Third hosted epoch — bounded empty-frame timeout attribution
 
 Preserve14 original JSONs/13 hashes from37337531285/8a30. Pre-build actual

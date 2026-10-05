@@ -3,6 +3,10 @@ const posix = @import("posix.zig");
 const linux = std.os.linux;
 const c = @import("libc");
 
+comptime {
+    _ = @import("main.zig");
+}
+
 test "fork and exec preserve blocking pipes, nonblocking wait and dup2 redirection" {
     const output = try posix.pipe();
     defer posix.close(output[0]);
