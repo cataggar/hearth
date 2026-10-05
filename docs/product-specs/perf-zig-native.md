@@ -50,9 +50,12 @@ failures, not compiler/counter unsupported outcomes.
 
 ### Fresh measurement milestones and exclusions
 
-Debug unchanged A/A completes ten counterbalanced pairs (20 observations per
-condition), including genuinely artifact-cold configurer/translation/helper
-work with only immutable package sources prefetched:
+Debug unchanged A/A retains60 successful rows covering ten counterbalanced
+pair identifiers (20 observations per condition), across an interrupted
+five-pair segment and a separately recorded five-pair continuation. This is
+**not a fresh homogeneous ten-pair recorder cohort**. The descriptive table
+combines both segments, including artifact-cold configurer/translation/helper
+work with only immutable package sources prefetched; it is not gate acceptance:
 
 | Condition | Median | Mean | SD | CV |
 |-----------|-------:|-----:|---:|---:|
@@ -66,8 +69,26 @@ controls, **not** native speedups or prospectively relaxed gates. The first
 cold126.228s observation remains included. Genuine ENOSPC halted after five
 pairs; remaining five use exact-manifest, complete-pair/cache-SHA/source-identity
 verified resume. Both recorder epochs and the interruption are retained, with
-no automatic pooling qualification. Warm20ms RSS sampling sometimes misses the
-entire short command; zeros do not establish its peak memory. The exact cloned
+no automatic pooling qualification. Exact registration is
+`postcleanup-build-aa-debug/manifest.json`, SHA256
+`52a6a5b12215a23ef760dfc3d00657b13eb014672044b9727be3153df2a22238`;
+all60 rows carry that manifest hash. It records source revision
+`1ab37da07fa56bfbfb8c19a3723e50c842bf48d5` with source-diff SHA256
+`48c0c6c8b28cb11720de9008c760f898c37bd6b3f8b90d37fea5b54b2e332ed6`
+and exact source/package hashes, not a claim that the historical source was
+clean or that current HEAD was benchmarked. Original indices0–4 contribute30 rows
+with recorder `b10354e212acbc1375512a2c7d24bebfe76eba9dab0d174466393aa43cf87110`;
+continuation indices5–9 contribute30 rows with recorder
+`9d21d221576fb9bb6004e0843cd36001b3130480fcc937167d3d455cf64c23ff`.
+`resume-1327811179458556.json` records five completed/five remaining pairs,
+unchanged manifest and explicitly no automatic pooling qualification. This
+historical retained registration is not the current owned-only445 recorder
+epoch, whose v8/v9 new safe reference A/A executes zero rows. Source/cache byte
+checks do not certify physical extents, OS-cache/writeback state or a quiet
+window across the interruption. No reconstructed witness or retained compiled
+cache is used to declare a new cold row. Warm20ms RSS sampling sometimes misses
+the entire short command; its legacy raw zero is missing/unknown, not zero
+memory or a measured peak. The exact cloned
 512→513MiB source patch changes emitted `.text`, unlike touch/comment edits;
 original/clone source restoration is checked.
 

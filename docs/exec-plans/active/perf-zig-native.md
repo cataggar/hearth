@@ -41,14 +41,21 @@ private stat/stack collectors; coverage pilots and full sample execution remain
 incomplete. Neither tool's completion implies adoption or complete
 asynchronous kernel CPU accounting.
 
-Fresh Debug unchanged A/A now completes ten paired repetitions of all three
-conditions: cold median114.0748s/CV2.5613%, warm26.2708ms/CV27.1557%,
+Debug unchanged A/A retains60 successful rows across ten pair identifiers,
+not a fresh homogeneous recorder cohort: cold median114.0748s/CV2.5613%,
+warm26.2708ms/CV27.1557%,
 codegen-changing rebuild0.982117s/CV3.5770% (20 observations each). The
 512→513MiB cloned-source patch changes emitted `.text`; pristine source is
 restored. Warm live-tree RSS sampling sometimes observes no process and cannot
 qualify peak memory. A real ENOSPC interruption after five pairs is preserved;
-verified same-manifest resume contributes the remaining five, not an automatic
-noise/acceptance decision. Safe A/A and explicit Debug comparisons each retain
+verified same-manifest continuation contributes the remaining five, not an
+automatic noise/acceptance decision. Registration SHA is `52a6a5b1…22238`:
+original indices0–4/30rows use recorder `b10354e2…7110`, continuation5–9/30rows
+use `9d21d221…3ff`; full pins and checkpoint filename are in the spec. The
+combined medians are descriptive only, not qualification, nor current445
+recorder reference acceptance. Byte/cache checks cannot certify physical
+extent or OS-cache/writeback equivalence across the pause. Safe A/A and
+explicit Debug comparisons each retain
 six complete pairs/36 rows; repeated resumes halt at the unchanged4GiB guard.
 Safe comparison has not started. Partial medians/CVs are recorded in the spec,
 not promoted to compilation-benefit qualification.
