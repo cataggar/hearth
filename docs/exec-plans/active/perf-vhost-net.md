@@ -70,6 +70,15 @@ read does not retroactively establish topology at earlier sample cuts. Preserve
 the unfavorable/unqualified population; any future deciding phase needs its own
 actual topology freeze before controls, not an assumed0/8 sibling map.
 
+The later own IRQ source/latch follow-up adds a concrete blocked correctness
+contract: common `raiseIrq` pulses IRQ_LINE1→0 unconditionally. With both PICs
+masked and an IOAPIC level route, own KVM IRR is0 before/after unmask; a held1
+control retains0x20. Two model assertions pass, one demonstrating the undesired
+current pulse behavior, FD6→6. No guest instruction runs and no full delivery,
+ACK/reset or pending1 snapshot/restore is accepted. No peer policy/code is
+borrowed. Reject adoption of this current bridge; keep S6/plan blocked rather
+than layering unvalidated IRQ plumbing onto a no-demand/unfavorable candidate.
+
 **Current implementation update:** S4/common dispatcher and S5/shadow-ring
 backend/lifecycle are implemented, with the existing guest features, 12-byte
 header and format-v2 snapshot. A′ and B now have actual unjailed KVM payload,

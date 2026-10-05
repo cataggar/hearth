@@ -134,6 +134,16 @@ shortcut. A minimal unjailed architectural probe does not substitute for a
 deterministic API-level pending-exit snapshot/restore regression or the pending
 network IRQ/race population.
 
+The current common net IRQ adapter is **not accepted for masked IOAPIC level
+routes**. Own source inspection finds its unconditional IRQ_LINE1→0 pulse;
+an own exact-host KVM latch model with both PICs masked observes IOAPIC IRR0
+before/after level-route unmask, versus IRR0x20 when the input remains asserted.
+Those are two characterization assertions, including an undesired result,
+not guest IRQ-delivery/ACK/snapshot acceptance. No peer IRQ policy is imported.
+Full guest masked/unmask/ACK/reset and format-v2 pending1 handoff remain unrun.
+Do not ship/adopt this bridge; a separately specified, independently validated
+IRQ contract would be required before reconsidering the current prototype.
+
 ### Reopened safe opt-in work (18:01 UTC)
 
 The coordinator independently confirms 15.961/16 busy visible cores. Quiet-host
