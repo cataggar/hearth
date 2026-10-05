@@ -159,7 +159,17 @@ typed errors and remaining unsafe generations in a FAILED receipt, even if
 later safe reconciliation removes every survivor. Keep existing finite budgets;
 do not silently downgrade errors, signal an unverified PID or scan globally.
 
-Current focused local execution passes64/64, skipped0, plus10 workflow coverage
+Actual corrected source71e614e passes isolated CI37316393129,9/9: Safe/Debug
+each66 current guards/skip0 plus both verified old-source negative controls
+(one expected error+one expected failure, not positive pass credit).
+Real exit/reap at the exact boundary is a no-signal outcome; persistent
+registration refusal produces an explicit FAILED unsafe/error receipt while
+eight other owned stand-ins terminate/reap. The fixture subsequently removes
+its artificial refusal and safely reaps the last generation. This is not
+eight-KVM scaling or full lifecycle/performance acceptance. Initial87 helper
+calibration failures remain separate; local storage guard executed no tests.
+
+Prior679162e focused local execution passes64/64, skipped0, plus10 workflow coverage
 guards. New controls include a15.6-second four-batch deterministic window,
 premature exit0/malformed ACK rejection, eight separate-session synthetic VMM
 stand-ins plus one auxiliary collector, successful-controller orphan rejection,

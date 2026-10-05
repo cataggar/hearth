@@ -1,0 +1,33 @@
+Selected actual CI37316393129 output; ANSI/time prefixes removed.
+Immutable executed source:71e614e166e1bd4a9f39b44cee8eb9857c93456f
+These are correctness controls, not performance measurements.
+
+ReleaseSafe job111784095110:
++- run test 25 pass (25 total) 53s MaxRSS:6M
++- run test 7 pass (7 total) 12s MaxRSS:64M
+Ran 2 tests in 2.165s
+FAILED (failures=1, errors=1)
+{"immutable_9ee9_negative_controls": 2, "expected_errors": 1, "expected_failures": 1, "skipped": 0, "verified_git_blob": "41561cad864b4dce2ed8d019a1768ee49fabe34f", "owned_fixture_children_reconciled": true}
+Ran 66 tests in 11.133s
+{"expected_failed_custody_receipt": {"status": "failed", "code": 1, "cleanup_errors": [{"phase": "signal", "pid": 4686, "start_ticks": 28636, "type": "CustodyError", "error": "injected per-registration verification refusal", "errno": null, "signal": 15}, {"phase": "signal", "pid": 4686, "start_ticks": 28636, "type": "CustodyError", "error": "injected per-registration verification refusal", "errno": null, "signal": 9}], "unsafe_registrations": [[4686, 28636]], "surviving_generations": [[4686, 28636]]}, "other_owned_children_reaped": 8, "fixture_injection_removed_and_reaped": true}
+{"focused_eventfd_tests_executed": 66, "skipped": 0}
+Ran 4 tests in 0.100s
+
+Debug job111784095290:
++- run test 25 pass (25 total) 53s MaxRSS:7M
++- run test 7 pass (7 total) 12s MaxRSS:70M
+Ran 2 tests in 2.165s
+FAILED (failures=1, errors=1)
+{"immutable_9ee9_negative_controls": 2, "expected_errors": 1, "expected_failures": 1, "skipped": 0, "verified_git_blob": "41561cad864b4dce2ed8d019a1768ee49fabe34f", "owned_fixture_children_reconciled": true}
+Ran 66 tests in 11.137s
+{"expected_failed_custody_receipt": {"status": "failed", "code": 1, "cleanup_errors": [{"phase": "signal", "pid": 4650, "start_ticks": 23855, "type": "CustodyError", "error": "injected per-registration verification refusal", "errno": null, "signal": 15}, {"phase": "signal", "pid": 4650, "start_ticks": 23855, "type": "CustodyError", "error": "injected per-registration verification refusal", "errno": null, "signal": 9}], "unsafe_registrations": [[4650, 23855]], "surviving_generations": [[4650, 23855]]}, "other_owned_children_reaped": 8, "fixture_injection_removed_and_reaped": true}
+{"focused_eventfd_tests_executed": 66, "skipped": 0}
+Ran 4 tests in 0.142s
+
+Unit job111784095109:
+Verified 39 actual static-musl unit tests in debug
+Verified 39 actual static-musl unit tests in safe
+
+Retained initial87a39d4 calibration CI37316121456:
+Both KVM jobs' old negative controls: Ran 2 tests; FAILED (failures=2).
+Current66-case suite did not execute in that failed epoch.

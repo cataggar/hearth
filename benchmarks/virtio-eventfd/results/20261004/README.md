@@ -55,6 +55,42 @@ original module dictionary and restores the current class in finally;87's
 separate epoch remains unqualified, not current-suite acceptance.
 No local performance matrix, label, measurement, default change or merge.
 
+[Actual CI37316393129](https://github.com/cataggar/hearth/actions/runs/37316393129)
+now completes **9/9 successful jobs** at corrected immutable source
+`71e614e166e1bd4a9f39b44cee8eb9857c93456f`,
+tree`63ff8c8ec4e897429aded5891facfa000837e423`.
+
+| Actual job | ID | Executed coverage |
+|---|---|---|
+| KVM ReleaseSafe |111784095110|66 current guards/skip0+2 verified old negative controls;25 dedicated+7 integrations+4 jail |
+| KVM Debug |111784095290|Same actual coverage, independently compiled/run |
+| Static units |111784095109|39 per optimization |
+
+Both authentic old-source controls fail as required: one actual exit/reap
+error, one abandoned-sweep/absent-receipt failure. These expected negatives
+are **not part of66 current positive passes**. Both current suites actually
+perform the no-signal race and persistent registration refusal. Failed receipt
+retains two typed signal errors/one unsafe survivor while eight other owned
+children terminate/reap; the fixture then removes only its artificial refusal
+and safely reaps that last known generation. It never rewrites the original
+FAILED receipt into success. Scope remains process stand-ins, **not8KVM**.
+Both native suites reexecute24 fatal/8 real pre-entry KVM EINTR/four missing136
+modes; native/collector/producer/deadline bytes remain unchanged.
+
+The [durable receipt](custody-exit-race-receipt.json) and
+[selected actual stdout](custody-exit-race-ci-excerpt.txt) preserve exact
+source/jobs, old negatives, current66 and explicit failed custody receipts.
+Full raw current/initial logs/metadata stay private under
+`.perf/eventfd/custody-exit-race/`. No compression/hash phase or local tests are
+claimed under the unmet local storage guard, and no evidence is deleted.
+Actual initial87 CI37316121456 fails both calibration jobs with2 failures/
+0 errors each; the current66-case suite did not execute in that epoch.
+Its copied-globals binding was corrected before accepting any current result.
+Both old and current fixtures safely reconcile all their recorded children.
+All own local attempted phases/source-CI watcher end; no benchmark starts.
+Await parent narrow-delta review before any label/measurement. Full issue and
+performance SQL remain BLOCKED; this scoped corrective source/test stage is done.
+
 ## Hosted runner corrections — bounded correctness stage
 
 The current profile uses initially disabled perf events with explicit

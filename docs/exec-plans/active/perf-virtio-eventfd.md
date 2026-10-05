@@ -46,6 +46,23 @@ helper to bind that exact class in its original module dictionary, restoring
 the current class in finally. Preserve87's separate CI epoch; do not count
 its calibration mismatch or unexecuted current suite as positive acceptance.
 
+Corrected source71e614e/tree63ff8c8 now actually completes isolated
+CI37316393129,9/9 successful jobs. Safe/Debug independently run both authentic
+old controls (one expected error+one expected failure, skipped0), then all
+66 current guards/skip0,25 dedicated+7 integrations+4 jail (2 real API+2 mocked
+cleanup); units39 per optimization remain passing. Both refusal fixtures emit
+FAILED receipts with one unsafe generation/errors while eight other owned
+stand-ins are terminated/reaped. Only afterwards does the test remove its
+artificial refusal and safely reap the last known generation. No8KVM claim.
+Existing24 fatal/8 actual pre-entry KVM EINTR/four missing136 modes run again.
+Actual initial87 CI37316121456 fails both negative-control calibrations with
+2 failures/0 errors each; current66 suite was not reached. Raw initial/current
+metadata and logs remain private. Durable JSON receipt and selected actual
+stdout excerpt in the result report preserve these scopes without compressing
+or deleting retained evidence under the unmet local storage guard.
+Corrective source/testing complete; full issue/performance remains BLOCKED
+pending parent narrow delta review/label and existing mandatory gates.
+
 ### Hosted collection boundaries and descendant custody — corrective stage
 
 Parent review identifies two current runner blockers: the15-second collector
