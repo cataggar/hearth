@@ -186,6 +186,22 @@ row is executed or claimed. Resumption must freeze the supplied validated
 bridge/fixture and current script hashes in a new epoch, not pool the changed
 recorder/RSS method into earlier measurements.
 
+The coordinator subsequently supplies validated canonical
+`7dfee42ed68fe1703744d6318f4be632113034b0`, based only on `b06ec0a`.
+Own cherry-pick `327f183` adds only the standalone
+`tools/perf/test_jail_baseline.py` and its contract. Existing jail/seccomp/unit
+blobs already match exactly (`fcda3fbf0fbdb20285a6ebed9930456751b38ae7`,
+`10d0c7bf65931d533d88caaaf5ac592a39f79333`,
+`060c876e4680f15586662401dbaf8f2723229b2c`). All five canonical files match;
+no compiler/device optimization is imported. Kernel5.10.245 retains the frozen
+`4da53980…` SHA. Independent three-case fixture execution is scheduled for
+each named Debug/safe×LLVM/native ELF, alongside fresh forced32+7 execution.
+These controls do not waive size, performance, noise or hardware gates.
+The denied-syscall/argument cases in the32-unit suite are **BPF-evaluator unit
+assertions**, not real-kernel negative child executions. Actual enforced-filter
+API/CLI permission, disk and all-task identity acceptance comes separately from
+the three standalone cases; keep both evidence layers and counts distinct.
+
 This is an experiment specification, not a benchmark result
 or decision to change defaults. The compiler migration in
 [#5](https://github.com/cataggar/hearth/pull/5) is complete.

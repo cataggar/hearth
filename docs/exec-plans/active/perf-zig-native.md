@@ -111,6 +111,18 @@ The owned socket directory is empty and no fleet lock is held. No v6 rows
 execute. Resume only after the bridge's exact hash/commands arrive, then freeze
 new identities; do not pool earlier recorder/RSS-method measurements.
 
+Canonical convergence is now verified against supplied `7dfee42`: own
+cherry-pick `327f183` adds only the standalone fixture/contract, because the
+three runtime/unit blobs already match byte-for-byte. No async/notification,
+codegen, dependency or device option changes are imported. All five canonical
+files match, and the kernel is the same verified5.10.245 input. Four standalone
+three-case Debug/safe×LLVM/native runs and renewed forced32+7 executions are
+queued under the fleet lock; record actual outcomes before declaring them
+passed. Canonical correctness convergence is not optimization adoption.
+Retained deny cases are BPF-evaluator assertions in the32-unit suite, not
+real-kernel negative child executions. The separate three-case fixture supplies
+actual enforced API/CLI permissions/disk/all-task-identity acceptance.
+
 ## Evidence and fixed scope
 
 The spec records inspected definitions at Hearth
