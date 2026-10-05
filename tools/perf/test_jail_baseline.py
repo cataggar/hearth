@@ -5,6 +5,7 @@ setpriv, /dev/kvm, static BusyBox, bsdcpio, gzip and the verified kernel.
 FLINT_JAIL_TEST_BINARY/KERNEL select immutable row inputs. No skips.
 """
 
+import errno
 import fcntl
 import hashlib
 import json
@@ -17,6 +18,7 @@ import stat
 import subprocess
 import time
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 KERNEL_SHA256 = "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208"
@@ -196,40 +198,44 @@ class OwnedJail:
         self.request("PUT", "/actions", {"action_type": "InstanceStart"})
 
     def close(self):
-        if self.process is not None:
-            if self.process.poll() is None:
-                self.find_owned()
-            for pid, stamp in reversed(list(self.owned.items())):
-                try:
-                    if start_time(pid) == stamp:
-                        subprocess.run(["sudo", "-n", "kill", "-TERM", "--", str(pid)],
-                                       check=False, timeout=5, stderr=subprocess.DEVNULL)
-                except subprocess.CalledProcessError:
-                    pass
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
+        try:
+            if self.process is not None:
+                if self.process.poll() is None:
+                    self.find_owned()
                 for pid, stamp in reversed(list(self.owned.items())):
                     try:
                         if start_time(pid) == stamp:
-                            subprocess.run(["sudo", "-n", "kill", "-KILL", "--", str(pid)],
+                            subprocess.run(["sudo", "-n", "kill", "-TERM", "--", str(pid)],
                                            check=False, timeout=5, stderr=subprocess.DEVNULL)
                     except subprocess.CalledProcessError:
                         pass
-                self.process.wait(timeout=5)
-            save(self.path / "cleanup.json", {
-                "recorded_pids": self.owned, "exit_code": self.process.returncode,
-                "live_pid_paths": [pid for pid in self.owned if Path(f"/proc/{pid}").exists()],
-            })
-        for stream in (self.output, self.errors):
-            if stream is not None:
-                stream.close()
-        subprocess.run(["sudo", "-n", "rm", "-f", "--", str(self.path / "dev/kvm")],
-                       check=True, timeout=5)
-        if (self.path / "dev").exists():
-            subprocess.run(["sudo", "-n", "rmdir", "--", str(self.path / "dev")],
-                           check=True, timeout=5)
-        (self.path / "api.sock").unlink(missing_ok=True)
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    for pid, stamp in reversed(list(self.owned.items())):
+                        try:
+                            if start_time(pid) == stamp:
+                                subprocess.run(["sudo", "-n", "kill", "-KILL", "--", str(pid)],
+                                               check=False, timeout=5, stderr=subprocess.DEVNULL)
+                        except subprocess.CalledProcessError:
+                            pass
+                    self.process.wait(timeout=5)
+                save(self.path / "cleanup.json", {
+                    "recorded_pids": self.owned, "exit_code": self.process.returncode,
+                    "live_pid_paths": [pid for pid in self.owned if Path(f"/proc/{pid}").exists()],
+                })
+        finally:
+            for stream in (self.output, self.errors):
+                if stream is not None:
+                    stream.close()
+            try:
+                subprocess.run(["sudo", "-n", "rm", "-f", "--", str(self.path / "dev/kvm")],
+                               check=True, timeout=5)
+                if (self.path / "dev").exists():
+                    subprocess.run(["sudo", "-n", "rmdir", "--", str(self.path / "dev")],
+                                   check=True, timeout=5)
+            finally:
+                (self.path / "api.sock").unlink(missing_ok=True)
 
     def __exit__(self, *_):
         self.close()
@@ -300,3 +306,37 @@ class JailBaseline(unittest.TestCase):
     def test_enforced_cli_guest_disk(self):
         with OwnedJail(api=False) as vm:
             self.disk(vm)
+
+    def test_cleanup_evidence_enospc_still_removes_owned_resources(self):
+        capacity = os.statvfs(ROOT)
+        self.assertGreaterEqual(capacity.f_bavail * capacity.f_frsize, 64 * 1024 * 1024)
+        original_save = save
+
+        def fail_cleanup_evidence(path, value):
+            if path.name == "cleanup.json":
+                raise OSError(errno.ENOSPC, "injected cleanup evidence failure")
+            original_save(path, value)
+
+        vm = OwnedJail()
+        with mock.patch.dict(OwnedJail.close.__globals__, {"save": fail_cleanup_evidence}):
+            with self.assertRaises(OSError) as failure:
+                with vm:
+                    self.identity(vm)
+                    self.assertEqual(json.loads(vm.request("GET", "/machine-config"))["vcpu_count"], 1)
+        self.assertEqual(failure.exception.errno, errno.ENOSPC)
+        self.assertIsNotNone(vm.process.returncode)
+        self.assertTrue(vm.owned)
+        self.assertFalse(any(Path(f"/proc/{pid}").exists() for pid in vm.owned))
+        self.assertTrue(vm.output.closed)
+        self.assertTrue(vm.errors.closed)
+        self.assertFalse((vm.path / "cleanup.json").exists())
+        self.assertFalse((vm.path / "dev").exists())
+        self.assertFalse((vm.path / "api.sock").exists())
+        original_save(vm.path / "cleanup-fault-audit.json", {
+            "fault": "injected ENOSPC while saving cleanup.json",
+            "recorded_pids": vm.owned,
+            "exit_code": vm.process.returncode,
+            "live_pid_paths": [],
+            "logs_closed": True,
+            "private_nodes_and_socket_gone": True,
+        })
