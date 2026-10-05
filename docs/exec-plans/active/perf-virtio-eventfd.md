@@ -40,6 +40,11 @@ byte/Git-blob verification and project-private fixture cleanup. Expected old
 failure/error are explicitly checked, never included in current pass counts.
 This is a negative test runner, not another capture/producer/provenance oracle.
 Current exact-source CI results are pending at initial publication.
+Initial helper source87a39d4 used a copied globals dictionary, preventing the
+deterministic identity hook from reaching the retained old method. Correct the
+helper to bind that exact class in its original module dictionary, restoring
+the current class in finally. Preserve87's separate CI epoch; do not count
+its calibration mismatch or unexecuted current suite as positive acceptance.
 
 ### Hosted collection boundaries and descendant custody — corrective stage
 

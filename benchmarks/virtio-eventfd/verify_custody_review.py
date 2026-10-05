@@ -44,9 +44,8 @@ def main():
         (directory / "custody.py").write_bytes(source)
         node = next(node for node in ast.parse(source).body
                     if isinstance(node, ast.ClassDef) and node.name == "Supervisor")
-        namespace = custody.__dict__.copy()
-        exec(compile(ast.Module(body=[node], type_ignores=[]), "<immutable-9ee9-custody>", "exec"), namespace)
-        custody.Supervisor = namespace["Supervisor"]
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "<immutable-9ee9-custody>", "exec"),
+             custody.__dict__)
         names = [
             "test_exit_reaped_between_liveness_and_lookup_is_normal_no_signal",
             "test_registration_error_preserves_failed_receipt_and_cleans_other_children",

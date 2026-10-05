@@ -49,6 +49,10 @@ Old expected error/failure are explicit negative controls, never positive passes
 The bounded API retrieval uses only a read-only token, fixed same-repository
 HTTPS/no redirects/proxy, verified bytes and private project fixture cleanup.
 At initial source publication actual new-source CI remains pending.
+Initial87a39d4 helper calibration bound the retained class to copied globals,
+so the identity hook could not reach its old method. The helper now uses the
+original module dictionary and restores the current class in finally;87's
+separate epoch remains unqualified, not current-suite acceptance.
 No local performance matrix, label, measurement, default change or merge.
 
 ## Hosted runner corrections — bounded correctness stage
