@@ -1,6 +1,6 @@
 # Execution Plan: Evaluate Flint vhost-net
 
-**Status**: In progress — fresh post-cleanup baselines/A/A and deterministic acceptance; no adoption qualification
+**Status**: Blocked — experimental correctness executed; relevance, remaining acceptance and performance qualification incomplete
 **Last updated**: 2026-10-05
 **Issue**: [#2](https://github.com/cataggar/hearth/issues/2)
 **Spec**: [Capability-gated vhost-net Evaluation](../../product-specs/perf-vhost-net.md)
