@@ -6,6 +6,7 @@ const linux = std.os.linux;
 const Memory = @import("../../memory.zig");
 const Queue = @import("queue.zig");
 const virtio = @import("../virtio.zig");
+const Worker = @import("blk_worker.zig");
 
 const log = std.log.scoped(.virtio_blk);
 
@@ -28,8 +29,32 @@ pub const F_FLUSH: u64 = 1 << 9;
 const SECTOR_SIZE: u64 = 512;
 const REQ_HDR_SIZE: u32 = 16; // type: u32, reserved: u32, sector: u64
 
+pub const Backend = enum { sync, worker };
+pub const MAX_SINGLE_READ: usize = 0x7ffff000;
+
 fd: i32,
 capacity: u64, // in 512-byte sectors
+requested_backend: Backend = .sync,
+worker: ?*Worker = null,
+pending: ?Pending = null,
+generation: u64 = 0,
+
+const Pending = struct {
+    descs: [Queue.MAX_QUEUE_SIZE]Queue.Desc,
+    count: usize,
+    head: u16,
+    kind: u32,
+    status: u8 = S_OK,
+    status_addr: u64,
+    used_len: u32 = 1,
+    generation: u64,
+    queue_state: Queue,
+    descriptor: usize = 1,
+    descriptor_offset: usize = 0,
+    file_offset: u64 = 0,
+    chunk_len: usize = 0,
+    flush_submitted: bool = false,
+};
 
 pub fn init(path: [*:0]const u8) !Self {
     const open_rc: isize = @bitCast(linux.open(path, .{ .ACCMODE = .RDWR, .CLOEXEC = true }, 0));
@@ -50,8 +75,257 @@ pub fn init(path: [*:0]const u8) !Self {
     return .{ .fd = fd, .capacity = capacity };
 }
 
-pub fn deinit(self: Self) void {
+pub fn deinit(self: *Self) void {
+    self.stopWorker();
     _ = linux.close(self.fd);
+}
+
+pub fn startWorker(self: *Self, wake: Worker.Wake) void {
+    self.startWorkerWithAllocator(wake, std.heap.page_allocator);
+}
+
+pub fn startWorkerWithAllocator(self: *Self, wake: Worker.Wake, allocator: std.mem.Allocator) void {
+    if (self.requested_backend != .worker) return;
+    std.debug.assert(self.pending == null and self.worker == null);
+    self.worker = Worker.createWithAllocator(self.fd, .{}, allocator) catch |err| {
+        log.warn("requested=worker effective=sync before admission: {}", .{err});
+        return;
+    };
+    self.worker.?.wake = wake;
+    log.info("requested=worker effective=worker tid={} requests=1 staging={} bytes", .{ self.worker.?.tid, Worker.CHUNK_SIZE });
+}
+
+pub fn stopWorker(self: *Self) void {
+    if (self.worker) |worker| {
+        worker.destroy();
+        self.worker = null;
+    }
+    self.pending = null;
+    self.generation +%= 1;
+}
+
+fn sameQueue(a: Queue, b: Queue) bool {
+    return a.ready == b.ready and a.size == b.size and a.desc_addr == b.desc_addr and
+        a.avail_addr == b.avail_addr and a.used_addr == b.used_addr and
+        a.last_avail_idx == b.last_avail_idx and a.next_used_idx == b.next_used_idx;
+}
+
+fn validateQueue(mem: *Memory, queue: Queue) !void {
+    if (!queue.isReady() or queue.size > Queue.MAX_QUEUE_SIZE or @popCount(queue.size) != 1) return error.InvalidQueue;
+    _ = try mem.slice(@intCast(queue.desc_addr), @as(usize, queue.size) * 16);
+    _ = try mem.slice(@intCast(queue.avail_addr), 4 + @as(usize, queue.size) * 2);
+    _ = try mem.slice(@intCast(queue.used_addr), 4 + @as(usize, queue.size) * 8);
+}
+
+fn capture(self: *Self, mem: *Memory, queue: *Queue, head: u16) !Pending {
+    var request: Pending = undefined;
+    request = .{
+        .descs = undefined,
+        .count = 0,
+        .head = head,
+        .kind = 0,
+        .status_addr = 0,
+        .generation = self.generation,
+        .queue_state = queue.*,
+    };
+    request.count = try queue.collectChain(mem, head, &request.descs);
+    if (request.count < 2) return error.MalformedRequest;
+    const header = request.descs[0];
+    const status = request.descs[request.count - 1];
+    if (header.len < REQ_HDR_SIZE or header.flags & virtio.DESC_F_WRITE != 0 or
+        status.len < 1 or status.flags & virtio.DESC_F_WRITE == 0) return error.MalformedRequest;
+    const bytes = try mem.slice(@intCast(header.addr), header.len);
+    request.kind = std.mem.readInt(u32, bytes[0..4], .little);
+    const sector = std.mem.readInt(u64, bytes[8..16], .little);
+    request.status_addr = status.addr;
+    _ = try mem.slice(@intCast(status.addr), status.len);
+    var total: u64 = 0;
+    for (request.descs[1 .. request.count - 1]) |desc| {
+        _ = try mem.slice(@intCast(desc.addr), desc.len);
+        total = try std.math.add(u64, total, desc.len);
+        if ((request.kind == T_IN and desc.flags & virtio.DESC_F_WRITE == 0) or
+            (request.kind == T_OUT and desc.flags & virtio.DESC_F_WRITE != 0))
+            request.status = S_IOERR;
+    }
+    if (request.kind == T_IN or request.kind == T_OUT) {
+        request.file_offset = std.math.mul(u64, sector, SECTOR_SIZE) catch value: {
+            request.status = S_IOERR;
+            break :value 0;
+        };
+        const end = std.math.add(u64, request.file_offset, total) catch value: {
+            request.status = S_IOERR;
+            break :value std.math.maxInt(u64);
+        };
+        if (!self.validateSectorRange(sector, total) or end > std.math.maxInt(i64))
+            request.status = S_IOERR;
+        if (request.kind == T_IN and request.status == S_OK)
+            request.used_len = @intCast(@min(total + 1, std.math.maxInt(u32)));
+    } else if (request.kind != T_FLUSH and request.kind != T_GET_ID) {
+        request.status = S_UNSUPP;
+    }
+    return request;
+}
+
+fn finish(self: *Self, mem: *Memory, queue: *Queue, publish: bool) !bool {
+    const request = &self.pending.?;
+    const applicable = publish and request.generation == self.generation and sameQueue(request.queue_state, queue.*);
+    if (applicable) {
+        const status = try mem.slice(@intCast(request.status_addr), 1);
+        status[0] = request.status;
+        try queue.pushUsed(mem, request.head, request.used_len);
+    }
+    self.pending = null;
+    return applicable;
+}
+
+fn submitNext(self: *Self, mem: *Memory, queue: *Queue, publish: bool) !bool {
+    const request = &self.pending.?;
+    const worker = self.worker.?;
+    if (request.status != S_OK) {
+        return self.finish(mem, queue, publish);
+    }
+    if (request.kind == T_GET_ID) {
+        if (request.count >= 3) {
+            const desc = request.descs[1];
+            const bytes = try mem.slice(@intCast(desc.addr), @min(desc.len, 20));
+            const id = "flint-virtio-blk";
+            const count = @min(bytes.len, id.len);
+            if (publish) {
+                @memcpy(bytes[0..count], id[0..count]);
+                @memset(bytes[count..], 0);
+            }
+            request.used_len = @intCast(@min(@as(u64, desc.len) + 1, std.math.maxInt(u32)));
+        }
+        return self.finish(mem, queue, publish);
+    }
+    if (request.kind == T_FLUSH) {
+        if (!request.flush_submitted) {
+            request.flush_submitted = true;
+            worker.submit(.flush, 0, 0);
+            return false;
+        }
+        return self.finish(mem, queue, publish);
+    }
+    while (request.descriptor < request.count - 1) {
+        const desc = request.descs[request.descriptor];
+        if (request.descriptor_offset == desc.len) {
+            request.descriptor += 1;
+            request.descriptor_offset = 0;
+            continue;
+        }
+        if (request.kind == T_IN and request.descriptor_offset >= MAX_SINGLE_READ) {
+            // Linux caps one pread; staging must retain its zero-filled suffix.
+            const remaining = desc.len - request.descriptor_offset;
+            if (publish) {
+                const bytes = try mem.slice(@intCast(desc.addr + request.descriptor_offset), remaining);
+                @memset(bytes, 0);
+            }
+            request.descriptor_offset += remaining;
+            request.file_offset += remaining;
+            continue;
+        }
+        const read_limit = if (request.kind == T_IN) MAX_SINGLE_READ - request.descriptor_offset else desc.len;
+        const length = @min(desc.len - request.descriptor_offset, Worker.CHUNK_SIZE, read_limit);
+        request.chunk_len = length;
+        if (request.kind == T_OUT) {
+            const bytes = try mem.slice(@intCast(desc.addr + request.descriptor_offset), length);
+            @memcpy(worker.buffer[0..length], bytes);
+        }
+        worker.submit(if (request.kind == T_IN) .read else .write, length, request.file_offset);
+        return false;
+    }
+    return self.finish(mem, queue, publish);
+}
+
+fn consumeChunk(self: *Self, mem: *Memory, queue: *Queue, publish: bool) !bool {
+    const worker = self.worker.?;
+    const request = &self.pending.?;
+    if (worker.result.failed) {
+        if (worker.result.read_error and request.kind == T_IN and request.descriptor_offset > 0) {
+            // A single pread returns its positive prefix, not a later error.
+            // Preserve that descriptor-level short-read/zero-fill behavior.
+            const desc = request.descs[request.descriptor];
+            const remaining = desc.len - request.descriptor_offset;
+            if (publish) {
+                const bytes = try mem.slice(@intCast(desc.addr + request.descriptor_offset), remaining);
+                @memset(bytes, 0);
+            }
+            request.descriptor_offset += remaining;
+            request.file_offset += remaining;
+        } else {
+            request.status = S_IOERR;
+        }
+    } else if (request.kind == T_IN or request.kind == T_OUT) {
+        const desc = request.descs[request.descriptor];
+        if (request.kind == T_IN and publish) {
+            const bytes = try mem.slice(@intCast(desc.addr + request.descriptor_offset), request.chunk_len);
+            @memcpy(bytes, worker.buffer[0..request.chunk_len]);
+        }
+        request.descriptor_offset += request.chunk_len;
+        request.file_offset += request.chunk_len;
+        if (request.kind == T_IN and worker.result.short_read) {
+            const remaining = desc.len - request.descriptor_offset;
+            if (publish) {
+                const bytes = try mem.slice(@intCast(desc.addr + request.descriptor_offset), remaining);
+                @memset(bytes, 0);
+            }
+            request.descriptor_offset += remaining;
+            request.file_offset += remaining;
+        }
+    }
+    worker.consume();
+    return self.submitNext(mem, queue, publish);
+}
+
+/// Drain only already admitted work. No avail consumption or extra disk sync.
+pub fn quiesce(self: *Self, mem: *Memory, queue: *Queue, publish: bool) !bool {
+    const worker = self.worker orelse return false;
+    var completed = false;
+    while (self.pending != null) {
+        const request = self.pending.?;
+        const applicable = publish and request.generation == self.generation and sameQueue(request.queue_state, queue.*);
+        worker.waitReady();
+        if (worker.ready()) {
+            if (try self.consumeChunk(mem, queue, applicable)) completed = true;
+        } else if (try self.submitNext(mem, queue, applicable)) completed = true;
+    }
+    return completed and publish;
+}
+
+pub fn invalidate(self: *Self, mem: *Memory, queue: *Queue) !void {
+    _ = try self.quiesce(mem, queue, false);
+    self.generation +%= 1;
+}
+
+/// One logical-request credit is reserved before popAvail. Completion refills
+/// retained avail work without requiring another guest notification.
+pub fn processAsync(self: *Self, mem: *Memory, queue: *Queue) !bool {
+    const worker = self.worker.?;
+    try validateQueue(mem, queue.*);
+    var did_work = false;
+    var count: usize = 0;
+    while (count < queue.size) : (count += 1) {
+        if (self.pending) |request| {
+            if (request.generation != self.generation or !sameQueue(request.queue_state, queue.*))
+                try self.invalidate(mem, queue);
+        }
+        if (self.pending != null) {
+            if (!worker.ready()) return did_work;
+            if (try self.consumeChunk(mem, queue, true)) did_work = true;
+            if (self.pending != null) return did_work;
+        }
+        // The empty slot and its fixed staging buffer are the reserved credit.
+        const head = try queue.popAvail(mem) orelse return did_work;
+        self.pending = self.capture(mem, queue, head) catch |err| {
+            log.warn("captured block request rejected: {}", .{err});
+            try queue.pushUsed(mem, head, 0);
+            did_work = true;
+            continue;
+        };
+        if (try self.submitNext(mem, queue, true)) did_work = true;
+        if (self.pending != null) return did_work;
+    }
+    return did_work;
 }
 
 /// Device features offered to the driver.

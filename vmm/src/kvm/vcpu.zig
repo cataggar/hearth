@@ -84,6 +84,17 @@ pub fn run(self: Self) !u32 {
     return self.kvm_run.exit_reason;
 }
 
+/// KVM's pending IO/MMIO emulation is not part of GET_REGS or snapshots.
+/// Complete it without executing another guest instruction before pause ack.
+pub fn completePendingExit(self: Self) !void {
+    @atomicStore(u8, &self.kvm_run.immediate_exit, 1, .seq_cst);
+    _ = self.run() catch |err| {
+        if (err == error.Interrupted) return;
+        return err;
+    };
+    return error.UnexpectedQuiescenceExit;
+}
+
 /// Get the IO exit data (valid when exit_reason == KVM_EXIT_IO).
 pub fn getIoData(self: Self) ?IoExit {
     const io = self.kvm_run.unnamed_0.io;

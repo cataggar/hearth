@@ -115,14 +115,50 @@ agent does not imply an AArch64 Flint VMM or native AArch64 runtime coverage.
 CI installs signed Zig 0.17.0 through `cataggar/ghr/actions/install`, checks
 formatting, builds/tests Flint, and builds both guest-agent targets alongside the
 existing TypeScript jobs. KVM integration is a separate hosted Linux job with
-explicit prerequisites: accessible `/dev/kvm`, the guest bzImage at
-`/tmp/vmlinuz-minimal`, static BusyBox, and `bsdcpio`. Run it locally from `vmm/`
-with `zig build integration-test -Doptimize=safe`. Missing prerequisites or an
+explicit prerequisites: accessible `/dev/kvm`, a verified project-local guest
+bzImage, static BusyBox, and `bsdcpio`. CI uses `.ci/guest/bzImage`. Run locally
+from `vmm/`:
+
+```bash
+zig build integration-test -Doptimize=safe \
+  -Dintegration-kernel=../.ci/guest/bzImage
+```
+
+The kernel option resolves relative to `vmm/`, independently of each test
+fixture's working directory. Missing prerequisites or an
 entirely skipped integration suite are not passing KVM coverage.
+
+### Experimental Flint block worker
+
+Flint defaults to synchronous block I/O. For correctness experiments only,
+append `--block-backend worker` to a normal CLI boot or `--restore` command;
+`--force-sync` overrides all requests before admission. The REST drive body
+accepts `"io_backend":"worker"` (default `"sync"`). Selection is startup-only,
+not a live backend switch or a new Sandbox SDK option.
+
+The opt-in backend uses one ordered request credit and 64 KiB host staging,
+with owner-published completions, event-driven KVM wakeup and lifecycle drains.
+Initialization failure diagnoses synchronous fallback before any admission;
+I/O failures never replay writes. It is **not performance-qualified** and must
+not be promoted by these correctness results. See the
+[spec and measured limitations](docs/product-specs/perf-async-block-io.md).
 
 The hosted job adds its runner user to `kvm` and starts KVM steps with `sg kvm`,
 so new processes inherit access without running as root or making the device
 world-writable. A one-off device ACL is insufficient on runners that reset it.
+
+Jailed startup needs privileged mount/device bootstrap, then drops to the
+configured UID/GID before VM interaction and installs the kill seccomp filter.
+New jail device directories are root-owned `0755`; device nodes are owned by
+that UID/GID with `0600`, independent of ambient umask. This does not change
+host device permissions or the private artifact umask. From the repository
+root, the KVM-capable CI job also executes these non-root regressions (with
+`sudo -n` available for bootstrap):
+
+```bash
+umask 077
+python3 -m unittest discover -s tools/perf -p test_jail_prerequisites.py -v
+```
 
 ## Environments
 

@@ -9,6 +9,7 @@ const Queue = @import("queue.zig");
 const Blk = @import("blk.zig");
 const Net = @import("net.zig");
 const Vsock = @import("vsock.zig");
+const BlockWorker = @import("blk_worker.zig");
 
 const log = std.log.scoped(.virtio_mmio);
 
@@ -75,7 +76,7 @@ pub fn initVsock(mmio_base: u64, irq: u32, guest_cid: u64, uds_path: [*:0]const 
 
 pub fn deinit(self: *Self) void {
     switch (self.backend) {
-        .blk => |b| b.deinit(),
+        .blk => |*b| b.deinit(),
         .net => |n| n.deinit(),
         .vsock => |*v| v.deinit(),
     }
@@ -151,6 +152,13 @@ pub fn snapshotSave(self: *const Self, buf: []u8) usize {
 /// initialized (disk reopened, TAP recreated, etc.) before calling this.
 /// Returns bytes consumed.
 pub fn snapshotRestore(self: *Self, buf: []const u8) usize {
+    switch (self.backend) {
+        .blk => |*b| {
+            std.debug.assert(b.pending == null);
+            b.generation +%= 1;
+        },
+        else => {},
+    }
     var pos: usize = 0;
 
     // Skip device identity (4+8+4 = 16 bytes) — already set by init*()
@@ -220,6 +228,10 @@ fn deviceFeatures(self: Self) u64 {
 }
 
 fn reset(self: *Self) void {
+    switch (self.backend) {
+        .blk => |*b| b.generation +%= 1,
+        else => {},
+    }
     self.status = 0;
     self.device_features_sel = 0;
     self.driver_features_sel = 0;
@@ -372,6 +384,58 @@ pub fn handleWrite(self: *Self, offset: u64, data: []const u8) void {
     }
 }
 
+pub fn configureBlockBackend(self: *Self, backend: Blk.Backend) void {
+    switch (self.backend) {
+        .blk => |*b| b.requested_backend = backend,
+        else => {},
+    }
+}
+
+pub fn startBlockWorker(self: *Self, wake: BlockWorker.Wake) void {
+    switch (self.backend) {
+        .blk => |*b| b.startWorker(wake),
+        else => {},
+    }
+}
+
+pub fn stopBlockWorker(self: *Self) void {
+    switch (self.backend) {
+        .blk => |*b| b.stopWorker(),
+        else => {},
+    }
+}
+
+pub fn hasBlockWorker(self: *const Self) bool {
+    return switch (self.backend) {
+        .blk => |b| b.worker != null,
+        else => false,
+    };
+}
+
+pub fn quiesceBlock(self: *Self, mem: *Memory, publish: bool) !bool {
+    switch (self.backend) {
+        .blk => |*b| {
+            const completed = try b.quiesce(mem, &self.queues[0], publish);
+            if (completed) self.interrupt_status |= virtio.INT_USED_RING;
+            return completed;
+        },
+        else => return false,
+    }
+}
+
+pub fn prepareQueueWrite(self: *Self, mem: *Memory, offset: u64, data: []const u8) !void {
+    if (data.len != 4) return;
+    const queue_change = switch (offset) {
+        virtio.MMIO_QUEUE_NUM, virtio.MMIO_QUEUE_READY, virtio.MMIO_QUEUE_DESC_LOW, virtio.MMIO_QUEUE_DESC_HIGH, virtio.MMIO_QUEUE_DRIVER_LOW, virtio.MMIO_QUEUE_DRIVER_HIGH, virtio.MMIO_QUEUE_DEVICE_LOW, virtio.MMIO_QUEUE_DEVICE_HIGH => self.queue_sel == 0,
+        virtio.MMIO_STATUS => std.mem.readInt(u32, data[0..4], .little) & virtio.STATUS_DRIVER_OK == 0,
+        else => false,
+    };
+    if (queue_change) switch (self.backend) {
+        .blk => |*b| try b.invalidate(mem, &self.queues[0]),
+        else => {},
+    };
+}
+
 /// Process pending requests on the virtqueue(s).
 /// Returns true if any work was done (interrupt should be raised).
 pub fn processQueues(self: *Self, mem: *Memory) bool {
@@ -379,8 +443,16 @@ pub fn processQueues(self: *Self, mem: *Memory) bool {
 
     var did_work = false;
     switch (self.backend) {
-        .blk => |b| {
+        .blk => |*b| {
             if (!self.queues[0].isReady()) return false;
+            if (b.worker != null) {
+                did_work = b.processAsync(mem, &self.queues[0]) catch |err| {
+                    log.err("async block queue failed: {}", .{err});
+                    return false;
+                };
+                if (did_work) self.interrupt_status |= virtio.INT_USED_RING;
+                return did_work;
+            }
             var processed: u16 = 0;
             while (processed < self.queues[0].size) : (processed += 1) {
                 const head = self.queues[0].popAvail(mem) catch |err| {

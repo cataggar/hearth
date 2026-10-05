@@ -201,9 +201,8 @@ jobs:
             https://github.com/joshuaisaact/hearth/releases/download/kernel-5.10.245/bzImage \
             --output .ci/guest/bzImage
           echo "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208  .ci/guest/bzImage" | sha256sum --check
-          install -m 0644 .ci/guest/bzImage /tmp/vmlinuz-minimal
-          test -r /tmp/vmlinuz-minimal
-          test -s /tmp/vmlinuz-minimal
+          test -r .ci/guest/bzImage
+          test -s .ci/guest/bzImage
           for tool in bsdcpio cpio gzip busybox timeout; do
             command -v "$tool"
           done
@@ -228,7 +227,7 @@ jobs:
         run: |
           set -euo pipefail
           timeout --kill-after=30s 10m \
-            zig build install integration-test-build -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
+            zig build install integration-test-build -Dtarget=x86_64-linux -Doptimize=safe -Dintegration-kernel=../.ci/guest/bzImage --summary all --color off \
             2>&1 | tee ../.ci-logs/kvm-build.log
           id
           getfacl -n /dev/kvm
@@ -239,7 +238,7 @@ jobs:
           print("KVM access immediately before test execution: OK")
           PY
           timeout --kill-after=30s 10m \
-            zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
+            zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe -Dintegration-kernel=../.ci/guest/bzImage --summary all --color off \
             2>&1 | tee ../.ci-logs/kvm-integration.log
           python3 - <<'PY'
           import pathlib
@@ -257,6 +256,13 @@ jobs:
               raise SystemExit(f"Incomplete integration coverage: {passed}/{total} passed; expected at least {expected}")
           print(f"Verified {passed} integration tests executed with KVM and the pinned kernel")
           PY
+      - name: Verify private-umask jail ownership and enforced API traffic
+        run: |
+          set -euo pipefail
+          umask 077
+          timeout --kill-after=10s 2m \
+            python3 -m unittest discover -s tools/perf -p test_jail_prerequisites.py -v \
+            2>&1 | tee .ci-logs/jail-prerequisites.log
       - name: Trace failed KVM device access
         if: failure()
         working-directory: vmm
@@ -272,7 +278,7 @@ jobs:
           timeout --kill-after=30s 2m \
             strace -f -e trace=open,openat,openat2,fork,vfork,clone,clone3,execve,getuid,geteuid,getgid,getegid,setuid,setgid,setresuid,setresgid,setfsuid,setfsgid,setgroups \
               -o ../.ci-logs/kvm-syscalls.log \
-              zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
+              zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe -Dintegration-kernel=../.ci/guest/bzImage --summary all --color off \
               2>&1 | tee ../.ci-logs/kvm-trace-test.log || status=$?
           printf 'Diagnostic integration exit status: %s\n' "$status"
           getfacl -n /dev/kvm
