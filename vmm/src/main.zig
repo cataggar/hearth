@@ -275,7 +275,7 @@ pub fn main(init: std.process.Init) !void {
     // Seccomp filter — installed after jail (jail needs mount/mknod/setuid)
     // but before any guest interaction
     if (cli.jail != null or cli.@"seccomp-audit") {
-        try seccomp.install(cli.@"seccomp-audit");
+        try seccomp.install(cli.@"seccomp-audit", if (virtio_mode == .L0) .baseline else .reactor);
     }
 
     if (cli.restore and cli.@"api-sock" != null) {

@@ -4,6 +4,48 @@
 
 **Date**: 2026-10-04
 
+### Legacy/readiness policy separation — 2026-10-05
+
+Read-only current f52 inspection disproves the peer's stale e2 unconditional
+poll/epoll finding: neither NR7 nor281 is in `simple_syscalls`, timeout must
+be zero and both signal-mask pointer halves must be zero. It confirms that
+exact-flags eventfd2 remains admitted without a mode selector; correct this
+actual default-policy gap. Keep baseline L0 denied and explicitly select the
+reactor filter for C00/C10/C01/C11. C00 needs its owner control eventfds after
+jail setup; it is an opt-in common-control mode, not the production default.
+Keep the current SO_ERROR compatibility addition and all shared restrictions.
+
+Expand the existing real fork/SIGSYS regression across baseline/reactor
+policies, including otherwise-valid eventfd2 denial only in baseline. Preserve
+current unit/KVM/fork controls and original failed/passed evidence. Run new
+Debug/Safe native/full-jail acceptance and focused actual corrected restores
+on newly frozen ELFs with bounded, separately released fleet phases and the
+unchanged capacity guard. Publish source/receipt for parent review; no A/A,
+candidate matrix, label, auto-merge or default promotion. Do not import the
+peer's fixture-only98b10c21 or count its tests without separate authorization.
+
+Executed on final new native source: Debug/ReleaseSafe each70 actual Zig
+tests (39 unit,24 dedicated:23 real KVM+1 policy,7 integration:5 actual guests)
+and3 standalone enforced CLI/API jail cases. The existing enforced-filter
+unit now executes26 actual forked scenarios per build: baseline valid-flags
+eventfd SIGSYS, reactor admission/drain, forbidden flags/AF_INET/affinity and
+poll/epoll-mask denials in both policies. All52 Python guards remain passing.
+New Safe passes one corrected live-producer mixed capture/new-process v2
+restore per Cxx,4/4 total with8 enforced VMMs and48 verified task confinement
+rows. It does not repeat the old ELF's80-cycle acceptance; that valid corrected
+f52 epoch and the older invalid-oracle epoch remain distinct and unpooled.
+
+An unchanged3GiB entry guard refuses before the first VM launches. Under a
+separate bounded fleet phase, record/hash/remove only12 owned completed
+`_zcu.o` intermediates (96,161,792 allocated bytes), never executed ELFs/raw/
+fixtures or others' resources. Fresh guarded restore phases then pass. All220
+recorded own numeric PID/TID paths are absent,6 standalone node/socket roots
+are absent; no general host availability or unrecorded-identity claim.
+Sanitized80-member policy archive and exact SHA are in the result report;
+private raw evidence is `.perf/eventfd/policy-review/`. Source/jail/owner/IRQ
+repairs and52/80 harness evidence remain preserved. No performance phase,
+hosted label, default promotion or merge. Publication awaits parent review.
+
 ### Authorized harness-review integration — 2026-10-05
 
 Parent authorized exact helper `22c5fcadc19850fd8559f02d1de0b4522ffc15e2`

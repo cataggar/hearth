@@ -17,107 +17,122 @@ const sync = @import("sync.zig");
 const Net = @import("devices/virtio/net.zig");
 const Vsock = @import("devices/virtio/vsock.zig");
 
-test "seccomp: enforced readiness and own-affinity query retain restrictions" {
+test "seccomp: baseline and opt-in readiness retain enforced restrictions" {
     const linux = std.os.linux;
-    for (0..12) |scenario| {
-        const child: isize = @bitCast(linux.syscall0(.fork));
-        if (child < 0) return error.ForkFailed;
-        if (child == 0) {
-            _ = linux.prctl(@backingInt(linux.PR.SET_DUMPABLE), 0, 0, 0, 0);
-            seccomp_mod.install(false) catch {
-                _ = linux.syscall1(.exit_group, 40);
+    for ([_]seccomp_mod.Policy{ .baseline, .reactor }) |policy| {
+        for (0..13) |scenario| {
+            const child: isize = @bitCast(linux.syscall0(.fork));
+            if (child < 0) return error.ForkFailed;
+            if (child == 0) {
+                _ = linux.prctl(@backingInt(linux.PR.SET_DUMPABLE), 0, 0, 0, 0);
+                seccomp_mod.install(false, policy) catch {
+                    _ = linux.syscall1(.exit_group, 40);
+                    unreachable;
+                };
+                if (scenario == 0) {
+                    var cpus: [128]u8 = @splat(0);
+                    const affinity: isize = @bitCast(linux.syscall3(.sched_getaffinity, 0, cpus.len, @intFromPtr(&cpus)));
+                    if (affinity <= 0) {
+                        _ = linux.syscall1(.exit_group, 45);
+                        unreachable;
+                    }
+                    const Entry = struct {
+                        fn run() void {}
+                    };
+                    const thread = std.Thread.spawn(.{}, Entry.run, .{}) catch {
+                        _ = linux.syscall1(.exit_group, 46);
+                        unreachable;
+                    };
+                    thread.join();
+                    if (policy == .reactor) {
+                        const counter = VirtioOwner.eventfd() catch {
+                            _ = linux.syscall1(.exit_group, 47);
+                            unreachable;
+                        };
+                        VirtioOwner.wake(counter) catch unreachable;
+                        VirtioOwner.wake(counter) catch unreachable;
+                        VirtioOwner.drain(counter) catch unreachable;
+                        _ = linux.close(counter);
+                    }
+                    const unix: isize = @bitCast(linux.socket(linux.AF.UNIX, linux.SOCK.STREAM | linux.SOCK.CLOEXEC, 0));
+                    if (unix < 0) {
+                        _ = linux.syscall1(.exit_group, 48);
+                        unreachable;
+                    }
+                    var socket_error: i32 = 0;
+                    var length: u32 = 4;
+                    const queried: isize = @bitCast(linux.syscall5(.getsockopt, @intCast(unix), 1, 4, @intFromPtr(&socket_error), @intFromPtr(&length)));
+                    _ = linux.close(@intCast(unix));
+                    if (queried != 0 or socket_error != 0 or length != 4) {
+                        _ = linux.syscall1(.exit_group, 49);
+                        unreachable;
+                    }
+                    var pollfds: [0]linux.pollfd = .{};
+                    const polled: isize = @bitCast(linux.poll(&pollfds, 0, 0));
+                    if (polled != 0) {
+                        _ = linux.syscall1(.exit_group, 41);
+                        unreachable;
+                    }
+                    const opened: isize = @bitCast(linux.epoll_create1(linux.EPOLL.CLOEXEC));
+                    if (opened < 0) {
+                        _ = linux.syscall1(.exit_group, 42);
+                        unreachable;
+                    }
+                    var events: [1]linux.epoll_event = undefined;
+                    const ready: isize = @bitCast(linux.epoll_wait(@intCast(opened), &events, events.len, 0));
+                    _ = linux.close(@intCast(opened));
+                    _ = linux.syscall1(.exit_group, if (ready == 0) 0 else 43);
+                    unreachable;
+                } else if (scenario == 1) {
+                    _ = linux.socket(linux.AF.INET, linux.SOCK.STREAM, 0);
+                } else if (scenario == 2) {
+                    _ = linux.syscall2(.eventfd2, 0, 0);
+                } else if (scenario == 3) {
+                    var cpus: [128]u8 = @splat(0);
+                    _ = linux.syscall3(.sched_getaffinity, 1, cpus.len, @intFromPtr(&cpus));
+                } else if (scenario == 4) {
+                    _ = linux.syscall3(.sched_setaffinity, 0, 0, 0);
+                } else if (scenario == 5) {
+                    var value: i32 = 0;
+                    var length: u32 = 4;
+                    _ = linux.syscall5(.getsockopt, 0, 1, 3, @intFromPtr(&value), @intFromPtr(&length));
+                } else if (scenario == 6) {
+                    _ = linux.syscall2(.eventfd2, 1, VirtioOwner.EVENT_FLAGS);
+                } else if (scenario == 7) {
+                    _ = linux.syscall2(.eventfd2, 0, VirtioOwner.EVENT_FLAGS | 1);
+                } else if (scenario == 8 or scenario == 9) {
+                    const mask: usize = if (scenario == 8) 1 else @as(usize, 1) << 32;
+                    _ = linux.syscall6(.epoll_pwait, 0, 0, 0, 0, mask, 8);
+                } else if (scenario == 10 or scenario == 11) {
+                    const timeout: usize = if (scenario == 10) 1 else @as(usize, 0xffff_ffff);
+                    _ = linux.syscall3(.poll, 0, 0, timeout);
+                } else {
+                    const counter = VirtioOwner.eventfd() catch {
+                        _ = linux.syscall1(.exit_group, 47);
+                        unreachable;
+                    };
+                    _ = linux.close(counter);
+                    _ = linux.syscall1(.exit_group, 0);
+                    unreachable;
+                }
+                _ = linux.syscall1(.exit_group, 44);
                 unreachable;
-            };
-            if (scenario == 0) {
-                var cpus: [128]u8 = @splat(0);
-                const affinity: isize = @bitCast(linux.syscall3(.sched_getaffinity, 0, cpus.len, @intFromPtr(&cpus)));
-                if (affinity <= 0) {
-                    _ = linux.syscall1(.exit_group, 45);
-                    unreachable;
-                }
-                const Entry = struct {
-                    fn run() void {}
-                };
-                const thread = std.Thread.spawn(.{}, Entry.run, .{}) catch {
-                    _ = linux.syscall1(.exit_group, 46);
-                    unreachable;
-                };
-                thread.join();
-                const counter = VirtioOwner.eventfd() catch {
-                    _ = linux.syscall1(.exit_group, 47);
-                    unreachable;
-                };
-                VirtioOwner.wake(counter) catch unreachable;
-                VirtioOwner.wake(counter) catch unreachable;
-                VirtioOwner.drain(counter) catch unreachable;
-                _ = linux.close(counter);
-                const unix: isize = @bitCast(linux.socket(linux.AF.UNIX, linux.SOCK.STREAM | linux.SOCK.CLOEXEC, 0));
-                if (unix < 0) {
-                    _ = linux.syscall1(.exit_group, 48);
-                    unreachable;
-                }
-                var socket_error: i32 = 0;
-                var length: u32 = 4;
-                const queried: isize = @bitCast(linux.syscall5(.getsockopt, @intCast(unix), 1, 4, @intFromPtr(&socket_error), @intFromPtr(&length)));
-                _ = linux.close(@intCast(unix));
-                if (queried != 0 or socket_error != 0 or length != 4) {
-                    _ = linux.syscall1(.exit_group, 49);
-                    unreachable;
-                }
-                var pollfds: [0]linux.pollfd = .{};
-                const polled: isize = @bitCast(linux.poll(&pollfds, 0, 0));
-                if (polled != 0) {
-                    _ = linux.syscall1(.exit_group, 41);
-                    unreachable;
-                }
-                const opened: isize = @bitCast(linux.epoll_create1(linux.EPOLL.CLOEXEC));
-                if (opened < 0) {
-                    _ = linux.syscall1(.exit_group, 42);
-                    unreachable;
-                }
-                var events: [1]linux.epoll_event = undefined;
-                const ready: isize = @bitCast(linux.epoll_wait(@intCast(opened), &events, events.len, 0));
-                _ = linux.close(@intCast(opened));
-                _ = linux.syscall1(.exit_group, if (ready == 0) 0 else 43);
-                unreachable;
-            } else if (scenario == 1) {
-                _ = linux.socket(linux.AF.INET, linux.SOCK.STREAM, 0);
-            } else if (scenario == 2) {
-                _ = linux.syscall2(.eventfd2, 0, 0);
-            } else if (scenario == 3) {
-                var cpus: [128]u8 = @splat(0);
-                _ = linux.syscall3(.sched_getaffinity, 1, cpus.len, @intFromPtr(&cpus));
-            } else if (scenario == 4) {
-                _ = linux.syscall3(.sched_setaffinity, 0, 0, 0);
-            } else if (scenario == 5) {
-                var value: i32 = 0;
-                var length: u32 = 4;
-                _ = linux.syscall5(.getsockopt, 0, 1, 3, @intFromPtr(&value), @intFromPtr(&length));
-            } else if (scenario == 6) {
-                _ = linux.syscall2(.eventfd2, 1, VirtioOwner.EVENT_FLAGS);
-            } else if (scenario == 7) {
-                _ = linux.syscall2(.eventfd2, 0, VirtioOwner.EVENT_FLAGS | 1);
-            } else if (scenario == 8 or scenario == 9) {
-                const mask: usize = if (scenario == 8) 1 else @as(usize, 1) << 32;
-                _ = linux.syscall6(.epoll_pwait, 0, 0, 0, 0, mask, 8);
-            } else {
-                const timeout: usize = if (scenario == 10) 1 else @as(usize, 0xffff_ffff);
-                _ = linux.syscall3(.poll, 0, 0, timeout);
             }
-            _ = linux.syscall1(.exit_group, 44);
-            unreachable;
-        }
-        var status: u32 = 0;
-        while (true) {
-            const waited: isize = @bitCast(linux.syscall4(.wait4, @intCast(child), @intFromPtr(&status), 0, 0));
-            if (waited == -@as(isize, @backingInt(linux.E.INTR))) continue;
-            try std.testing.expectEqual(child, waited);
-            break;
-        }
-        if (scenario == 0) {
-            try std.testing.expectEqual(@as(u32, 0), status);
-        } else {
-            try std.testing.expectEqual(@backingInt(linux.SIG.SYS), status & 0x7f);
+            var status: u32 = 0;
+            while (true) {
+                const waited: isize = @bitCast(linux.syscall4(.wait4, @intCast(child), @intFromPtr(&status), 0, 0));
+                if (waited == -@as(isize, @backingInt(linux.E.INTR))) continue;
+                try std.testing.expectEqual(child, waited);
+                break;
+            }
+            std.debug.print("enforced_policy={s} scenario={} child_pid={} status={}\n", .{
+                @tagName(policy), scenario, child, status,
+            });
+            if (scenario == 0 or (scenario == 12 and policy == .reactor)) {
+                try std.testing.expectEqual(@as(u32, 0), status);
+            } else {
+                try std.testing.expectEqual(@backingInt(linux.SIG.SYS), status & 0x7f);
+            }
         }
     }
 }

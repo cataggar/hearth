@@ -20,6 +20,94 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Default/readiness policy separation — new correctness-only epoch
+
+Current-source inspection against canonical7d confirms `poll(timeout=0)` and
+`epoll_pwait(NULL)` with both pointer halves checked; the peer's unconditional
+NR7/281 finding was against older e2 source, not f52. It also confirms a real
+scope gap: f52's **argument-confined** eventfd2 was not mode-conditional.
+Earlier shorthand “conditional filter” must not be read as proof of that
+missing mode selector or whole-filter byte convergence.
+
+Production now explicitly selects **baseline** for default L0 and **reactor**
+for validated `--virtio-mode C00/C10/C01/C11`, before any guest interaction.
+Baseline kills eventfd2; reactor admits only init0/NONBLOCK|CLOEXEC. C00 is an
+opt-in common-control reactor, not the default: `Owner.start` creates control
+eventfds after enforced jail for blocking readiness/admission/pause/failure/
+shutdown even when both KVM accelerators are disabled. Do not move that work
+outside the enforced boundary or call C00 eventfd-free. Existing confined
+SO_ERROR remains needed by the shared vsock immediate-connect validation
+(`vsock.zig::handleRequest/checkSocket`), including legacy; that intentional
+addition means the filter is **not** byte-canonical. Jail remains byte-exact7d,
+and poll/epoll/clone/affinity/socket/mprotect restrictions remain unchanged.
+
+**Actual final results:** Debug/Safe each70 executed Zig tests (39 units,
+24 dedicated:23 actual KVM+1 policy,7 integration:5 guest+2 CLI/error) plus3
+standalone enforced CLI/API jail cases. The existing real forked seccomp unit
+executes26 scenarios per build: baseline otherwise-valid eventfd2 dies SIGSYS,
+reactor exact-flags creation/wake/drain succeeds, and forbidden flags/AF_INET/
+affinity/poll/epoll-mask arguments die in both. All prior masked IRQ/reset/
+IRET-HLT and24 fatal tests/build execute again; all8 exact pre-entry cases
+observe consumed SIGUSR1 then actual KVM EINTR/RIP0x100. No cached execution
+or skips are counted. All52 Python guards and source formatting pass.
+
+New Safe ELF passes **4/4** focused corrected active mixed captures/new-process
+v2 restores, one per C00/C10/C01/C11 (**8** enforced VMMs,48 task confinement
+rows). Each verifies the same live disk generation before capture/after restore,
+outstanding TAP/vsock, zero acknowledged-pause all-task CPU,14MiB block/payload
+integrity and both exits0. Unchanged agent50ms/reconnect/fixture relaunch applies.
+These are **not80 new repeats**, exact disk-syscall-at-capture proof or adoption.
+The corrected f52/80 source/ELF epoch below remains independently valid; older
+invalid-oracle80 stays invalid. None requalifies frozen performance gates.
+
+One unchanged3GiB capacity guard refused before any VM launched. Under the
+fleet lock,12 exact owned completed/unexecuted compiler `_zcu.o` leaves were
+recorded/hashed then removed (96,161,792 allocated bytes); every executed ELF,
+raw/failed epoch and fixture remains. Fresh restore entries rechecked the guard
+and passed. All220 recorded own numeric PID/TID paths are absent at seal;
+six standalone owned node/socket roots are absent. This is not a claim about
+foreign resources, unrecorded identities or overall host availability.
+
+Exact commands, all `cd` here, `umask077`, bounded exclusive fleet phases,
+released between native/jail/restore cells:
+
+```
+cd vmm
+zig build install test eventfd-test integration-test \
+  -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe \
+  -Dintegration-kernel=../.perf/eventfd/fixtures/bzImage --summary all --color off
+cd ..
+FLINT_JAIL_TEST_BINARY="$PWD/.perf/eventfd/policy-review/flint-ReleaseSafe" \
+FLINT_JAIL_TEST_KERNEL="$PWD/.perf/eventfd/fixtures/bzImage" \
+FLINT_JAIL_TEST_REVISION=policy-working-tree-on-f52 \
+  python3 -m unittest discover -s tools/perf -p test_jail_baseline.py -v
+python3 -m unittest discover -s benchmarks/virtio-eventfd -p 'test_*.py' -v
+sudo -n unshare --net python3 benchmarks/virtio-eventfd/restore_stress.py \
+  --out .perf/eventfd/policy-review/restore-C00 \
+  --binary .perf/eventfd/policy-review/flint-ReleaseSafe \
+  --fixture .perf/eventfd/harness-review/fixture-final --mode C00 --cycles 1
+```
+
+Repeat native/jail with Debug and restore with new C10/C01/C11 output paths.
+Native outer/child bounds740/620s, jail260–280/180s (plus Python60s),
+restore260/180s, lock wait60s;
+no nested lease. Executed source manifest/native diff, all actual logs/receipts,
+guard refusal and owned recovery records are privately
+`.perf/eventfd/policy-review/`. New production Safe SHA256
+`5ef1aaa6649ec1c4e13b43bdb3328316ce61d8fc0959f36df58111c0cc8d4c44`,
+Debug `f3698403501029dfe8d9cb1e0b5403f3503cb265918401d443428b8508b5f3d9`.
+The [policy-review-validation.tar.gz](policy-review-validation.tar.gz) contains
+80 sanitized receipt/log/source members, **not** guest images/ELFs/private
+global traces; exact archive SHA
+`ab81670ddd06268c61a2b01a9e9d67acb511fdc9be83d0df0b2be054f5930c3a`
+is also in [policy-review-SHA256SUMS](policy-review-SHA256SUMS). Immutable native
+source is pinned by file SHA and delta from f52, not mislabeled as unchanged f52.
+
+The fixture-only ENOSPC cleanup follow-up98b10c21 is **not imported**, nor its
+peer cases counted. No new A/A/candidates, parent label, hosted execution,
+default change or merge; remaining full lifecycle/performance coverage stays
+blocked. Parent must review this new exact source before any hosted trigger.
+
 ## Authorized harness integration — corrected actual acceptance
 
 Parent-authorized helper `22c5fcadc19850fd8559f02d1de0b4522ffc15e2` is

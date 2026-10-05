@@ -60,7 +60,7 @@ fn isolated(comptime scenario: fn () anyerror!void) !void {
     const pid: isize = @bitCast(linux.syscall0(.fork));
     if (pid < 0) return error.ForkFailed;
     if (pid == 0) {
-        seccomp.install(false) catch linux.exit_group(91);
+        seccomp.install(false, .reactor) catch linux.exit_group(91);
         scenario() catch |err| {
             std.debug.print("real enforced KVM scenario failed: {}\n", .{err});
             linux.exit_group(92);

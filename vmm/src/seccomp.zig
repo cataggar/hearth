@@ -9,13 +9,14 @@
 //   sched_getaffinity — current process only (thread startup)
 //   epoll_pwait — only a null signal mask, as emitted by linux.epoll_wait
 //   poll — only the existing nonblocking vsock check
-//   eventfd2 — zero initial count, nonblocking and close-on-exec
+//   eventfd2 — reactor only, zero initial count, nonblocking and close-on-exec
 //   getsockopt — only the Unix connection SO_ERROR query
 
 const std = @import("std");
 const linux = std.os.linux;
 
 const log = std.log.scoped(.seccomp);
+pub const Policy = enum { baseline, reactor };
 
 // Seccomp constants (stable kernel ABI — hardcoded to avoid Zig 0.16-dev
 // compilation bug in AUDIT.ARCH enum)
@@ -165,7 +166,7 @@ const simple_syscalls = [_]u32{
 ///   [4+N+8]    default KILL
 ///   [4+N+9..]  argument check blocks
 ///   [last]      ALLOW
-fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simple.len + 49]SockFilter {
+fn buildFilter(comptime simple: []const u32, comptime default_action: u32, comptime policy: Policy) [simple.len + 49]SockFilter {
     const N = simple.len;
     const ALLOW_POS = N + 48;
     const CLONE_BLK = 4 + N + 9;
@@ -224,7 +225,10 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
     f[AFFINITY_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, @intCast(ALLOW_POS - (AFFINITY_BLK + 1) - 1), 0);
     f[AFFINITY_BLK + 2] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 
-    f[EVENTFD_BLK + 0] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0);
+    f[EVENTFD_BLK + 0] = if (policy == .reactor)
+        bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG0)
+    else
+        bpf_stmt(BPF_RET | BPF_K, default_action);
     f[EVENTFD_BLK + 1] = bpf_jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, 0);
     f[EVENTFD_BLK + 2] = bpf_stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
     f[EVENTFD_BLK + 3] = bpf_stmt(BPF_LD | BPF_W | BPF_ABS, DATA_OFF_ARG1);
@@ -256,19 +260,24 @@ fn buildFilter(comptime simple: []const u32, comptime default_action: u32) [simp
     return f;
 }
 
-pub const kill_filter = buildFilter(&simple_syscalls, SECCOMP_RET_KILL_PROCESS);
-pub const log_filter = buildFilter(&simple_syscalls, SECCOMP_RET_LOG);
+pub const kill_filter = buildFilter(&simple_syscalls, SECCOMP_RET_KILL_PROCESS, .baseline);
+pub const log_filter = buildFilter(&simple_syscalls, SECCOMP_RET_LOG, .baseline);
+const reactor_kill_filter = buildFilter(&simple_syscalls, SECCOMP_RET_KILL_PROCESS, .reactor);
+const reactor_log_filter = buildFilter(&simple_syscalls, SECCOMP_RET_LOG, .reactor);
 
 /// Install the seccomp BPF filter. After this, unlisted syscalls kill
 /// the process (or log in audit mode for development).
-pub fn install(audit: bool) !void {
+pub fn install(audit: bool, policy: Policy) !void {
     const rc1: isize = @bitCast(linux.prctl(@backingInt(linux.PR.SET_NO_NEW_PRIVS), 1, 0, 0, 0));
     if (rc1 < 0) {
         log.err("prctl(NO_NEW_PRIVS) failed: {}", .{rc1});
         return error.PrctlFailed;
     }
 
-    const filter = if (audit) &log_filter else &kill_filter;
+    const filter = switch (policy) {
+        .baseline => if (audit) &log_filter else &kill_filter,
+        .reactor => if (audit) &reactor_log_filter else &reactor_kill_filter,
+    };
     const prog = SockFprog{
         .len = @intCast(filter.len),
         .filter = filter,
@@ -283,6 +292,8 @@ pub fn install(audit: bool) !void {
     if (audit) {
         log.warn("seccomp in AUDIT mode — violations logged, not killed", .{});
     } else {
-        log.info("seccomp filter installed ({} syscall classes admitted)", .{simple_syscalls.len + 8});
+        log.info("seccomp {s} filter installed ({} syscall classes admitted)", .{
+            @tagName(policy), simple_syscalls.len + @as(usize, if (policy == .reactor) 8 else 7),
+        });
     }
 }

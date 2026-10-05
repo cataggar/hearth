@@ -2,6 +2,35 @@
 
 **Status**: Blocked qualification — four controlled modes implemented; new corrected80-cycle live-producer restore acceptance passes; historical80-cycle oracle remains invalid; frozen performance gates unmet
 
+### Explicit readiness policy
+
+Production seccomp selection must follow the validated `--virtio-mode` before
+any guest interaction: default L0 denies `eventfd2`; explicitly selected
+C00/C10/C01/C11 admit only `eventfd2(0, NONBLOCK|CLOEXEC)`. C00 is not the
+default policy: its blocking owners require control eventfds for admission,
+pause, failure and shutdown after jail/filter installation even with both KVM
+accelerators disabled. Do not claim C00 has no eventfds or move their creation
+outside the enforced boundary. All modes retain `poll(timeout=0)`, null
+`epoll_pwait` mask checks on both pointer halves and confined SO_ERROR queries.
+The latter is an experimental legacy-vsock compatibility addition, not a
+byte-canonical common filter. Actual forked SIGSYS controls must verify valid
+eventfd denial in baseline and exact-flags admission only in the reactor
+policy, plus forbidden operations and poll/epoll arguments in both policies.
+Post-change native/restore results are a new correctness epoch; they do not
+requalify historical performance or replace the separately pinned f52 evidence.
+
+Actual new-source Debug/Safe each pass70 Zig+3 enforced standalone cases and
+26 forked policy controls; valid eventfd2 is SIGSYS in baseline and succeeds in
+reactor. Poll/epoll negative arguments die in both. All52 Python guards pass.
+New Safe ELF passes four focused corrected mixed captures/new-process restores,
+one per Cxx, with all48 task confinement rows verified. This is **4/4, not a
+repeat of80/80** on the new ELF. Original corrected f52/80 evidence remains
+valid for its own pin; older invalid-oracle80 remains invalid. All220 recorded
+own numeric PID/TID paths are absent at seal. One unchanged3GiB capacity guard
+refused before VM launch; removing only12 owned unexecuted compiler objects
+recovered96,161,792 allocated bytes before successful fresh phases. No raw,
+executed ELF, fixture, failed bytes or foreign resource was removed.
+
 ### Independent runtime-review acceptance
 
 Masking PIC/IOAPIC alone must not change an established route's edge/level
