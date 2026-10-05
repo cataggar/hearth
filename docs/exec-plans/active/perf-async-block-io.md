@@ -6,6 +6,33 @@
 **Spec**: [Asynchronous VirtIO Block I/O](../../product-specs/perf-async-block-io.md)
 **Actual results**: [baseline capability execution](../../product-specs/perf-async-block-io-results.md)
 
+### Shared fixture cleanup follow-up — 2026-10-05 03:35 UTC
+
+The standalone canonical jail fixture has the same tightly coupled ENOSPC
+surface observed in sibling workload harnesses: saving `cleanup.json` after
+joining the owned child can raise before log/node/socket cleanup. Harden this
+fixture only, preserve evidence-write failure propagation, and add one focused
+real enforced-child fault case. Before admission recheck project storage;
+execute Debug/Safe standalone cases under one bounded fleet lock and audit
+recorded owned PID paths/nodes/sockets. No VMM/compiler/guest-feature change,
+new performance sample, gate relaxation or peer count borrowing is permitted.
+Validation actually executes **4/4 standalone cases per Debug/Safe mode,
+8/8 total, no skips**, on unchanged SHA-verified canonical static executables.
+Four cases boot real CLI/API guests; two use real enforced API children with
+injected ENOSPC during cleanup-evidence persistence. A separate original-helper
+negative control confirms the joined child's logs/node/socket were retained
+before the fix, then explicitly recovers them using the hardened helper.
+All nine launch records have no live PID paths, private nodes or sockets.
+The initial syntax/import failure executed zero tests and is retained, not
+accepted. No new VMM unit/performance executions are inferred. Preserve
+the original canonical helper/version and publish a separately scoped
+fixture-only follow-up; raw phase/custody is under
+`.perf/blk-io/canonical-prerequisite/cleanup-current-results.json`.
+That follow-up is now `98b10c21f7769e36799d0994f231d7e881953ac3`, exact parent
+`7dfee42`, only fixture/contract changes and verified zero VMM delta.
+The private bundle and `cleanup-acceptance-manifest.json` preserve reproduction
+and nine-launch resource custody. This does not unblock performance gates.
+
 ## Execution checkpoint — 2026-10-04
 
 ### Fresh qualification continuation — 22:13 UTC

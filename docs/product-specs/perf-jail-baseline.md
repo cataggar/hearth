@@ -24,9 +24,17 @@ The standalone `tools/perf/test_jail_baseline.py` does not import the performanc
 runner or async worker. It checks real enforced API receive/send, umask077
 directory/node ownership/access, empty groups/caps and all actual VMM task
 filters, plus real CLI/API guest disk write/fsync/read/hash and unchanged host
-KVM metadata. There are three cases; missing prerequisites fail, not skip.
+KVM metadata. Missing prerequisites fail, not skip.
 Its small serial fixture is synchronous correctness, not a throughput,
 interactive, timer-free wake or snapshot performance acceptance.
+
+Cleanup evidence persistence is not a prerequisite for resource teardown.
+An injected ENOSPC while saving the exited child's cleanup record must still
+close both logs and remove its private device directory/node and API socket;
+the original evidence error must propagate. The focused fourth case exercises
+this on a real enforced API child, checks every recorded PID path is gone,
+and writes a separately identified fault audit after teardown. It is an
+injected write failure, not a claim that the host was full during that test.
 
 ## TAP declaration limitation
 
@@ -120,3 +128,41 @@ fleet lock; copied fixtures remained project-relative and each admission
 required at least64MiB available space. The corresponding group-only bundle is
 `jail-groups-after-5ee.bundle`; its custody manifest is
 `groups-forward-bridge.json`.
+
+## Evidence-write cleanup acceptance
+
+The helper now puts log closure and private node/socket removal in `finally`;
+an ENOSPC from saving `cleanup.json` after child joining still propagates.
+The focused new case injects only that write failure on an actual enforced API
+child, verifies groups/caps/filter, and independently checks PID absence,
+closed logs and removed device directory/socket. Its separate fault audit
+identifies the injection; this is not a simulated guest success or a claim
+that the host was full during validation.
+
+An unchanged `7dfee42` helper negative control actually reproduces retained
+logs/node/socket after the joined child's injected evidence error; the fixed
+helper then explicitly cleans that same owned launch. Debug/Safe subsequently
+execute **4/4 standalone cases each, 8/8 total, no skips**, including four real
+CLI/API guest disk boots and two real enforced-child injected-ENOSPC cases.
+All nine launches pass PID/node/socket custody checks. An initial import/
+indentation failure executes zero tests and is retained separately.
+
+Executables remain the SHA-verified canonical LLVM static binaries; no VMM
+source, syscall allowance, compiler/dependency/guest feature or performance
+gate changes. These counts are not native/GNU, sibling net/worker or production
+application-state acceptance. Exact command, case/log hashes and negative
+control are retained in `check-cleanup-fault.py`, `check-cleanup-fault.log`,
+`cleanup-current-{debug,safe}.log`, `cleanup-current-results.json` and the
+separate cleanup acceptance manifest under the canonical-prerequisite
+directory. The phase rechecks at least256MiB before each bounded mode/control and holds
+the common exclusive fleet lock; no new large images or performance sample.
+
+The separately scoped follow-up is
+`98b10c21f7769e36799d0994f231d7e881953ac3`, exact parent `7dfee42`.
+It changes only this fixture and its minimal contract; all VMM files remain
+byte-identical to `7dfee42`. Clean integration is `7dfee42` then `98b10c21`.
+Historical peers without the standalone file must inspect/import that exact
+fixture blob rather than blindly applying a modify/delete conflict or
+importing block/backend patches. The private verified bundle is
+`jail-fixture-enospc.bundle`, with source/log/custody hashes in
+`cleanup-acceptance-manifest.json`.
