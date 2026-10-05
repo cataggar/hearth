@@ -70,3 +70,25 @@ in a public PR.
 
 Passing this prerequisite does not authorize a native-size waiver, quieter
 host assumption, async/vhost/eventfd adoption, performance merge or auto-merge.
+
+## Integration provenance
+
+Clean `b06ec0a` histories use the single-parent, five-file cumulative prerequisite
+`7dfee42ed68fe1703744d6318f4be632113034b0`. Its fixture is self-contained;
+do not import the historical block-performance harness to satisfy it.
+
+For a peer that already committed the partial `f2f9ab4` repair, the forward-only
+reconciliation is `cde7d842bc6854dc2daced42f4cc8b1124982660`, with exact parent
+`f2f9ab4c8e7a67097f2c3f52636327e9c41d5084`. Only the three common runtime/test
+files and standalone fixture/contract change. All five resulting blobs were
+verified byte-identical to `7dfee42`; this extraction executes no new tests.
+Retain peer-specific device/filter overlays and rerun actual enforced-jail
+acceptance against their combined source. Preserve prior SIGSYS failures.
+
+This reconciliation preserves, but does not endorse or repair, the old f2
+CI/harness dependency. It is not a clean baseline or an alternative main merge
+chain. Main and clean peers must use `7dfee42` directly. The private verified
+bundle and extraction manifest are under
+`.perf/blk-io/canonical-prerequisite/jail-after-f2.bundle` and
+`.perf/blk-io/canonical-prerequisite/f2-forward-bridge.json`; peer convergence
+remains pending until application and fresh acceptance are acknowledged.
