@@ -1,0 +1,30 @@
+{
+  "status": "negative-hosted-noise-decision",
+  "source": "300dea5bb7c6f5407ea87d3c3fe9b53c444a9942",
+  "performance_merge_eligible": false,
+  "default": "legacy",
+  "auto_merge": false,
+  "reason": "actual complete A/A exceeds unchanged gates; zero candidate samples",
+  "owned_input_image_cleanup": [
+    {
+      "path": ".perf/eventfd-hosted/bzImage",
+      "bytes": 7605472,
+      "sha256": "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208"
+    },
+    {
+      "path": ".perf/eventfd-hosted/disk-probe",
+      "bytes": 1396632,
+      "sha256": "0400bd6bbeb0398f99f10e3b1d87775c3fd3a771730ff0897e0385d1500973b5"
+    },
+    {
+      "path": ".perf/eventfd-hosted/fixture/initrd.cpio.gz",
+      "bytes": 4797995,
+      "sha256": "66a443637f1fd7cc5cf98b1d075a379b51c86834638086add9d1ee18543356bf"
+    },
+    {
+      "path": ".perf/eventfd-hosted/native-fixture/initrd.cpio.gz",
+      "bytes": 2120776,
+      "sha256": "56f2686ef017decbbc2949b2cd8c53449f1779b20c72cb962214cf154bdd7358"
+    }
+  ]
+}

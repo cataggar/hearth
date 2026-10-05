@@ -1,0 +1,83 @@
+{
+  "source_commit": "71e614e166e1bd4a9f39b44cee8eb9857c93456f",
+  "source_tree": "63ff8c8ec4e897429aded5891facfa000837e423",
+  "run_id": 37316393129,
+  "url": "https://github.com/cataggar/hearth/actions/runs/37316393129",
+  "actual_successful_jobs": 9,
+  "scope": "ordinary correctness; not performance or full active restore/lifecycle",
+  "target": "x86_64-linux-musl",
+  "local_test_execution": {
+    "executed": 0,
+    "reason": "unchanged3GiB guard refused before tests",
+    "free_bytes": 3198894080,
+    "no_eligible_owned_unexecuted_cache_objects": true,
+    "guard_lowered": false
+  },
+  "negative_controls": {
+    "source": "9ee9a91c852c9c7492a456be2d569728a511d623",
+    "verified_git_blob": "41561cad864b4dce2ed8d019a1768ee49fabe34f",
+    "actual_tests_each_optimization": 2,
+    "expected_errors_each": 1,
+    "expected_failures_each": 1,
+    "skipped": 0,
+    "owned_fixture_children_reconciled": true,
+    "not_in_current_positive_pass_count": true
+  },
+  "cells": {
+    "ReleaseSafe": {
+      "job_id": 111784095110,
+      "dedicated": 25,
+      "integration": 7,
+      "current_focused": 66,
+      "focused_skipped": 0,
+      "jail": 4,
+      "jail_real_API": 2,
+      "jail_mocked": 2,
+      "fatal_paths": 24,
+      "actual_pre_entry_KVM_EINTR": 8,
+      "missing_immediate_exit_modes": 4
+    },
+    "Debug": {
+      "job_id": 111784095290,
+      "dedicated": 25,
+      "integration": 7,
+      "current_focused": 66,
+      "focused_skipped": 0,
+      "jail": 4,
+      "jail_real_API": 2,
+      "jail_mocked": 2,
+      "fatal_paths": 24,
+      "actual_pre_entry_KVM_EINTR": 8,
+      "missing_immediate_exit_modes": 4
+    }
+  },
+  "static_units": {
+    "job_id": 111784095109,
+    "actual_each_optimization": 39
+  },
+  "per_registration_refusal": {
+    "expected_receipt_status": "failed",
+    "expected_receipt_code": 1,
+    "unsafe_registered_survivors_at_receipt": 1,
+    "other_owned_children_terminated_and_reaped": 8,
+    "fixture_only_artificial_refusal_removed_after_failed_receipt": true,
+    "fixture_last_owned_generation_safely_reaped": true,
+    "scope": "nine Python process stand-ins, not eight KVM VMs"
+  },
+  "retained_initial_calibration_epoch": {
+    "source": "87a39d4ad5c8d10aa06297164f8c29f5114fc5ee",
+    "run_id": 37316121456,
+    "actual_conclusion": "failure",
+    "reason": "copied globals prevented retained-method identity hook",
+    "actual_negative_failures_each": 2,
+    "actual_negative_errors_each": 0,
+    "current_focused_suite_not_executed": true,
+    "not_positive_acceptance": true
+  },
+  "collector_native_producer_and_deadline_changes": false,
+  "performance_measurements": 0,
+  "performance_merge_eligible": false,
+  "default": "L0",
+  "perf_label": "unapplied",
+  "auto_merge": false
+}

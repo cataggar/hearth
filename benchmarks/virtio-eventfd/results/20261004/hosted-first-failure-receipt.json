@@ -1,0 +1,48 @@
+{
+  "schema": "virtio-eventfd-hosted-prerequisite-failure-v1",
+  "run_id": 37323212257,
+  "run_attempt": 1,
+  "source": "71bbd4a6342b08c4cf7e701c733dc27d795eddfc",
+  "qualification_job_seconds": 216,
+  "status": "terminal-independent-failed-epoch",
+  "phase": {
+    "name": "zig-Debug",
+    "selectors": ["install", "test", "eventfd-test", "integration-test"],
+    "target": "x86_64-linux-musl",
+    "optimize": "Debug",
+    "returncode": 1,
+    "test_counts": [[66, 71]],
+    "skip_detected": false,
+    "coverage_rejected": true,
+    "stderr_sha256": "847b929ccb4e769a05000f430bebb26aa303c9929a38e74d2abb988a73df72f0",
+    "failed_identifiers": "unavailable in original allowlisted artifact",
+    "raw_stderr": "not preserved in uploaded artifact; cannot reconstruct from hash"
+  },
+  "successful_prerequisites": {
+    "signed_compiler": "Zig 0.17.0",
+    "kernel_sha256": "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208",
+    "host": "nested Azure Standard_D4ads_v5, AMD svm",
+    "host_kernel": "6.17.0-1022-azure",
+    "visible_logical_cpus": 4,
+    "visible_smt_pairs": [[0, 1], [2, 3]],
+    "vm_cpu": 0,
+    "client_cpu": 2,
+    "kvm_api": 12,
+    "nonroot_vm_create": true,
+    "capabilities": {"32": 1, "36": 1, "82": 1, "136": 1},
+    "root_probe_returncodes": {"software": 0, "pmu": 0, "trace": 0, "netns": 0},
+    "user_perf_returncodes": {"software": 255, "pmu": 255, "trace": 129}
+  },
+  "source_confirmed_correction": {
+    "dependency": "integration fixture requires vmm/.zig-cache parent; hosted local compiler cache is redirected",
+    "fix": "prepare private owned fixture parent before first hosted compiler invocation",
+    "historical_five_failure_causation": "not established without missing raw diagnostics",
+    "future_public_diagnostics": "source-allowlisted identifiers, fixed observed error labels and aggregate counts only"
+  },
+  "aa_rows": 0,
+  "candidate_rows": 0,
+  "quietness_established": false,
+  "performance_merge_eligible": false,
+  "default": "legacy",
+  "automatic_rerun": false
+}

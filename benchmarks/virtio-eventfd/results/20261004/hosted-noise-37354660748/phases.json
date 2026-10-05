@@ -1,0 +1,182 @@
+[
+  {
+    "name": "zig-Debug",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "92700ea75c58f2a43e5268804bdb1c44e3c54184b92c4d6cbc6267af909feffb",
+    "argv": [
+      "/home/runner/work/_temp/ghr-bin/zig",
+      "build",
+      "install",
+      "test",
+      "eventfd-test",
+      "integration-test",
+      "-Dtarget=x86_64-linux-musl",
+      "-Doptimize=Debug",
+      "-Dintegration-kernel=/home/runner/work/hearth/hearth/.perf/eventfd-hosted/bzImage",
+      "--summary",
+      "all",
+      "--color",
+      "off"
+    ],
+    "test_counts": [
+      [
+        71,
+        71
+      ]
+    ],
+    "skip_detected": false,
+    "test_failure_diagnostics": {
+      "scope": "source-allowlisted test identifiers and observed error labels, not proven causes",
+      "failure_headers": 0,
+      "unknown_failure_headers": 0,
+      "failures": []
+    }
+  },
+  {
+    "name": "jail-Debug",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "96d09abf6327612b5b8ee14d5c8c4bb71630583f1e4162e18dec3f0042802e3f",
+    "argv": [
+      "/usr/bin/python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools/perf",
+      "-p",
+      "test_jail_baseline.py",
+      "-v"
+    ]
+  },
+  {
+    "name": "zig-ReleaseSafe",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "7a3e4b8f03d7e1b9aecc5685e918e68ffcf277201e12b9c1ca4328ba69da4147",
+    "argv": [
+      "/home/runner/work/_temp/ghr-bin/zig",
+      "build",
+      "install",
+      "test",
+      "eventfd-test",
+      "integration-test",
+      "-Dtarget=x86_64-linux-musl",
+      "-Doptimize=ReleaseSafe",
+      "-Dintegration-kernel=/home/runner/work/hearth/hearth/.perf/eventfd-hosted/bzImage",
+      "--summary",
+      "all",
+      "--color",
+      "off"
+    ],
+    "test_counts": [
+      [
+        71,
+        71
+      ]
+    ],
+    "skip_detected": false,
+    "test_failure_diagnostics": {
+      "scope": "source-allowlisted test identifiers and observed error labels, not proven causes",
+      "failure_headers": 0,
+      "unknown_failure_headers": 0,
+      "failures": []
+    }
+  },
+  {
+    "name": "jail-ReleaseSafe",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "4b205e9162e638779294975b3ad6e30cf862c89ba85cc8eda7bad58f1ea8e388",
+    "argv": [
+      "/usr/bin/python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools/perf",
+      "-p",
+      "test_jail_baseline.py",
+      "-v"
+    ]
+  },
+  {
+    "name": "agent",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "argv": [
+      "/home/runner/work/_temp/ghr-bin/zig",
+      "build",
+      "-Dtarget=x86_64-linux-musl",
+      "-Doptimize=safe"
+    ]
+  },
+  {
+    "name": "native-probes",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "argv": [
+      "/home/runner/work/_temp/ghr-bin/zig",
+      "build",
+      "eventfd-guest-probe",
+      "eventfd-tcp-probe",
+      "-Dtarget=x86_64-linux-musl",
+      "-Doptimize=ReleaseSafe"
+    ]
+  },
+  {
+    "name": "disk-probe",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "argv": [
+      "/home/runner/work/_temp/ghr-bin/zig",
+      "cc",
+      "-target",
+      "x86_64-linux-musl",
+      "-O2",
+      "/home/runner/work/hearth/hearth/benchmarks/virtio-eventfd/disk_probe.c",
+      "-o",
+      "/home/runner/work/hearth/hearth/.perf/eventfd-hosted/disk-probe"
+    ]
+  },
+  {
+    "name": "irqfd-observer-build",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "aa-0",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "aa-1",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "aa-2",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "aa-3",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "aa-4",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

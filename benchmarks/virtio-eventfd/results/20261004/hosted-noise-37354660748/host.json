@@ -1,0 +1,180 @@
+{
+  "kernel": "6.17.0-1022-azure",
+  "architecture": "x86_64",
+  "uid": 1001,
+  "gid": 993,
+  "topology": {
+    "0": {
+      "core": [
+        0,
+        0
+      ],
+      "siblings": [
+        0,
+        1
+      ]
+    },
+    "1": {
+      "core": [
+        0,
+        0
+      ],
+      "siblings": [
+        0,
+        1
+      ]
+    },
+    "2": {
+      "core": [
+        0,
+        1
+      ],
+      "siblings": [
+        2,
+        3
+      ]
+    },
+    "3": {
+      "core": [
+        0,
+        1
+      ],
+      "siblings": [
+        2,
+        3
+      ]
+    }
+  },
+  "topology_scope": "actual guest-exposed package/core/SMT; hidden host placement is not assumed",
+  "available_bytes": 91784204288,
+  "azure": {
+    "verified": true,
+    "vmSize": "Standard_D4ads_v6",
+    "azEnvironment": "AzurePublicCloud"
+  },
+  "nesting": {
+    "verified": true,
+    "hypervisor_flag": true,
+    "virtualization_flag": "svm"
+  },
+  "non_nested_comparison": "not available; no persistent resource requested",
+  "vm_cpu": 0,
+  "client_cpu": 2,
+  "visible_logical_cores": 4,
+  "runner_environment": "github-hosted",
+  "dmi": {
+    "sys_vendor": "Microsoft Corporation",
+    "product_name": "Virtual Machine"
+  },
+  "kvm": {
+    "api_version": 12,
+    "nonroot_vm_create": true,
+    "capabilities": {
+      "irqfd": 1,
+      "ioeventfd": 1,
+      "resample": 1,
+      "immediate_exit": 1
+    }
+  },
+  "perf_binary_sha256": "2d0953085bf720a25efbe24f853e97d27b1f12f18a398255ff82cbafde254dad",
+  "perf_version": "perf version 6.17.13",
+  "user_perf": {
+    "software": {
+      "name": "probe-user-software",
+      "returncode": 255,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "3e16d8f851a488f8fd897a68f4b3bdf14c890916b53a59cf3456a56555dcb6bc"
+    },
+    "pmu": {
+      "name": "probe-user-pmu",
+      "returncode": 255,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "3e16d8f851a488f8fd897a68f4b3bdf14c890916b53a59cf3456a56555dcb6bc"
+    },
+    "trace": {
+      "name": "probe-user-trace",
+      "returncode": 129,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "0309616b4c89a5dbbe452a376ae44a751bae23ccaf554f650318c3fd5e8a9818"
+    }
+  },
+  "root_perf": {
+    "software": {
+      "name": "probe-root-software",
+      "returncode": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "04a66dccd2e4084d9211c7f4b17c6231619d7a372f157085e98437036108c6b8"
+    },
+    "pmu": {
+      "name": "probe-root-pmu",
+      "returncode": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "28c939d4d8d74949a2a5fcb650423caa717aea3c096c34f82de8b2e22680cac9"
+    },
+    "trace": {
+      "name": "probe-root-trace",
+      "returncode": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c7788f2c101b7733c737a2baeefb2cdca5df87ff187a0d262db33ee0556ff3f6"
+    }
+  },
+  "sudo_namespace": {
+    "name": "probe-netns",
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "cpu_accounting": {
+    "primary": "all visible-host CPU: user+nice+system+irq+softirq; guest already in user/nice; includes VMM, peers and deferred kernel/scheduler work; not physical Azure hypervisor CPU",
+    "background_subtracted": false,
+    "owned_detail_added": false,
+    "owned_attribution_gaps": [
+      "irqfd workqueue dispatcher and scheduler outside the tagged function intervals",
+      "marginal TAP/softirq and resample scheduling outside owned task/function intervals"
+    ]
+  },
+  "perf_control_probe": {
+    "name": "probe-perf-control",
+    "returncode": 0,
+    "stdout_sha256": "18192fe77645ecfdc2510925866696b430b58f61f74680135edf996b73f8a635",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "protocol": {
+      "status": "passed",
+      "actual_perf": true,
+      "commands": [
+        {
+          "command": "disable",
+          "epoch": 1,
+          "sent_ns": 64649161811,
+          "ack_ns": 64649237664,
+          "ack_frame_hex": "61636b0a00"
+        },
+        {
+          "command": "enable",
+          "epoch": 2,
+          "sent_ns": 64649249011,
+          "ack_ns": 64649286788,
+          "ack_frame_hex": "61636b0a00"
+        },
+        {
+          "command": "disable",
+          "epoch": 3,
+          "sent_ns": 64649292817,
+          "ack_ns": 64649333047,
+          "ack_frame_hex": "61636b0a00"
+        }
+      ],
+      "collector_budget_seconds": 30,
+      "perf_version": "perf version 6.17.13",
+      "perf_binary_sha256": "2d0953085bf720a25efbe24f853e97d27b1f12f18a398255ff82cbafde254dad",
+      "supervision": {
+        "status": "passed",
+        "termination_reason": "completed",
+        "controller_returncode": 0,
+        "surviving_generations": [],
+        "cleanup_errors": [],
+        "unsafe_registrations": []
+      }
+    }
+  }
+}

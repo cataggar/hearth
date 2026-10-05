@@ -1,0 +1,17 @@
+[
+  {
+    "path": ".perf/jail-baseline/5057-1791224432101815722/disk.raw",
+    "bytes": 1048576,
+    "sha256": "01fa20d9c2587f02bf06cb3863adf560cd984e5341b5fb835abcff0066c90e7f"
+  },
+  {
+    "path": ".perf/jail-baseline/5057-1791224432101815722/bzImage",
+    "bytes": 7605472,
+    "sha256": "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208"
+  },
+  {
+    "path": ".perf/jail-baseline/5057-1791224432101815722/initrd.cpio.gz",
+    "bytes": 1110403,
+    "sha256": "a394bea8ca022e8cd45a4e487ea80859b994812a1ff17f24e769586ea7e83834"
+  }
+]

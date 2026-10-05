@@ -1,0 +1,74 @@
+{
+  "issue": 3,
+  "date": "2026-10-05",
+  "classification": "canonical prerequisite correctness only",
+  "canonical_source": "7dfee42ed68fe1703744d6318f4be632113034b0",
+  "experiment_cherry_pick": "85e6f3b587f2820c11b8568fc2bd4f1332814bb1",
+  "canonical_jail_blob": "fcda3fbf0fbdb20285a6ebed9930456751b38ae7",
+  "canonical_seccomp_blob": "10d0c7bf65931d533d88caaaf5ac592a39f79333",
+  "experimental_seccomp_blob": "4f52431203a451354413fd742794861663c4d007",
+  "experimental_additions": [
+    "confined eventfd2",
+    "Unix SO_ERROR query"
+  ],
+  "rows": {
+    "bare-Debug": {
+      "zig_tests_passed": 32,
+      "actual_common_tests_passed": 3,
+      "elf_sha256": "33aaffac8ae457e463fc195b8238b25089b662351be7146832b8e65997824d16",
+      "target": "x86_64-linux-musl",
+      "compiler_selection": "existing default; no native override",
+      "source": "7dfee42"
+    },
+    "bare-ReleaseSafe": {
+      "zig_tests_passed": 32,
+      "actual_common_tests_passed": 3,
+      "elf_sha256": "90d3063d0a2178e3968503c5c57f90555295fc690ece2c9db114383a531875ca",
+      "target": "x86_64-linux-musl",
+      "compiler_selection": "existing default; no native override",
+      "source": "7dfee42"
+    },
+    "current-Debug": {
+      "zig_tests_passed": 63,
+      "actual_common_tests_passed": 3,
+      "elf_sha256": "dc00d5a3af1f431d6ec20665abbcd50900c572299075e14b12a1de62a50edd98",
+      "target": "x86_64-linux-musl",
+      "compiler_selection": "existing default; no native override",
+      "source": "85e6f3b"
+    },
+    "current-ReleaseSafe": {
+      "zig_tests_passed": 63,
+      "actual_common_tests_passed": 3,
+      "elf_sha256": "34d1c7335c2f011a82eb0e6263d61a7196624055cc3956cfa75ba278982976c9",
+      "target": "x86_64-linux-musl",
+      "compiler_selection": "existing default; no native override",
+      "source": "85e6f3b"
+    }
+  },
+  "zig_tests_passed": 190,
+  "actual_enforced_common_tests_passed": 12,
+  "collector_guard_tests_passed": 20,
+  "skips": 0,
+  "fixture_only_change": "remove unsupported --cmdline token; supported positional string retained",
+  "fixture_sha256": "d1a9d26171dfc3c2ad0fe06bb313e4f16959d324df40fd27320e6fb828df03b9",
+  "compiler_sha256": "7c61539af19fa4082c94848f1c2b57b89e76dc6cfd5bd4c57764c3caf8f82272",
+  "observed_isolated_tasks": 24,
+  "recorded_owned_PID_TID_numbers": 36,
+  "all_recorded_owned_numbers_absent_at_seal": true,
+  "host_kvm_metadata_unchanged": "root:kvm0660",
+  "helper_census_limit": "short compiler/inspection/packing helpers not completely creation-censused; waited bounded helpers and recorded VMM IDs only",
+  "old_elf_pins_preserved": {
+    "untouched_L0": "bd10cfef94ef4cf2402e485913b3f4a9ffb93f9cf80d25d0310d093b55111d23",
+    "old_current_Safe": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+    "old_current_Debug": "ccd6f4fb476925efe297aac9c21f5f30d8a0172e91a0bd35a9249a9d96955c34"
+  },
+  "new_candidate_performance_samples": 0,
+  "performance_merge_eligible": false,
+  "mandatory_noise_lifecycle_irq_accounting_blockers_changed": false,
+  "runtime_optimization_imported": false,
+  "sibling_worktree_read": false,
+  "archive": "canonical-jail-validation.tar.gz",
+  "archive_sha256": "2df844798fe2e040fa341c24e4493df3ed276374f45955beb8c50969070cc6e3",
+  "archive_bytes": 57574,
+  "verified_files": 93
+}

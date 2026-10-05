@@ -27,14 +27,35 @@ used_addr: u64 = 0,
 // Device-side tracking (host-authoritative, not read from guest memory)
 last_avail_idx: u16 = 0,
 next_used_idx: u16 = 0,
+generation: u64 = 0,
 
 pub fn reset(self: *Self) void {
-    self.* = .{};
+    self.* = .{ .generation = self.generation +% 1 };
+}
+
+fn reject(self: *Self) void {
+    self.ready = false;
+    self.generation +%= 1;
 }
 
 pub fn isReady(self: Self) bool {
-    return self.ready and self.size > 0 and
-        self.desc_addr != 0 and self.avail_addr != 0 and self.used_addr != 0;
+    return self.ready and self.size > 0 and self.size <= MAX_QUEUE_SIZE and @popCount(self.size) == 1 and
+        self.desc_addr != 0 and self.avail_addr != 0 and self.used_addr != 0 and
+        self.desc_addr % 16 == 0 and self.avail_addr % 2 == 0 and self.used_addr % 4 == 0;
+}
+
+pub fn validate(self: Self, mem: *Memory) bool {
+    if (!self.isReady()) return false;
+    _ = mem.slice(@intCast(self.desc_addr), @as(usize, self.size) * 16) catch return false;
+    _ = mem.slice(@intCast(self.avail_addr), 6 + @as(usize, self.size) * 2) catch return false;
+    _ = mem.slice(@intCast(self.used_addr), 6 + @as(usize, self.size) * 8) catch return false;
+    const desc_end = self.desc_addr + @as(u64, self.size) * 16;
+    const avail_end = self.avail_addr + 6 + @as(u64, self.size) * 2;
+    const used_end = self.used_addr + 6 + @as(u64, self.size) * 8;
+    if (self.desc_addr < avail_end and self.avail_addr < desc_end) return false;
+    if (self.desc_addr < used_end and self.used_addr < desc_end) return false;
+    if (self.avail_addr < used_end and self.used_addr < avail_end) return false;
+    return true;
 }
 
 /// Descriptor table entry (16 bytes).
@@ -48,7 +69,7 @@ pub const Desc = packed struct {
 /// Read a descriptor from guest memory.
 pub fn getDesc(self: Self, mem: *Memory, index: u16) !Desc {
     if (index >= self.size) return error.InvalidDescIndex;
-    const offset: usize = @intCast(self.desc_addr + @as(u64, index) * 16);
+    const offset: usize = @intCast(try std.math.add(u64, self.desc_addr, @as(u64, index) * 16));
     const bytes = try mem.slice(offset, 16);
     return .{
         .addr = std.mem.readInt(u64, bytes[0..8], .little),
@@ -60,15 +81,26 @@ pub fn getDesc(self: Self, mem: *Memory, index: u16) !Desc {
 
 /// Read the current avail.idx (free-running u16).
 fn getAvailIdx(self: Self, mem: *Memory) !u16 {
-    const offset: usize = @intCast(self.avail_addr + 2); // avail.idx at offset 2
+    const offset: usize = @intCast(try std.math.add(u64, self.avail_addr, 2));
     const bytes = try mem.slice(offset, 2);
-    return std.mem.readInt(u16, bytes[0..2], .little);
+    if (offset % 2 != 0) return error.InvalidRingAlignment;
+    const index: *const u16 = @ptrCast(@alignCast(bytes.ptr));
+    return std.mem.littleToNative(u16, @atomicLoad(u16, index, .acquire));
+}
+
+pub fn hasAvail(self: Self, mem: *Memory) bool {
+    if (!self.isReady()) return false;
+    const available = self.getAvailIdx(mem) catch return false;
+    const count = available -% self.last_avail_idx;
+    if (count == 0 or count > self.size) return false;
+    const head = self.getAvailRing(mem, self.last_avail_idx) catch return false;
+    return head < self.size;
 }
 
 /// Read an entry from the available ring.
 fn getAvailRing(self: Self, mem: *Memory, ring_idx: u16) !u16 {
     const pos = ring_idx % self.size;
-    const offset: usize = @intCast(self.avail_addr + 4 + @as(u64, pos) * 2);
+    const offset: usize = @intCast(try std.math.add(u64, self.avail_addr, 4 + @as(u64, pos) * 2));
     const bytes = try mem.slice(offset, 2);
     return std.mem.readInt(u16, bytes[0..2], .little);
 }
@@ -76,19 +108,20 @@ fn getAvailRing(self: Self, mem: *Memory, ring_idx: u16) !u16 {
 /// Write an entry to the used ring and advance used.idx.
 /// Tracks used_idx on the host side to prevent guest TOCTOU attacks.
 pub fn pushUsed(self: *Self, mem: *Memory, desc_head: u16, len: u32) !void {
+    if (!self.isReady()) return error.InvalidQueue;
+    const idx_bytes = try mem.slice(@intCast(try std.math.add(u64, self.used_addr, 2)), 2);
+    const index: *u16 = @ptrCast(@alignCast(idx_bytes.ptr));
     const pos = self.next_used_idx % self.size;
 
     // Write used element (id + len) at ring[pos]
-    const elem_offset: usize = @intCast(self.used_addr + 4 + @as(u64, pos) * 8);
+    const elem_offset: usize = @intCast(try std.math.add(u64, self.used_addr, 4 + @as(u64, pos) * 8));
     const elem_bytes = try mem.slice(elem_offset, 8);
     std.mem.writeInt(u32, elem_bytes[0..4], desc_head, .little);
     std.mem.writeInt(u32, elem_bytes[4..8], len, .little);
 
     // Increment host-tracked used.idx and write to guest memory
     self.next_used_idx +%= 1;
-    const idx_offset: usize = @intCast(self.used_addr + 2);
-    const idx_bytes = try mem.slice(idx_offset, 2);
-    std.mem.writeInt(u16, idx_bytes[0..2], self.next_used_idx, .little);
+    @atomicStore(u16, index, std.mem.nativeToLittle(u16, self.next_used_idx), .release);
 }
 
 // --- Snapshot support ---
@@ -110,6 +143,7 @@ pub fn snapshotSave(self: *const Self) [SNAPSHOT_SIZE]u8 {
 }
 
 pub fn snapshotRestore(self: *Self, buf: [SNAPSHOT_SIZE]u8) void {
+    self.generation +%= 1;
     const size = std.mem.readInt(u16, buf[0..2], .little);
     // Validate queue size: must be 0, or a power-of-2 <= MAX_QUEUE_SIZE.
     // Invalid sizes would cause division-by-zero in ring index modular arithmetic.
@@ -130,6 +164,7 @@ pub fn snapshotRestore(self: *Self, buf: [SNAPSHOT_SIZE]u8) void {
 /// Walk a descriptor chain starting at `head`, collecting up to `max` descriptors.
 /// Returns the number of descriptors collected. Detects cycles via a visited bitset.
 pub fn collectChain(self: Self, mem: *Memory, head: u16, descs: []Desc) !usize {
+    if (self.size > MAX_QUEUE_SIZE) return error.InvalidQueue;
     var visited: [MAX_QUEUE_SIZE / 8]u8 = @splat(0);
     var count: usize = 0;
     var idx = head;
@@ -157,10 +192,25 @@ pub fn collectChain(self: Self, mem: *Memory, head: u16, descs: []Desc) !usize {
 
 /// Pop the next available descriptor chain head. Returns null if none available.
 pub fn popAvail(self: *Self, mem: *Memory) !?u16 {
-    const avail_idx = try self.getAvailIdx(mem);
+    if (!self.isReady()) return error.InvalidQueue;
+    const avail_idx = self.getAvailIdx(mem) catch |err| {
+        self.reject();
+        return err;
+    };
     if (avail_idx == self.last_avail_idx) return null;
+    if (avail_idx -% self.last_avail_idx > self.size) {
+        self.reject();
+        return error.QueueOverrun;
+    }
 
-    const head = try self.getAvailRing(mem, self.last_avail_idx);
+    const head = self.getAvailRing(mem, self.last_avail_idx) catch |err| {
+        self.reject();
+        return err;
+    };
+    if (head >= self.size) {
+        self.reject();
+        return error.InvalidDescIndex;
+    }
     self.last_avail_idx +%= 1;
     return head;
 }

@@ -31,6 +31,16 @@ Custom KVM-based microVMM written in Zig. Built from source during `hearth setup
 - Built-in jail (mount namespace, pivot_root, cgroups, seccomp)
 - Pre-boot REST API for configuration, post-boot API for control
 
+The internal `--virtio-mode C00|C10|C01|C11` experiment uses
+`vmm/src/devices/virtio/owner.zig`: one mutation owner per device, synchronous
+MMIO mailboxes, blocking host readiness and whole-VM pause fences.
+`accelerator.zig` independently selects exact per-queue ioeventfd and
+trigger-aware IRQFD/resampling. All modes retain synchronous block I/O,
+userspace TAP and snapshot v2; host fds/counters are not serialized.
+Legacy L0 remains the default. See the
+[eventfd spec](docs/product-specs/perf-virtio-eventfd.md) for the unqualified
+performance gates and opt-in correctness evidence.
+
 ### `src/vm/`
 TypeScript layer for VMM interaction. Handles:
 - Spawning `flint` with the correct config
@@ -72,6 +82,11 @@ The control channel (port 1024) supports an interactive shell mode used by `hear
 Host-side client that talks to the guest agent:
 - Control channel: length-prefixed JSON requests over vsock UDS (guest-initiated connection)
 - Port forwarding + transfers: vsock CONNECT protocol (host-initiated via `vsockConnect` helper)
+
+Current Flint supports guest-initiated UDS connections, but not the
+host-initiated CONNECT path required by those SDK forwarding/transfer helpers.
+Eventfd acceptance uses the supported control/native guest-initiated path;
+it does not implement or qualify the missing CONNECT interface.
 
 ### `src/daemon/`
 Daemon server and client for multi-process and remote access:

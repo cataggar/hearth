@@ -37,6 +37,7 @@ pub const NUM_QUEUES: u32 = 2;
 
 tap_fd: i32,
 mac: [6]u8,
+tx_blocked: bool = false,
 
 pub fn init(tap_name: [*:0]const u8) !Self {
     // Open /dev/net/tun
@@ -117,16 +118,30 @@ pub fn readConfig(self: Self, offset: u64, data: []u8) void {
 }
 
 /// Process TX queue: read frames from guest, write to TAP.
-pub fn processTx(self: Self, mem: *Memory, queue: *Queue) bool {
+pub fn processTx(self: *Self, mem: *Memory, queue: *Queue) bool {
+    return self.processTxInternal(mem, queue, queue.size, false);
+}
+
+pub fn processTxBudget(self: *Self, mem: *Memory, queue: *Queue, budget: u16) bool {
+    return self.processTxInternal(mem, queue, budget, true);
+}
+
+fn processTxInternal(self: *Self, mem: *Memory, queue: *Queue, budget: u16, retry: bool) bool {
     var did_work = false;
+    self.tx_blocked = false;
     var processed: u16 = 0;
-    while (processed < queue.size) : (processed += 1) {
+    while (processed < @min(queue.size, budget)) : (processed += 1) {
         const head = queue.popAvail(mem) catch |err| {
             log.err("TX popAvail failed: {}", .{err});
             break;
         } orelse break;
 
         self.transmitChain(mem, queue, head) catch |err| {
+            if (err == error.WouldBlock and retry) {
+                queue.last_avail_idx -%= 1;
+                self.tx_blocked = true;
+                break;
+            }
             log.err("TX failed: {}", .{err});
             queue.pushUsed(mem, head, 0) catch |e| log.warn("TX pushUsed failed: {}", .{e});
         };
@@ -159,9 +174,8 @@ fn transmitChain(self: Self, mem: *Memory, queue: *Queue, head: u16) !void {
 
     if (desc_count > 0) {
         const rc: isize = @bitCast(linux.writev(self.tap_fd, @ptrCast(&iov), @intCast(desc_count)));
-        if (rc < 0) {
-            log.warn("TAP writev failed", .{});
-        }
+        if (rc == -@as(isize, @backingInt(linux.E.AGAIN)) or rc == -@as(isize, @backingInt(linux.E.INTR))) return error.WouldBlock;
+        if (rc < 0) return error.TransmitFailed;
     }
 
     try queue.pushUsed(mem, head, 0); // TX: device writes 0 bytes back
@@ -171,11 +185,15 @@ fn transmitChain(self: Self, mem: *Memory, queue: *Queue, head: u16) !void {
 /// Non-blocking: returns immediately if no data available.
 /// Returns true if any frames were delivered (caller should inject IRQ).
 pub fn pollRx(self: Self, mem: *Memory, queue: *Queue) bool {
+    return self.pollRxBudget(mem, queue, queue.size);
+}
+
+pub fn pollRxBudget(self: Self, mem: *Memory, queue: *Queue, budget: u16) bool {
     if (!queue.isReady()) return false;
 
     var did_work = false;
     var processed: u16 = 0;
-    while (processed < queue.size) : (processed += 1) {
+    while (processed < @min(queue.size, budget)) : (processed += 1) {
         // Need an available RX buffer from the guest
         const head = queue.popAvail(mem) catch break orelse break;
 
@@ -183,7 +201,7 @@ pub fn pollRx(self: Self, mem: *Memory, queue: *Queue) bool {
             // EAGAIN/EWOULDBLOCK means no more frames
             if (err == error.WouldBlock) {
                 // Already popped descriptor, push back as unused
-                queue.pushUsed(mem, head, 0) catch |e| log.warn("RX pushUsed failed: {}", .{e});
+                queue.last_avail_idx -%= 1;
                 break;
             }
             log.err("RX failed: {}", .{err});

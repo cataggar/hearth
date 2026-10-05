@@ -61,18 +61,17 @@ pub fn setup(config: Config) !void {
     try check(linux.umount2("old_root", linux.MNT.DETACH), "umount2(old_root)");
     _ = linux.rmdir("old_root");
 
-    // Create device nodes inside the jail (only what the VMM needs).
-    // Use mode 0666 — safe because we're inside a private mount namespace,
-    // so only this process can see these device nodes.
-    try check(linux.mkdir("dev", 0o755), "mkdir(/dev)");
-    try check(linux.mknod("dev/kvm", S_IFCHR | 0o666, DEV_KVM), "mknod(/dev/kvm)");
+    try createDeviceDirectory("dev");
+    try createDeviceNode("dev/kvm", DEV_KVM, config);
 
     if (config.need_tun) {
-        try check(linux.mkdir("dev/net", 0o755), "mkdir(/dev/net)");
-        try check(linux.mknod("dev/net/tun", S_IFCHR | 0o666, DEV_NET_TUN), "mknod(/dev/net/tun)");
+        try createDeviceDirectory("dev/net");
+        try createDeviceNode("dev/net/tun", DEV_NET_TUN, config);
     }
 
     // Drop privileges — last step requiring root
+    // Supplementary groups survive setgid/setuid.
+    try check(linux.syscall2(.setgroups, 0, 0), "setgroups");
     try check(linux.setgid(config.gid), "setgid");
     try check(linux.setuid(config.uid), "setuid");
 
@@ -83,6 +82,27 @@ pub fn setup(config: Config) !void {
     }
 
     log.info("jail active: uid={} gid={}", .{ config.uid, config.gid });
+}
+
+fn createDeviceDirectory(path: [*:0]const u8) !void {
+    try check(linux.mkdir(path, 0o700), "mkdir(device directory)");
+    const rc = linux.open(path, .{ .ACCMODE = .RDONLY, .DIRECTORY = true, .NOFOLLOW = true, .CLOEXEC = true }, 0);
+    try check(rc, "open(device directory)");
+    const fd: linux.fd_t = @intCast(rc);
+    defer _ = linux.close(fd);
+    try check(linux.fchown(fd, 0, 0), "fchown(device directory)");
+    try check(linux.fchmod(fd, 0o755), "fchmod(device directory)");
+}
+
+fn createDeviceNode(path: [*:0]const u8, device: u32, config: Config) !void {
+    try check(linux.mknod(path, S_IFCHR | 0o600, device), "mknod(device)");
+    const rc = linux.open(path, .{ .ACCMODE = .RDONLY, .NOFOLLOW = true, .CLOEXEC = true }, 0);
+    try check(rc, "open(device)");
+    const fd: linux.fd_t = @intCast(rc);
+    defer _ = linux.close(fd);
+    // Creation modes alone are insufficient under a private ambient umask.
+    try check(linux.fchown(fd, config.uid, config.gid), "fchown(device)");
+    try check(linux.fchmod(fd, 0o600), "fchmod(device)");
 }
 
 fn setupCgroup(name: [*:0]const u8, config: Config) !void {

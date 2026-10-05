@@ -1,0 +1,121 @@
+{
+  "issue": 3,
+  "date": "2026-10-05",
+  "classification": "fresh post-cleanup validation; not an optimization comparison",
+  "source_base": "5a71144903bb421700b788a492248ed1d135de31",
+  "fresh_AA": {
+    "blocks": 5,
+    "cells": 85,
+    "binary_sha256": "d0beacfc752f7fd2917d26c829447252490707a4c578c8f85e340f5bae2f4ea0",
+    "status": "noise-inconclusive",
+    "noise_failed_classes": [
+      "disk-read-4096",
+      "disk-write-4096",
+      "disk-flush-4096",
+      "disk-read-1048576",
+      "disk-write-1048576",
+      "tap-1400",
+      "tap-65536",
+      "vsock-64",
+      "vsock-4096",
+      "exec",
+      "interactive",
+      "concurrent",
+      "lifecycle"
+    ],
+    "primary": {
+      "cpu_per_operation": {
+        "n": 5,
+        "mean": 0.0003753834643570941,
+        "p50": 0.00033878985452063105,
+        "p95": 0.0004646119315896941,
+        "p99": 0.00048037610945983076,
+        "cv": 0.17232495021905775
+      },
+      "p95_ms": {
+        "n": 5,
+        "mean": 0.38557702,
+        "p50": 0.3578461,
+        "p95": 0.44543273999999994,
+        "p99": 0.45496334799999993,
+        "cv": 0.1134219654719034
+      },
+      "throughput": {
+        "n": 5,
+        "mean": 9903250.220475435,
+        "p50": 10684418.119713206,
+        "p95": 10855558.4634054,
+        "p99": 10882271.523297492,
+        "cv": 0.13510760284836437
+      }
+    },
+    "gates_sha256": "af7119408b00b2aefa948773afd115fe28202e92170f6422cdde648c0c5c08fa",
+    "new_candidate_performance_samples": 0
+  },
+  "collector_tests": 18,
+  "target": "x86_64-linux-musl",
+  "current_tests_per_optimization": {
+    "units": 39,
+    "dedicated": 17,
+    "real_dedicated_KVM": 16,
+    "existing_integrations": 7,
+    "real_existing_guest_integrations": 5,
+    "total_passed": 63,
+    "skips": 0
+  },
+  "new_IOAPIC_EOI_first_scenarios_per_optimization": 4,
+  "new_IOAPIC_full_active_congestion_storm_coverage_claimed": false,
+  "fresh_current_jail_cases_per_optimization": 4,
+  "fresh_current_no_heartbeat_Linux_cases": 12,
+  "current_ELFs": {
+    "ReleaseSafe": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+    "Debug": "ccd6f4fb476925efe297aac9c21f5f30d8a0172e91a0bd35a9249a9d96955c34"
+  },
+  "fresh_C00_native_scale_counts": [
+    1,
+    4,
+    8
+  ],
+  "mixed_device_four_eight_VM_qualification_claimed": false,
+  "owned_VM_phase_cleanup_receipts": [
+    ".perf/eventfd/q6/aa-01/teardown.json",
+    ".perf/eventfd/q6/aa-02/teardown.json",
+    ".perf/eventfd/q6/aa-03/teardown.json",
+    ".perf/eventfd/q6/aa-04/teardown.json",
+    ".perf/eventfd/q6/aa-05/teardown.json",
+    ".perf/eventfd/q6/n-C00/teardown.json",
+    ".perf/eventfd/q6/a-C00/teardown.json",
+    ".perf/eventfd/q6/n-C10/teardown.json",
+    ".perf/eventfd/q6/a-C10/teardown.json",
+    ".perf/eventfd/q6/n-C01/teardown.json",
+    ".perf/eventfd/q6/a-C01/teardown.json",
+    ".perf/eventfd/q6/n-C11/teardown.json",
+    ".perf/eventfd/q6/a-C11/teardown.json",
+    ".perf/eventfd/q6/c00-n8/g0/teardown.json",
+    ".perf/eventfd/q6/c00-n8/g1/teardown.json",
+    ".perf/eventfd/q6/c00-n8/g2/teardown.json",
+    ".perf/eventfd/q6/c00-n8/g3/teardown.json",
+    ".perf/eventfd/q6/c00-n8/g4/teardown.json",
+    ".perf/eventfd/q6/c00-n8/g5/teardown.json",
+    ".perf/eventfd/q6/c00-n8/g6/teardown.json",
+    ".perf/eventfd/q6/c00-n8/g7/teardown.json",
+    ".perf/eventfd/q6/c00-n4/g0/teardown.json",
+    ".perf/eventfd/q6/c00-n4/g1/teardown.json",
+    ".perf/eventfd/q6/c00-n4/g2/teardown.json",
+    ".perf/eventfd/q6/c00-n4/g3/teardown.json",
+    ".perf/eventfd/q6/c00-n1/g0/teardown.json"
+  ],
+  "recorded_owned_PID_TID_numbers": 183,
+  "all_recorded_owned_numbers_absent_at_seal": true,
+  "helper_cleanup": "perf collectors waited return0; kernel observers completed STOP/closed unpinned maps+fds; own VM supervisor receipts; helper PID creation census not captured in this batch",
+  "parent_residual_load": "externally reported8.733/16; no unrelated tasks inspected/terminated/moved",
+  "old_saturation_and_noisy_data_used_for_current_qualification": false,
+  "pre_post_cleanup_claimed_as_optimization": false,
+  "numeric_policy_caps_relaxed": false,
+  "default_changed": false,
+  "performance_adoption_eligible": false,
+  "archive": "post-cleanup-fresh-validation.tar.gz",
+  "archive_sha256": "a1fe52eed614e632a838681ef8554d40890a21d75000265e279625dac75ea8bc",
+  "archive_bytes": 6283215,
+  "verified_files": 358
+}

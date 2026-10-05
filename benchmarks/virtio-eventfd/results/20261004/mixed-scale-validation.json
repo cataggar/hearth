@@ -1,0 +1,464 @@
+{
+  "issue": 3,
+  "date": "2026-10-05",
+  "classification": "real enforced mixed-device correctness; not candidate performance or true idle",
+  "cells": [
+    {
+      "mode": "C00",
+      "count": 4,
+      "path": ".perf/eventfd/q6/mixed-n4-C00-retry",
+      "status": "passed",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "runner_sha256": "a141e820be92efac50d2a95936489fb0b53ceecb0ecf8a158ff7f181286c9dde"
+    },
+    {
+      "mode": "C00",
+      "count": 8,
+      "path": ".perf/eventfd/q6/mixed-n8-C00",
+      "status": "passed",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "runner_sha256": "a141e820be92efac50d2a95936489fb0b53ceecb0ecf8a158ff7f181286c9dde"
+    },
+    {
+      "mode": "C10",
+      "count": 4,
+      "path": ".perf/eventfd/q6/mixed-n4-C10",
+      "status": "passed",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "runner_sha256": "a141e820be92efac50d2a95936489fb0b53ceecb0ecf8a158ff7f181286c9dde"
+    },
+    {
+      "mode": "C10",
+      "count": 8,
+      "path": ".perf/eventfd/q6/mixed-n8-C10",
+      "status": "passed",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "runner_sha256": "a141e820be92efac50d2a95936489fb0b53ceecb0ecf8a158ff7f181286c9dde"
+    },
+    {
+      "mode": "C01",
+      "count": 4,
+      "path": ".perf/eventfd/q6/mixed-n4-C01",
+      "status": "passed",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "runner_sha256": "a141e820be92efac50d2a95936489fb0b53ceecb0ecf8a158ff7f181286c9dde"
+    },
+    {
+      "mode": "C01",
+      "count": 8,
+      "path": ".perf/eventfd/q6/mixed-n8-C01",
+      "status": "passed",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "runner_sha256": "a141e820be92efac50d2a95936489fb0b53ceecb0ecf8a158ff7f181286c9dde"
+    },
+    {
+      "mode": "C11",
+      "count": 4,
+      "path": ".perf/eventfd/q6/mixed-n4-C11",
+      "status": "passed",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "runner_sha256": "a141e820be92efac50d2a95936489fb0b53ceecb0ecf8a158ff7f181286c9dde"
+    },
+    {
+      "mode": "C11",
+      "count": 8,
+      "path": ".perf/eventfd/q6/mixed-n8-C11",
+      "status": "passed",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "runner_sha256": "a141e820be92efac50d2a95936489fb0b53ceecb0ecf8a158ff7f181286c9dde"
+    }
+  ],
+  "passing_cells": 8,
+  "passing_sandboxes": 48,
+  "per_sandbox_messages_each_transport": 128,
+  "message_bytes": 65536,
+  "transport_integrity": "all numbered payloads and FNV checks verified; 12288 checked messages across48 sandboxes",
+  "mandatory_checks": [
+    "common actual outstanding block/TAP/vsock barrier",
+    "loaded exec and PTY",
+    "disk producer completion and guest/host whole-disk SHA256",
+    "acknowledged zero-CPU pause",
+    "timer-free native TAP/vsock wake after resume",
+    "graceful owner join"
+  ],
+  "guest_agent_poll_ms": 50,
+  "backend_heartbeat_ms": 0,
+  "preserved_failed_pilot": "4 sandbox C00, three16-message backlogs drained while sequentially booting peers; rejected by real writer-liveness assertion, not passing; retry128-message backlog retains assertion",
+  "cleanup_receipts": [
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C00/g0/teardown.json",
+      "supervisor_pid": 3008301,
+      "vmm_pid": 3008303,
+      "vmm_start_ticks": 134705756,
+      "supervisor_exit_code": -15
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C00/g1/teardown.json",
+      "supervisor_pid": 3008338,
+      "vmm_pid": 3008340,
+      "vmm_start_ticks": 134705869,
+      "supervisor_exit_code": -15
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C00/g2/teardown.json",
+      "supervisor_pid": 3008798,
+      "vmm_pid": 3008805,
+      "vmm_start_ticks": 134706022,
+      "supervisor_exit_code": -15
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C00/g3/teardown.json",
+      "supervisor_pid": 3009296,
+      "vmm_pid": 3009298,
+      "vmm_start_ticks": 134706236,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C00-retry/g0/teardown.json",
+      "supervisor_pid": 3011551,
+      "vmm_pid": 3011553,
+      "vmm_start_ticks": 134714868,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C00-retry/g1/teardown.json",
+      "supervisor_pid": 3011599,
+      "vmm_pid": 3011601,
+      "vmm_start_ticks": 134715057,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C00-retry/g2/teardown.json",
+      "supervisor_pid": 3012074,
+      "vmm_pid": 3012076,
+      "vmm_start_ticks": 134715315,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C00-retry/g3/teardown.json",
+      "supervisor_pid": 3012132,
+      "vmm_pid": 3012134,
+      "vmm_start_ticks": 134715614,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C00/g0/teardown.json",
+      "supervisor_pid": 3012794,
+      "vmm_pid": 3012796,
+      "vmm_start_ticks": 134718319,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C00/g1/teardown.json",
+      "supervisor_pid": 3013220,
+      "vmm_pid": 3013222,
+      "vmm_start_ticks": 134718523,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C00/g2/teardown.json",
+      "supervisor_pid": 3013259,
+      "vmm_pid": 3013261,
+      "vmm_start_ticks": 134718801,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C00/g3/teardown.json",
+      "supervisor_pid": 3013322,
+      "vmm_pid": 3013324,
+      "vmm_start_ticks": 134719094,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C00/g4/teardown.json",
+      "supervisor_pid": 3013545,
+      "vmm_pid": 3013547,
+      "vmm_start_ticks": 134719447,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C00/g5/teardown.json",
+      "supervisor_pid": 3013898,
+      "vmm_pid": 3013901,
+      "vmm_start_ticks": 134719850,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C00/g6/teardown.json",
+      "supervisor_pid": 3014065,
+      "vmm_pid": 3014067,
+      "vmm_start_ticks": 134720310,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C00/g7/teardown.json",
+      "supervisor_pid": 3014137,
+      "vmm_pid": 3014139,
+      "vmm_start_ticks": 134720806,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C10/g0/teardown.json",
+      "supervisor_pid": 3015589,
+      "vmm_pid": 3015591,
+      "vmm_start_ticks": 134724134,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C10/g1/teardown.json",
+      "supervisor_pid": 3015630,
+      "vmm_pid": 3015632,
+      "vmm_start_ticks": 134724322,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C10/g2/teardown.json",
+      "supervisor_pid": 3016419,
+      "vmm_pid": 3016429,
+      "vmm_start_ticks": 134724566,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C10/g3/teardown.json",
+      "supervisor_pid": 3016540,
+      "vmm_pid": 3016542,
+      "vmm_start_ticks": 134724865,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C10/g0/teardown.json",
+      "supervisor_pid": 3016634,
+      "vmm_pid": 3016636,
+      "vmm_start_ticks": 134726108,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C10/g1/teardown.json",
+      "supervisor_pid": 3016665,
+      "vmm_pid": 3016667,
+      "vmm_start_ticks": 134726297,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C10/g2/teardown.json",
+      "supervisor_pid": 3016704,
+      "vmm_pid": 3016706,
+      "vmm_start_ticks": 134726532,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C10/g3/teardown.json",
+      "supervisor_pid": 3016762,
+      "vmm_pid": 3016764,
+      "vmm_start_ticks": 134726821,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C10/g4/teardown.json",
+      "supervisor_pid": 3016789,
+      "vmm_pid": 3016791,
+      "vmm_start_ticks": 134727167,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C10/g5/teardown.json",
+      "supervisor_pid": 3016830,
+      "vmm_pid": 3016832,
+      "vmm_start_ticks": 134727570,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C10/g6/teardown.json",
+      "supervisor_pid": 3017420,
+      "vmm_pid": 3017422,
+      "vmm_start_ticks": 134728034,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C10/g7/teardown.json",
+      "supervisor_pid": 3017535,
+      "vmm_pid": 3017537,
+      "vmm_start_ticks": 134728552,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C01/g0/teardown.json",
+      "supervisor_pid": 3018614,
+      "vmm_pid": 3018616,
+      "vmm_start_ticks": 134731300,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C01/g1/teardown.json",
+      "supervisor_pid": 3018657,
+      "vmm_pid": 3018659,
+      "vmm_start_ticks": 134731494,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C01/g2/teardown.json",
+      "supervisor_pid": 3018716,
+      "vmm_pid": 3018718,
+      "vmm_start_ticks": 134731763,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C01/g3/teardown.json",
+      "supervisor_pid": 3018773,
+      "vmm_pid": 3018775,
+      "vmm_start_ticks": 134732098,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C01/g0/teardown.json",
+      "supervisor_pid": 3019025,
+      "vmm_pid": 3019027,
+      "vmm_start_ticks": 134733292,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C01/g1/teardown.json",
+      "supervisor_pid": 3019067,
+      "vmm_pid": 3019069,
+      "vmm_start_ticks": 134733476,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C01/g2/teardown.json",
+      "supervisor_pid": 3019517,
+      "vmm_pid": 3019528,
+      "vmm_start_ticks": 134733727,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C01/g3/teardown.json",
+      "supervisor_pid": 3019659,
+      "vmm_pid": 3019661,
+      "vmm_start_ticks": 134734019,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C01/g4/teardown.json",
+      "supervisor_pid": 3019745,
+      "vmm_pid": 3019747,
+      "vmm_start_ticks": 134734394,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C01/g5/teardown.json",
+      "supervisor_pid": 3019853,
+      "vmm_pid": 3019855,
+      "vmm_start_ticks": 134734860,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C01/g6/teardown.json",
+      "supervisor_pid": 3019986,
+      "vmm_pid": 3019988,
+      "vmm_start_ticks": 134735411,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C01/g7/teardown.json",
+      "supervisor_pid": 3020117,
+      "vmm_pid": 3020119,
+      "vmm_start_ticks": 134735932,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C11/g0/teardown.json",
+      "supervisor_pid": 3021756,
+      "vmm_pid": 3021758,
+      "vmm_start_ticks": 134738651,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C11/g1/teardown.json",
+      "supervisor_pid": 3021815,
+      "vmm_pid": 3021818,
+      "vmm_start_ticks": 134738841,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C11/g2/teardown.json",
+      "supervisor_pid": 3021892,
+      "vmm_pid": 3021895,
+      "vmm_start_ticks": 134739084,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n4-C11/g3/teardown.json",
+      "supervisor_pid": 3021987,
+      "vmm_pid": 3021989,
+      "vmm_start_ticks": 134739392,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C11/g0/teardown.json",
+      "supervisor_pid": 3022783,
+      "vmm_pid": 3022785,
+      "vmm_start_ticks": 134740643,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C11/g1/teardown.json",
+      "supervisor_pid": 3022893,
+      "vmm_pid": 3022895,
+      "vmm_start_ticks": 134740847,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C11/g2/teardown.json",
+      "supervisor_pid": 3023032,
+      "vmm_pid": 3023035,
+      "vmm_start_ticks": 134741089,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C11/g3/teardown.json",
+      "supervisor_pid": 3023187,
+      "vmm_pid": 3023189,
+      "vmm_start_ticks": 134741406,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C11/g4/teardown.json",
+      "supervisor_pid": 3023375,
+      "vmm_pid": 3023377,
+      "vmm_start_ticks": 134741774,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C11/g5/teardown.json",
+      "supervisor_pid": 3023640,
+      "vmm_pid": 3023642,
+      "vmm_start_ticks": 134742244,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C11/g6/teardown.json",
+      "supervisor_pid": 3023855,
+      "vmm_pid": 3023857,
+      "vmm_start_ticks": 134742773,
+      "supervisor_exit_code": 0
+    },
+    {
+      "path": ".perf/eventfd/q6/mixed-n8-C11/g7/teardown.json",
+      "supervisor_pid": 3024701,
+      "vmm_pid": 3024703,
+      "vmm_start_ticks": 134743377,
+      "supervisor_exit_code": 0
+    }
+  ],
+  "recorded_owned_PID_TID_numbers": 516,
+  "all_recorded_owned_numbers_absent_at_seal": true,
+  "controller_census_limit": "original failed pilot had no namespace-supervisor PID census; wrappers were waited; orchestrator launch PID was not recorded",
+  "noise_gates": "unchanged; fresh13/16-class C00 noise failure still prevents candidate performance",
+  "performance_adoption_eligible": false,
+  "default_changed": false,
+  "archive": "mixed-scale-validation.tar.gz",
+  "archive_sha256": "ea7ec25c6e31ae05cd84372bf9c6c2a96554cf28c2a6f10f7ab5ed7d23095343",
+  "archive_bytes": 648814,
+  "verified_files": 591,
+  "collector_gate_tests": 20
+}

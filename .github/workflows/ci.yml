@@ -55,6 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Install Linux KVM headers and native build dependencies
         run: |
@@ -77,10 +78,29 @@ jobs:
         working-directory: vmm
         run: |
           set -euo pipefail
+          umask 077
           mkdir -p ../.ci-logs
           for mode in debug safe; do
-            zig build -Dtarget=x86_64-linux -Doptimize="$mode" --summary all 2>&1 | tee "../.ci-logs/flint-build-$mode.log"
-            zig build test -Dtarget=x86_64-linux -Doptimize="$mode" --summary all 2>&1 | tee "../.ci-logs/flint-test-$mode.log"
+            timeout --kill-after=30s 5m \
+              zig build -Dtarget=x86_64-linux-musl -Doptimize="$mode" --summary all 2>&1 | tee "../.ci-logs/flint-build-$mode.log"
+            timeout --kill-after=30s 5m \
+              zig build test -Dtarget=x86_64-linux-musl -Doptimize="$mode" --summary all 2>&1 | tee "../.ci-logs/flint-test-$mode.log"
+            python3 - "$mode" <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          log = pathlib.Path(f"../.ci-logs/flint-test-{sys.argv[1]}.log").read_text()
+          sources = [pathlib.Path("src/tests.zig"), pathlib.Path("src/devices/virtio/accelerator.zig")]
+          expected = sum(len(re.findall(r'^\s*test "', path.read_text(), re.MULTILINE)) for path in sources)
+          summary = re.search(r"(\d+)/(\d+) tests passed", log)
+          run = re.search(rf"(?m)^\+- run test {expected} pass \({expected} total\) (?!cached\b)", log)
+          if expected < 39 or not summary or tuple(map(int, summary.groups())) != (expected, expected):
+              raise SystemExit("Missing or incomplete current-head unit execution")
+          if not run or re.search(r"\bskip(?:ped)?\b", log, re.IGNORECASE):
+              raise SystemExit("Unit tests were skipped or cached rather than executed")
+          print(f"Verified {expected} actual static-musl unit tests in {sys.argv[1]}")
+          PY
           done
       - name: Retain Flint failure logs
         if: failure()
@@ -146,15 +166,20 @@ jobs:
           if-no-files-found: ignore
 
   zig-kvm:
-    name: Flint KVM integration
+    name: Flint KVM correctness (${{ matrix.optimize }})
     # Full ephemeral hosted VMs support KVM; ubuntu-slim containers do not.
     # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
     # https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        optimize: [ReleaseSafe, Debug]
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Install KVM, kernel download, and initrd prerequisites
         run: |
@@ -162,11 +187,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential libc6-dev linux-libc-dev acl curl python3 \
             libarchive-tools cpio gzip busybox-static
+          if ! perf --version >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends linux-tools-common linux-tools-generic
+          fi
           sudo usermod --append --groups kvm "$(id -un)"
       - name: Verify accessible and functional KVM
         shell: sg kvm -c "bash --noprofile --norc -e -o pipefail {0}"
         run: |
           set -euo pipefail
+          umask 077
           mkdir -p .ci-logs
           if ! test -c /dev/kvm; then
             echo "::error::Hosted runner has no /dev/kvm. KVM integration is blocked, not skipped; use a KVM-capable ephemeral hosted runner."
@@ -196,14 +225,14 @@ jobs:
       - name: Install the exact 5.10.245 guest kernel and check initrd tools
         run: |
           set -euo pipefail
+          umask 077
           mkdir -p .ci/guest/initrd
           curl --fail --location --retry 3 --max-time 120 \
             https://github.com/joshuaisaact/hearth/releases/download/kernel-5.10.245/bzImage \
             --output .ci/guest/bzImage
           echo "4da539807474d189f1a15852046994e78d430a194c2e78b9255ae880069c7208  .ci/guest/bzImage" | sha256sum --check
-          install -m 0644 .ci/guest/bzImage /tmp/vmlinuz-minimal
-          test -r /tmp/vmlinuz-minimal
-          test -s /tmp/vmlinuz-minimal
+          test -r .ci/guest/bzImage
+          test -s .ci/guest/bzImage
           for tool in bsdcpio cpio gzip busybox timeout; do
             command -v "$tool"
           done
@@ -222,13 +251,17 @@ jobs:
         run: |
           zig version
           test "$(zig version)" = 0.17.0
-      - name: Run real KVM integration and reject skipped coverage
+      - name: Run dedicated eventfd and integration tests without skipped or cached coverage
         working-directory: vmm
         shell: sg kvm -c "bash --noprofile --norc -e -o pipefail {0}"
+        env:
+          OPTIMIZE: ${{ matrix.optimize }}
         run: |
           set -euo pipefail
+          umask 077
           timeout --kill-after=30s 10m \
-            zig build install integration-test-build -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
+            zig build install integration-test-build -Dtarget=x86_64-linux-musl -Doptimize="$OPTIMIZE" \
+              -Dintegration-kernel=../.ci/guest/bzImage --summary all --color off \
             2>&1 | tee ../.ci-logs/kvm-build.log
           id
           getfacl -n /dev/kvm
@@ -239,7 +272,8 @@ jobs:
           print("KVM access immediately before test execution: OK")
           PY
           timeout --kill-after=30s 10m \
-            zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
+            zig build integration-test eventfd-test -Dtarget=x86_64-linux-musl -Doptimize="$OPTIMIZE" \
+              -Dintegration-kernel=../.ci/guest/bzImage --summary all --color off \
             2>&1 | tee ../.ci-logs/kvm-integration.log
           python3 - <<'PY'
           import pathlib
@@ -249,18 +283,122 @@ jobs:
           if re.search(r"\bskip(?:ped)?\b", log, re.IGNORECASE):
               raise SystemExit("Integration coverage was skipped; all KVM tests must execute")
           summary = re.search(r"(\d+)/(\d+) tests passed", log)
-          expected = len(re.findall(r'^test "', pathlib.Path("src/integration_tests.zig").read_text(), re.MULTILINE))
-          if not summary or expected <= 2:
-              raise SystemExit("Missing integration test execution summary or KVM test cases")
+          expected = {}
+          for name in ("integration", "eventfd"):
+              source = pathlib.Path(f"src/{name}_tests.zig").read_text()
+              count = len(re.findall(r'^\s*test "', source, re.MULTILINE))
+              if name == "eventfd":
+                  policy = pathlib.Path("src/devices/virtio/accelerator.zig").read_text()
+                  count += len(re.findall(r'^\s*test "', policy, re.MULTILINE))
+              minimum = 7 if name == "integration" else 25
+              if count < minimum:
+                  raise SystemExit(f"Missing required {name} test cases: {count} < {minimum}")
+              pattern = rf"(?m)^\+- run test {count} pass \({count} total\) (?!cached\b)"
+              if not re.search(pattern, log):
+                  raise SystemExit(f"{name} tests did not actually execute all {count} cases")
+              expected[name] = count
+          if not summary:
+              raise SystemExit("Missing actual KVM suite execution summary")
           passed, total = map(int, summary.groups())
-          if passed != total or total < expected:
-              raise SystemExit(f"Incomplete integration coverage: {passed}/{total} passed; expected at least {expected}")
-          print(f"Verified {passed} integration tests executed with KVM and the pinned kernel")
+          if passed != total or total != sum(expected.values()):
+              raise SystemExit(f"Incomplete KVM coverage: {passed}/{total} passed; expected {expected}")
+          print(f"Verified actual KVM execution: {expected}, total {passed}, pinned kernel")
           PY
+      - name: Run complete focused eventfd harness regressions without skips
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          timeout --kill-after=10s 2m python3 - <<'PY' 2>&1 | tee .ci-logs/eventfd-harness.log
+          import json
+          import unittest
+
+          import runpy
+          runpy.run_path("benchmarks/virtio-eventfd/verify_custody_review.py", run_name="__main__")
+          suite = unittest.defaultTestLoader.discover("benchmarks/virtio-eventfd", pattern="test_*.py")
+          expected = suite.countTestCases()
+          if expected < 75:
+              raise SystemExit(f"Required focused regression coverage missing: {expected} < 75")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if (not result.wasSuccessful() or result.testsRun != expected or result.skipped
+                  or result.expectedFailures or result.unexpectedSuccesses):
+              raise SystemExit("Focused eventfd harness failed, skipped or incompletely executed")
+          print(json.dumps({"focused_eventfd_tests_executed": result.testsRun, "skipped": len(result.skipped)}))
+          PY
+      - name: Verify actual supported perf control framing before hosted admission
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p .perf/eventfd-hosted
+          timeout --kill-after=5s 65s python3 - <<'PY' 2>&1 | tee .ci-logs/perf-control-probe.log
+          import json
+          import pathlib
+          import sys
+          sys.path.insert(0, "benchmarks/virtio-eventfd")
+          import hosted
+          perf, _ = hosted.perf_binary()
+          phase = hosted.owned_command([
+              "sudo", "-n", sys.executable, str(pathlib.Path(hosted.__file__)),
+              "control-probe", "--perf", perf, "--out", str(hosted.HOME / "control-probe"),
+          ], "probe-perf-control", 65)
+          if phase["returncode"]:
+              raise SystemExit("Actual supported perf control/owned cleanup failed")
+          protocol = json.loads((hosted.HOME / "control-probe/protocol.json").read_text())
+          if protocol["status"] != "passed" or protocol["supervision"]["status"] != "passed":
+              raise SystemExit("Actual perf protocol/custody receipt failed")
+          print(json.dumps(protocol))
+          PY
+      - name: Verify private-umask jail ownership and enforced API traffic
+        run: |
+          set -euo pipefail
+          umask 077
+          timeout --kill-after=10s 2m \
+            python3 -m unittest discover -s tools/perf -p test_jail_prerequisites.py -v \
+            2>&1 | tee .ci-logs/jail-prerequisites.log
+      - name: Reproduce repeated real PTY completion after exec and backpressure
+        if: matrix.optimize == 'ReleaseSafe'
+        shell: sg kvm -c "bash --noprofile --norc -e -o pipefail {0}"
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p .perf/eventfd-pty/scratch
+          export TMPDIR="$PWD/.perf/eventfd-pty/scratch"
+          timeout --kill-after=10s 5m \
+            bash -c 'cd agent && zig build -Dtarget=x86_64-linux-musl -Doptimize=safe --summary all --color off'
+          timeout --kill-after=10s 5m \
+            bash -c 'cd vmm && zig build eventfd-guest-probe eventfd-tcp-probe -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe --summary all --color off'
+          timeout --kill-after=10s 2m zig cc -target x86_64-linux-musl -O2 \
+            benchmarks/virtio-eventfd/disk_probe.c -o .perf/eventfd-pty/disk-probe
+          python3 - <<'PY'
+          import sys
+          from types import SimpleNamespace
+          sys.path.insert(0, "benchmarks/virtio-eventfd")
+          import matrix
+          matrix.prepare(SimpleNamespace(
+              out=".perf/eventfd-pty/fixture", kernel=".ci/guest/bzImage",
+              agent="agent/zig-out/bin/hearth-agent", native="vmm/zig-out/bin/eventfd-guest-probe",
+              tcp="vmm/zig-out/bin/eventfd-tcp-probe", disk_probe=".perf/eventfd-pty/disk-probe",
+              vsock_only=False, profile_only=False))
+          PY
+          sudo -n unshare --net -- python3 benchmarks/virtio-eventfd/pty_repro.py supervise \
+            --out ".perf/eventfd-pty/C00" --mode C00 --all-devices --closed-pty \
+            --binary "$PWD/vmm/zig-out/bin/flint" --fixture "$PWD/.perf/eventfd-pty/fixture"
+      - name: Retain only source-allowlisted PTY correctness receipts
+        if: always() && matrix.optimize == 'ReleaseSafe'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pty-correctness-${{ github.run_id }}
+          path: .perf/eventfd-pty/pty-proof-*.json
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Trace failed KVM device access
         if: failure()
         working-directory: vmm
         shell: sg kvm -c "bash --noprofile --norc -e -o pipefail {0}"
+        env:
+          OPTIMIZE: ${{ matrix.optimize }}
         run: |
           set -euo pipefail
           if ! command -v strace; then
@@ -272,7 +410,8 @@ jobs:
           timeout --kill-after=30s 2m \
             strace -f -e trace=open,openat,openat2,fork,vfork,clone,clone3,execve,getuid,geteuid,getgid,getegid,setuid,setgid,setresuid,setresgid,setfsuid,setfsgid,setgroups \
               -o ../.ci-logs/kvm-syscalls.log \
-              zig build integration-test -Dtarget=x86_64-linux -Doptimize=safe --summary all --color off \
+              zig build integration-test -Dtarget=x86_64-linux-musl -Doptimize="$OPTIMIZE" \
+                -Dintegration-kernel=../.ci/guest/bzImage --summary all --color off \
               2>&1 | tee ../.ci-logs/kvm-trace-test.log || status=$?
           printf 'Diagnostic integration exit status: %s\n' "$status"
           getfacl -n /dev/kvm
@@ -282,7 +421,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kvm-integration-logs
+          name: kvm-integration-logs-${{ matrix.optimize }}
           path: .ci-logs/
           include-hidden-files: true
           retention-days: 7

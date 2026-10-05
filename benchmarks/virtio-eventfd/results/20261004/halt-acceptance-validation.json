@@ -1,0 +1,221 @@
+{
+  "issue": 3,
+  "date": "2026-10-05",
+  "classification": "actual supported CLI save-on-halt acceptance failures; not inferred from API snapshots",
+  "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+  "actual_halt_cases": 4,
+  "passing_halt_save_cases": 0,
+  "pre_halt_legacy_transport_failure_cases": 1,
+  "cases": [
+    {
+      "status": "failed",
+      "errors": [
+        "TimeoutError: receive timed out: received=0, expected=4, partial_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "mode": "L0",
+      "classification": "actual CLI halt/save acceptance; current corrected L0 is not untouched historical binary",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "guest_agent_poll_ms": 50,
+      "heartbeat_ms": 0,
+      "performance_merge_eligible": false,
+      "actual_guest_halt_serial_marker": false,
+      "halt_snapshot_files_before_cleanup": {
+        "state": null,
+        "memory": null
+      }
+    },
+    {
+      "status": "failed",
+      "errors": [
+        "RuntimeError: actual guest halt did not produce bounded CLI save/exit"
+      ],
+      "mode": "C00",
+      "classification": "actual CLI halt/save acceptance; current corrected L0 is not untouched historical binary",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "guest_agent_poll_ms": 50,
+      "heartbeat_ms": 0,
+      "performance_merge_eligible": false,
+      "initial_agent_disk": {
+        "ping": {
+          "ok": true
+        },
+        "exec": {
+          "ok": true,
+          "exit_code": 0,
+          "stdout": "RVZFTlRGRA==",
+          "stderr": ""
+        },
+        "interactive": {
+          "ok": true,
+          "first_byte_ms": 0.5668329540640116,
+          "stdout": "UFRZ"
+        },
+        "agent_poll_ms": 50
+      },
+      "halt_exit_timeout_seconds": 20,
+      "actual_guest_halt_serial_marker": true,
+      "halt_snapshot_files_before_cleanup": {
+        "state": null,
+        "memory": null
+      }
+    },
+    {
+      "status": "failed",
+      "errors": [
+        "RuntimeError: actual guest halt did not produce bounded CLI save/exit"
+      ],
+      "mode": "C10",
+      "classification": "actual CLI halt/save acceptance; current corrected L0 is not untouched historical binary",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "guest_agent_poll_ms": 50,
+      "heartbeat_ms": 0,
+      "performance_merge_eligible": false,
+      "initial_agent_disk": {
+        "ping": {
+          "ok": true
+        },
+        "exec": {
+          "ok": true,
+          "exit_code": 0,
+          "stdout": "RVZFTlRGRA==",
+          "stderr": ""
+        },
+        "interactive": {
+          "ok": true,
+          "first_byte_ms": 0.47411699779331684,
+          "stdout": "UFRZ"
+        },
+        "agent_poll_ms": 50
+      },
+      "halt_exit_timeout_seconds": 20,
+      "actual_guest_halt_serial_marker": true,
+      "halt_snapshot_files_before_cleanup": {
+        "state": null,
+        "memory": null
+      }
+    },
+    {
+      "status": "failed",
+      "errors": [
+        "RuntimeError: actual guest halt did not produce bounded CLI save/exit"
+      ],
+      "mode": "C01",
+      "classification": "actual CLI halt/save acceptance; current corrected L0 is not untouched historical binary",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "guest_agent_poll_ms": 50,
+      "heartbeat_ms": 0,
+      "performance_merge_eligible": false,
+      "initial_agent_disk": {
+        "ping": {
+          "ok": true
+        },
+        "exec": {
+          "ok": true,
+          "exit_code": 0,
+          "stdout": "RVZFTlRGRA==",
+          "stderr": ""
+        },
+        "interactive": {
+          "ok": true,
+          "first_byte_ms": 0.5509380716830492,
+          "stdout": "UFRZ"
+        },
+        "agent_poll_ms": 50
+      },
+      "halt_exit_timeout_seconds": 20,
+      "actual_guest_halt_serial_marker": true,
+      "halt_snapshot_files_before_cleanup": {
+        "state": null,
+        "memory": null
+      }
+    },
+    {
+      "status": "failed",
+      "errors": [
+        "RuntimeError: actual guest halt did not produce bounded CLI save/exit"
+      ],
+      "mode": "C11",
+      "classification": "actual CLI halt/save acceptance; current corrected L0 is not untouched historical binary",
+      "binary_sha256": "8f1ca382cc9678804cae31cecdfd4fcf7183e68986dd9249680edaae07bd8f6e",
+      "guest_agent_poll_ms": 50,
+      "heartbeat_ms": 0,
+      "performance_merge_eligible": false,
+      "initial_agent_disk": {
+        "ping": {
+          "ok": true
+        },
+        "exec": {
+          "ok": true,
+          "exit_code": 0,
+          "stdout": "RVZFTlRGRA==",
+          "stderr": ""
+        },
+        "interactive": {
+          "ok": true,
+          "first_byte_ms": 0.5394830368459225,
+          "stdout": "UFRZ"
+        },
+        "agent_poll_ms": 50
+      },
+      "halt_exit_timeout_seconds": 20,
+      "actual_guest_halt_serial_marker": true,
+      "halt_snapshot_files_before_cleanup": {
+        "state": null,
+        "memory": null
+      }
+    }
+  ],
+  "cleanup_receipts": [
+    {
+      "mode": "L0",
+      "supervisor_pid": 3026377,
+      "vmm_pid": 3026384,
+      "vmm_start_ticks": 134751476,
+      "supervisor_exit_code": -15
+    },
+    {
+      "mode": "C00",
+      "supervisor_pid": 3026929,
+      "vmm_pid": 3026939,
+      "vmm_start_ticks": 134752074,
+      "supervisor_exit_code": -15
+    },
+    {
+      "mode": "C10",
+      "supervisor_pid": 3027258,
+      "vmm_pid": 3027260,
+      "vmm_start_ticks": 134754174,
+      "supervisor_exit_code": -15
+    },
+    {
+      "mode": "C01",
+      "supervisor_pid": 3028146,
+      "vmm_pid": 3028148,
+      "vmm_start_ticks": 134756292,
+      "supervisor_exit_code": -15
+    },
+    {
+      "mode": "C11",
+      "supervisor_pid": 3028727,
+      "vmm_pid": 3028729,
+      "vmm_start_ticks": 134758384,
+      "supervisor_exit_code": -15
+    }
+  ],
+  "recorded_owned_PID_TID_numbers": 23,
+  "all_recorded_owned_numbers_absent_at_seal": true,
+  "diagnosis_scope": "C00 also fails; no accelerator-specific causation claimed. Kernel-handled HLT is not a userspace KVM_EXIT_HLT save event. Legacy control timed out before halt and is not counted as a halt case.",
+  "remaining_qualification": [
+    "actual CLI save-on-halt",
+    "old/new legacy compatibility",
+    "full active IRQ congestion/storm races",
+    "complete marginal kernel/scheduler CPU",
+    "fresh noise-qualified paired performance and scaling idle comparison"
+  ],
+  "default_changed": false,
+  "performance_adoption_eligible": false,
+  "archive": "halt-acceptance-validation.tar.gz",
+  "archive_sha256": "85b29b2c8cab49eff0b3b866240ed9f185ea91880a04478dca1fd3cd1088bcd5",
+  "archive_bytes": 25859,
+  "verified_files": 45
+}

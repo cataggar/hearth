@@ -1,0 +1,15 @@
+{
+  "date_utc": "2026-10-05T02:20:15Z",
+  "removed_only": "vmm/.zig-cache",
+  "cache_namespace_allocated_bytes_before": 223674368,
+  "filesystem_available_before": 2268516352,
+  "filesystem_available_after": 2484473856,
+  "filesystem_delta_exclusively_attributed": false,
+  "new_immutable_binary_pins_verified_before_and_after": {
+    ".perf/eventfd/w5/ioapic/ReleaseSafe/flint": "d0beacfc752f7fd2917d26c829447252490707a4c578c8f85e340f5bae2f4ea0",
+    ".perf/eventfd/w5/ioapic/Debug/flint": "18b3a12bd3f57a2ea616bb4d7106d48acca013a90a7d319f07f79f8575a6c9a4"
+  },
+  "raw_evidence_or_images_changed": false,
+  "global_or_agent_cache_changed": false,
+  "unowned_resources_changed": false
+}

@@ -1,0 +1,285 @@
+{
+  "issue": 3,
+  "kind": "shared_filter_and_inherited_group_correctness_followup",
+  "date": "2026-10-05",
+  "runtime_build_source_commit": "b8a9b3760dccab303252d7d4949b110abef00fd7",
+  "shared_chain": [
+    "f2f9ab4c8e7a67097f2c3f52636327e9c41d5084",
+    "5ee81b163b266f9c7643fb67c88cb59fe7aa2878",
+    "ced7ed72b5b2f80286e37ba8c9d5eada0cb90236"
+  ],
+  "binary_sha256": {
+    "ReleaseSafe": "4c3bd1bd56cd4c58aa1c581658a473e640a0e759c41057459dd1dd1fd3fad5de",
+    "Debug": "5b9f7201168d1b0b614d3d31d69da6813385c006aeb800999c989146f60dc84d"
+  },
+  "zig_target": "x86_64-linux-musl",
+  "exclusive_lock": "/d/hearth/.perf/fleet/host.lock",
+  "umask": "077",
+  "unit_tests_per_optimization": 39,
+  "dedicated_tests_per_optimization": {
+    "total": 14,
+    "real_enforced_kvm": 13,
+    "policy_unit": 1
+  },
+  "existing_integration_per_optimization": {
+    "total": 7,
+    "real_guest": 5,
+    "cli_errors": 2,
+    "heartbeat": true
+  },
+  "unit_enforced_fork_case": {
+    "successful_filtered_thread_and_readiness_case": 1,
+    "actual_SIGSYS_denials": 11,
+    "new_narrowing_denials": 4
+  },
+  "python_jail_per_optimization": {
+    "total": 4,
+    "actual_enforced_API": 2,
+    "deterministic_PID_cleanup": 2,
+    "deliberate_inherited_root_group_case": 1
+  },
+  "benchmark_python_tests": 17,
+  "skips": 0,
+  "fresh_no_heartbeat_linux_cases": [
+    {
+      "mode": "C00",
+      "kind": "n",
+      "status": "passed",
+      "owned_task_count": 4,
+      "shutdown_exit_code": 0,
+      "checked_messages": 8,
+      "bytes_each_direction": 524288
+    },
+    {
+      "mode": "C00",
+      "kind": "a",
+      "status": "passed",
+      "owned_task_count": 5,
+      "shutdown_exit_code": 0,
+      "unchanged_agent_poll_ms": 50,
+      "pending_write_reconnect": true,
+      "host_disk_marker": "EVENTFD"
+    },
+    {
+      "mode": "C00",
+      "kind": "t",
+      "status": "passed",
+      "owned_task_count": 3,
+      "checked_messages": 18,
+      "post_silence_seconds": 2,
+      "controlled_termination_signal": "SIGTERM",
+      "graceful_shutdown_claimed": false,
+      "operation_window_seconds": 4.776736770058051,
+      "host_noise_control": {
+        "nonidle_including_steal_cpu_seconds": 4.75,
+        "idle_or_iowait_cpu_seconds": 71.58,
+        "steal_cpu_seconds": 0.0,
+        "nonidle_one_core_equivalent_percent": 99.44027122813958,
+        "scope": "aggregate host noise control, not owned backend CPU attribution"
+      }
+    },
+    {
+      "mode": "C10",
+      "kind": "n",
+      "status": "passed",
+      "owned_task_count": 4,
+      "shutdown_exit_code": 0,
+      "checked_messages": 8,
+      "bytes_each_direction": 524288
+    },
+    {
+      "mode": "C10",
+      "kind": "a",
+      "status": "passed",
+      "owned_task_count": 5,
+      "shutdown_exit_code": 0,
+      "unchanged_agent_poll_ms": 50,
+      "pending_write_reconnect": true,
+      "host_disk_marker": "EVENTFD"
+    },
+    {
+      "mode": "C10",
+      "kind": "t",
+      "status": "passed",
+      "owned_task_count": 3,
+      "checked_messages": 18,
+      "post_silence_seconds": 2,
+      "controlled_termination_signal": "SIGTERM",
+      "graceful_shutdown_claimed": false,
+      "operation_window_seconds": 4.774995838990435,
+      "host_noise_control": {
+        "nonidle_including_steal_cpu_seconds": 3.5600000000000023,
+        "idle_or_iowait_cpu_seconds": 72.64,
+        "steal_cpu_seconds": 0.0,
+        "nonidle_one_core_equivalent_percent": 74.55503879041461,
+        "scope": "aggregate host noise control, not owned backend CPU attribution"
+      }
+    },
+    {
+      "mode": "C01",
+      "kind": "n",
+      "status": "passed",
+      "owned_task_count": 4,
+      "shutdown_exit_code": 0,
+      "checked_messages": 8,
+      "bytes_each_direction": 524288
+    },
+    {
+      "mode": "C01",
+      "kind": "a",
+      "status": "passed",
+      "owned_task_count": 5,
+      "shutdown_exit_code": 0,
+      "unchanged_agent_poll_ms": 50,
+      "pending_write_reconnect": true,
+      "host_disk_marker": "EVENTFD"
+    },
+    {
+      "mode": "C01",
+      "kind": "t",
+      "status": "passed",
+      "owned_task_count": 3,
+      "checked_messages": 18,
+      "post_silence_seconds": 2,
+      "controlled_termination_signal": "SIGTERM",
+      "graceful_shutdown_claimed": false,
+      "operation_window_seconds": 4.774852066999301,
+      "host_noise_control": {
+        "nonidle_including_steal_cpu_seconds": 5.939999999999998,
+        "idle_or_iowait_cpu_seconds": 70.33,
+        "steal_cpu_seconds": 0.0,
+        "nonidle_one_core_equivalent_percent": 124.40175981688412,
+        "scope": "aggregate host noise control, not owned backend CPU attribution"
+      }
+    },
+    {
+      "mode": "C11",
+      "kind": "n",
+      "status": "passed",
+      "owned_task_count": 4,
+      "shutdown_exit_code": 0,
+      "checked_messages": 8,
+      "bytes_each_direction": 524288
+    },
+    {
+      "mode": "C11",
+      "kind": "a",
+      "status": "passed",
+      "owned_task_count": 5,
+      "shutdown_exit_code": 0,
+      "unchanged_agent_poll_ms": 50,
+      "pending_write_reconnect": true,
+      "host_disk_marker": "EVENTFD"
+    },
+    {
+      "mode": "C11",
+      "kind": "t",
+      "status": "passed",
+      "owned_task_count": 3,
+      "checked_messages": 18,
+      "post_silence_seconds": 2,
+      "controlled_termination_signal": "SIGTERM",
+      "graceful_shutdown_claimed": false,
+      "operation_window_seconds": 4.776004487881437,
+      "host_noise_control": {
+        "nonidle_including_steal_cpu_seconds": 3.7099999999999937,
+        "idle_or_iowait_cpu_seconds": 72.64,
+        "steal_cpu_seconds": 0.0,
+        "nonidle_one_core_equivalent_percent": 77.67999400783003,
+        "scope": "aggregate host noise control, not owned backend CPU attribution"
+      }
+    }
+  ],
+  "jail_launches": [
+    {
+      "binary_sha256": "4c3bd1bd56cd4c58aa1c581658a473e640a0e759c41057459dd1dd1fd3fad5de",
+      "seeded_root_group": false,
+      "path": ".perf/jail-tests/2541104-1791161798941193158"
+    },
+    {
+      "binary_sha256": "4c3bd1bd56cd4c58aa1c581658a473e640a0e759c41057459dd1dd1fd3fad5de",
+      "seeded_root_group": true,
+      "path": ".perf/jail-tests/2541104-1791161799017255523"
+    },
+    {
+      "binary_sha256": "5b9f7201168d1b0b614d3d31d69da6813385c006aeb800999c989146f60dc84d",
+      "seeded_root_group": false,
+      "path": ".perf/jail-tests/2658834-1791165763020030544"
+    },
+    {
+      "binary_sha256": "5b9f7201168d1b0b614d3d31d69da6813385c006aeb800999c989146f60dc84d",
+      "seeded_root_group": true,
+      "path": ".perf/jail-tests/2658834-1791165763101772878"
+    }
+  ],
+  "recorded_owned_pid_or_tid_count": 64,
+  "all_recorded_owned_pids_absent_at_seal": true,
+  "archive": "shared-filter-validation.tar.gz",
+  "archive_sha256": "3891d581e143d973ceb383442a6340343b49bd54fef2ad9a5870acf5e3ab483a",
+  "archive_bytes": 75467,
+  "archive_verified_files": 136,
+  "logs": {
+    "safe": {
+      "path": ".perf/eventfd/w5/shared-filter/resume-safe.log",
+      "sha256": "249fbf29b9d437c51e1794cfb54f47676f990ab03441b336b45e45b56e501f9c"
+    },
+    "debug": {
+      "path": ".perf/eventfd/w5/shared-filter/resume-debug.log",
+      "sha256": "55d99fe612b36a16f973476f65c84d828fc3e1f4dd170d8ab0f0509a34677731"
+    },
+    "controls": {
+      "path": ".perf/eventfd/w5/shared-filter/resume-safe-controls.log",
+      "sha256": "1379151c4738981750425fcdaf7673a7b2d1978735cc48752d323673998eb380"
+    },
+    "debug_jail": {
+      "path": ".perf/eventfd/w5/shared-filter/resume-debug-jail-final.log",
+      "sha256": "31d9a37cc2d5e4c5d4efb9dcc977a06d6908574895db5d5866aa4690d383e801"
+    }
+  },
+  "subsequent_Debug_jail_lock_refusals": [
+    {
+      "request": "eventfd-resume-debug-jail",
+      "wait_seconds": 480,
+      "exit_code": 1,
+      "tests_executed": 0
+    },
+    {
+      "request": "eventfd-resume-seal",
+      "wait_seconds": 1200,
+      "exit_code": 1,
+      "tests_executed": 0
+    },
+    {
+      "request": "eventfd-resume-seal-2",
+      "wait_seconds": 300,
+      "exit_code": 1,
+      "tests_executed": 0
+    }
+  ],
+  "new_IOAPIC_tests_included_in_these_binary_validation_counts": false,
+  "prior_acquired_attempt_failed_before_test": {
+    "request": "eventfd-ioapic-abi-probe",
+    "reason": "ENOSPC opening redirected Debug jail log",
+    "tests_executed": 0,
+    "IOAPIC_probes_executed": 0
+  },
+  "historical_pending_receipt_superseded_not_overwritten": "shared-filter-pending.json",
+  "historical_build19_pins_changed": false,
+  "performance_samples_collected": 0,
+  "frozen_gates_changed": false,
+  "default_changed": false,
+  "performance_adoption_eligible": false,
+  "current_TAP_host_control_is_independent_idle_or_AA": false,
+  "new_independent_no_owned_VM_host_floor": {
+    "scope": "independent aggregate no-owned-VM host floor; not backend CPU or A/A",
+    "before_first_eight_cpu_fields": "cpu  278701845 0 16649321 1846150289 1633365 0 4817402 0 369197 0",
+    "after_first_eight_cpu_fields": "cpu  278705548 0 16649483 1846154333 1633406 0 4817419 0 369197 0",
+    "seconds": 5.000237981090322,
+    "clock_ticks_per_second": 100,
+    "busy_definition": "user+nice+system+irq+softirq; guest not added again",
+    "busy_cpu_seconds": 38.82,
+    "busy_cores": 7.763630480550676,
+    "iowait_cpu_seconds": 0.41,
+    "steal_cpu_seconds": 0.0
+  }
+}

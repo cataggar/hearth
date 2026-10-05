@@ -45,24 +45,17 @@ const SHUTDOWN_SEND: u32 = 2;
 const CONN_BUF_ALLOC: u32 = 262144; // 256KB
 
 // Maximum simultaneous connections
-const MAX_CONNECTIONS: usize = 64;
+pub const MAX_CONNECTIONS: usize = 64;
 
 // Maximum UDS path length
 const MAX_UDS_PATH: usize = 107; // sun_path max (108) minus null
-
-// Per-connection write buffer for backpressure handling.
-// When the host socket returns EAGAIN, unsent data is stashed here
-// and flushed on the next poll cycle. Without this, data was silently
-// dropped — the guest had no way to know the write failed.
-// 256 bytes per connection × 64 connections = 16KB total (fits on stack).
-// This only needs to buffer one partial write between poll cycles.
-const WRITE_BUF_SIZE: usize = 256;
 
 const Connection = struct {
     state: State = .idle,
     guest_port: u32 = 0,
     host_port: u32 = 0,
     fd: i32 = -1,
+    generation: u64 = 0,
     // Flow control: what the guest can receive
     guest_buf_alloc: u32 = 0,
     guest_fwd_cnt: u32 = 0,
@@ -71,10 +64,11 @@ const Connection = struct {
     // Flow control: our receive buffer tracking
     rx_cnt: u32 = 0,
     // Write buffer for backpressure (data pending write to host socket)
-    write_buf: [WRITE_BUF_SIZE]u8 = undefined,
+    write_buf: []u8 = &.{},
     write_len: u32 = 0,
+    credit_dirty: bool = false,
 
-    const State = enum { idle, established, closing };
+    const State = enum { idle, connecting, established, closing };
 
     fn availableForTx(self: Connection) u32 {
         // How many bytes can we send to the guest
@@ -95,17 +89,19 @@ const Connection = struct {
             self.write_len = 0;
             return true;
         }
-        while (self.write_len > 0) {
-            const rc: isize = @bitCast(linux.write(self.fd, self.write_buf[0..self.write_len].ptr, self.write_len));
+        var budget: u32 = 0;
+        while (self.write_len > 0 and budget < 32) : (budget += 1) {
+            const rc: isize = @bitCast(linux.syscall6(.sendto, @intCast(self.fd), @intFromPtr(self.write_buf.ptr), self.write_len, 0x4000, 0, 0));
             if (rc < 0) {
                 const errno: linux.E = @fromBackingInt(@intCast(@as(u16, @intCast(-rc))));
+                if (errno == .INTR) continue;
                 if (errno == .AGAIN) return false; // still blocked
-                // Real error — drop buffer, connection will be cleaned up
-                self.write_len = 0;
-                return true;
+                self.state = .closing;
+                return false;
             }
             if (rc == 0) return false;
             const written: u32 = @intCast(rc);
+            self.rx_cnt +%= written;
             // Shift remaining data to front of buffer
             if (written < self.write_len) {
                 const remaining = self.write_len - written;
@@ -115,12 +111,12 @@ const Connection = struct {
                 self.write_len = 0;
             }
         }
-        return true;
+        return self.write_len == 0;
     }
 
     /// Stash data in the write buffer. Returns how many bytes were stashed.
     fn stashWrite(self: *Connection, data: []const u8) u32 {
-        const space = WRITE_BUF_SIZE - self.write_len;
+        const space = self.write_buf.len - self.write_len;
         const to_copy = @min(data.len, space);
         if (to_copy == 0) return 0;
         @memcpy(self.write_buf[self.write_len..][0..to_copy], data[0..to_copy]);
@@ -135,6 +131,9 @@ uds_path_len: usize,
 connections: [MAX_CONNECTIONS]Connection = @splat(.{}),
 pending: [MAX_PENDING]PendingPacket = undefined,
 pending_count: usize = 0,
+next_generation: u64 = 0,
+restore_pending: bool = false,
+rx_cursor: usize = 0,
 
 pub fn init(guest_cid: u64, uds_path: [*:0]const u8) !Self {
     if (guest_cid < 3) {
@@ -161,12 +160,17 @@ pub fn init(guest_cid: u64, uds_path: [*:0]const u8) !Self {
 }
 
 pub fn deinit(self: *Self) void {
+    self.pending_count = 0;
+    self.restore_pending = false;
     for (&self.connections) |*conn| {
         if (conn.fd >= 0) {
             _ = linux.close(conn.fd);
             conn.fd = -1;
         }
         conn.state = .idle;
+        if (conn.write_buf.len > 0) std.heap.page_allocator.free(conn.write_buf);
+        conn.write_buf = &.{};
+        conn.write_len = 0;
     }
 }
 
@@ -189,20 +193,37 @@ pub fn readConfig(self: Self, offset: u64, data: []u8) void {
 }
 
 /// Flush pending write buffers on all connections.
-/// Called from the run loop between KVM exits.
+/// Called by the readiness owner, or between exits on the legacy path.
 pub fn flushPendingWrites(self: *Self) void {
     for (&self.connections) |*conn| {
-        if (conn.state != .idle and conn.write_len > 0) {
+        if (conn.state == .closing and self.pending_count + 2 < self.pending.len) {
+            self.queueRst(conn.guest_port, conn.host_port);
+            self.closeConnectionPtr(conn);
+        }
+        if (conn.state == .established and conn.write_len > 0) {
+            const before = conn.rx_cnt;
             _ = conn.flushWriteBuffer();
+            if (conn.state == .closing) {
+                if (self.pending_count + 2 < self.pending.len) {
+                    self.queueRst(conn.guest_port, conn.host_port);
+                    self.closeConnectionPtr(conn);
+                }
+            } else if (conn.rx_cnt != before) {
+                self.queueCredit(conn);
+            }
         }
     }
 }
 
 /// Process TX queue: handle packets from guest to host.
 pub fn processTx(self: *Self, mem: *Memory, queue: *Queue) bool {
+    return self.processTxBudget(mem, queue, queue.size);
+}
+
+pub fn processTxBudget(self: *Self, mem: *Memory, queue: *Queue, budget: u16) bool {
     var did_work = false;
     var processed: u16 = 0;
-    while (processed < queue.size) : (processed += 1) {
+    while (processed < @min(queue.size, budget) and self.pending_count + 2 < self.pending.len) : (processed += 1) {
         const head = queue.popAvail(mem) catch |err| {
             log.err("TX popAvail failed: {}", .{err});
             break;
@@ -219,21 +240,47 @@ pub fn processTx(self: *Self, mem: *Memory, queue: *Queue) bool {
 
 /// Poll for incoming data from host-side sockets and deliver to guest RX queue.
 pub fn pollRx(self: *Self, mem: *Memory, queue: *Queue) bool {
-    if (!queue.isReady()) return false;
+    if (!queue.isReady() or self.pending_count + 2 >= self.pending.len) return false;
 
     var did_work = false;
-    for (&self.connections) |*conn| {
+    const start = self.rx_cursor;
+    for (0..MAX_CONNECTIONS) |offset| {
+        const index = (start + offset) % MAX_CONNECTIONS;
+        const conn = &self.connections[index];
         if (conn.state != .established or conn.fd < 0) continue;
 
         // Try to deliver data from this connection to the guest
         if (self.deliverRxData(mem, queue, conn)) |delivered| {
-            if (delivered) did_work = true;
+            if (delivered) {
+                did_work = true;
+                self.rx_cursor = (index + 1) % MAX_CONNECTIONS;
+            }
         } else |err| {
-            if (err == error.NoBuffers) break; // no more guest RX buffers
+            if (err == error.NoBuffers) {
+                self.rx_cursor = index;
+                break;
+            }
             log.warn("RX delivery failed for port {}: {}", .{ conn.guest_port, err });
         }
     }
     return did_work;
+}
+
+pub fn deliverRestore(self: *Self, mem: *Memory, queue: *Queue) bool {
+    if (!self.restore_pending or !queue.isReady()) return false;
+    const available = queue.popAvail(mem) catch return false;
+    const head = available orelse return false;
+    var descriptors: [16]Queue.Desc = undefined;
+    const count = queue.collectChain(mem, head, &descriptors) catch return false;
+    if (count == 0 or descriptors[0].len < 4 or descriptors[0].flags & virtio.DESC_F_WRITE == 0) {
+        queue.pushUsed(mem, head, 0) catch {};
+        return true;
+    }
+    const payload = mem.slice(@intCast(descriptors[0].addr), 4) catch return false;
+    std.mem.writeInt(u32, payload[0..4], 0, .little); // VIRTIO_VSOCK_EVENT_TRANSPORT_RESET
+    queue.pushUsed(mem, head, 4) catch return false;
+    self.restore_pending = false;
+    return true;
 }
 
 fn handleTxPacket(self: *Self, mem: *Memory, queue: *Queue, head: u16) !void {
@@ -303,7 +350,7 @@ fn handleTxPacket(self: *Self, mem: *Memory, queue: *Queue, head: u16) !void {
             }
         },
         OP_CREDIT_REQUEST => {
-            // Guest wants our credit info; we'll send it in the next RX packet
+            if (self.findConnection(src_port, dst_port)) |conn| self.queueCredit(conn);
         },
         else => {
             log.warn("unknown vsock op: {}", .{op});
@@ -371,12 +418,20 @@ fn handleRequest(self: *Self, guest_port: u32, host_port: u32, buf_alloc: u32, f
         self.queueRst(guest_port, host_port);
         return;
     };
+    const buffer = std.heap.page_allocator.alloc(u8, CONN_BUF_ALLOC) catch {
+        _ = linux.close(fd);
+        self.queueRst(guest_port, host_port);
+        return;
+    };
+    self.next_generation +%= 1;
 
     conn.* = .{
-        .state = .established,
+        .state = if (conn_rc == 0) .established else .connecting,
         .guest_port = guest_port,
         .host_port = host_port,
         .fd = fd,
+        .generation = self.next_generation,
+        .write_buf = buffer,
         .guest_buf_alloc = buf_alloc,
         .guest_fwd_cnt = fwd_cnt,
         .tx_cnt = 0,
@@ -384,7 +439,14 @@ fn handleRequest(self: *Self, guest_port: u32, host_port: u32, buf_alloc: u32, f
     };
 
     // Queue a RESPONSE packet for the RX queue
-    self.queueResponse(guest_port, host_port);
+    if (conn.state == .established) {
+        checkSocket(fd) catch {
+            self.queueRst(guest_port, host_port);
+            self.closeConnectionPtr(conn);
+            return;
+        };
+        self.queueResponse(guest_port, host_port);
+    }
 }
 
 fn handleRw(self: *Self, mem: *Memory, descs: []const Queue.Desc, desc_count: usize, guest_port: u32, host_port: u32, payload_len: u32, buf_alloc: u32, fwd_cnt: u32) void {
@@ -399,74 +461,31 @@ fn handleRw(self: *Self, mem: *Memory, descs: []const Queue.Desc, desc_count: us
 
     if (payload_len == 0 or conn.fd < 0) return;
 
-    // Cap payload_len to actual descriptor data to prevent flow control skew
+    // Buffer capacity is exactly the advertised window. Credit advances only
+    // after bytes actually reach the host, never when they are merely stashed.
     var total_desc_data: u32 = 0;
     for (descs[1..desc_count]) |desc| {
-        total_desc_data += desc.len;
+        total_desc_data = std.math.add(u32, total_desc_data, desc.len) catch return;
     }
-    const effective_payload = @min(payload_len, total_desc_data);
-
-    // Flush any pending write buffer first
-    if (!conn.flushWriteBuffer()) {
-        // Still blocked — stash new data in write buffer
-        for (descs[1..desc_count]) |desc| {
-            const chunk_len = @min(desc.len, effective_payload);
-            if (chunk_len == 0) break;
-            const buf = mem.slice(@intCast(desc.addr), chunk_len) catch return;
-            const stashed = conn.stashWrite(buf[0..chunk_len]);
-            conn.rx_cnt +%= stashed;
-            if (stashed < chunk_len) break; // buffer full, stop
-        }
+    if (payload_len > total_desc_data or payload_len > conn.write_buf.len - conn.write_len) {
+        self.queueRst(guest_port, host_port);
+        self.closeConnectionPtr(conn);
         return;
     }
-
-    // Write payload from data descriptors to host socket
-    var remaining: u32 = effective_payload;
-    var desc_idx: usize = 1; // start after header descriptor
-    while (desc_idx < desc_count) : (desc_idx += 1) {
+    var remaining = payload_len;
+    for (descs[1..desc_count]) |desc| {
         if (remaining == 0) break;
-        const desc = descs[desc_idx];
         const chunk_len = @min(desc.len, remaining);
-        const buf = mem.slice(@intCast(desc.addr), chunk_len) catch {
-            log.err("RW: bad guest address", .{});
-            return;
-        };
-
-        var written: usize = 0;
-        while (written < chunk_len) {
-            const rc: isize = @bitCast(linux.write(conn.fd, buf[written..].ptr, chunk_len - written));
-            if (rc < 0) {
-                const errno: linux.E = @fromBackingInt(@intCast(@as(u16, @intCast(-rc))));
-                if (errno == .AGAIN) {
-                    // Stash unwritten data in buffer instead of dropping it
-                    const unsent = buf[written..chunk_len];
-                    const stashed = conn.stashWrite(unsent);
-                    conn.rx_cnt +%= @intCast(written + stashed);
-                    if (stashed < unsent.len) return; // buffer full
-                    // Stash remaining descriptors starting from the NEXT one
-                    remaining -= chunk_len;
-                    var rem_idx = desc_idx + 1;
-                    while (rem_idx < desc_count) : (rem_idx += 1) {
-                        if (remaining == 0) break;
-                        const rem_desc = descs[rem_idx];
-                        const rem_len = @min(rem_desc.len, remaining);
-                        const rem_buf = mem.slice(@intCast(rem_desc.addr), rem_len) catch break;
-                        const rem_stashed = conn.stashWrite(rem_buf[0..rem_len]);
-                        conn.rx_cnt +%= rem_stashed;
-                        remaining -= rem_stashed;
-                        if (rem_stashed < rem_len) break; // buffer full
-                    }
-                    return;
-                }
-                log.warn("write to host socket failed: {}", .{errno});
-                return;
-            }
-            if (rc == 0) break;
-            written += @intCast(rc);
-        }
-        conn.rx_cnt +%= @intCast(written);
+        const bytes = mem.slice(@intCast(desc.addr), chunk_len) catch return;
+        _ = conn.stashWrite(bytes);
         remaining -= chunk_len;
     }
+    const before = conn.rx_cnt;
+    _ = conn.flushWriteBuffer();
+    if (conn.state == .closing) {
+        self.queueRst(guest_port, host_port);
+        self.closeConnectionPtr(conn);
+    } else if (conn.rx_cnt != before) self.queueCredit(conn);
 }
 
 fn handleShutdown(self: *Self, guest_port: u32, host_port: u32, flags: u32) void {
@@ -556,7 +575,7 @@ fn deliverRxData(self: *Self, mem: *Memory, queue: *Queue, conn: *Connection) !b
         }
 
         if (iov_count == 0) {
-            queue.pushUsed(mem, head, 0) catch |e| log.warn("RX pushUsed failed: {}", .{e});
+            queue.last_avail_idx -%= 1;
             return false;
         }
 
@@ -617,7 +636,26 @@ const PendingPacket = struct {
     host_port: u32,
     op: u16,
 };
-const MAX_PENDING: usize = 64;
+const MAX_PENDING: usize = 128;
+
+fn queueCredit(self: *Self, conn: *Connection) void {
+    conn.credit_dirty = true;
+    for (self.pending[0..self.pending_count]) |packet| {
+        if (packet.op == OP_CREDIT_UPDATE and packet.guest_port == conn.guest_port and packet.host_port == conn.host_port) {
+            conn.credit_dirty = false;
+            return;
+        }
+    }
+    if (self.pending_count < self.pending.len) {
+        self.pending[self.pending_count] = .{
+            .guest_port = conn.guest_port,
+            .host_port = conn.host_port,
+            .op = OP_CREDIT_UPDATE,
+        };
+        self.pending_count += 1;
+        conn.credit_dirty = false;
+    }
+}
 
 fn queueResponse(self: *Self, guest_port: u32, host_port: u32) void {
     if (self.pending_count < self.pending.len) {
@@ -643,10 +681,14 @@ fn queueRst(self: *Self, guest_port: u32, host_port: u32) void {
 
 /// Deliver pending control packets (RESPONSE, RST) to the guest RX queue.
 pub fn deliverPending(self: *Self, mem: *Memory, queue: *Queue) bool {
+    for (&self.connections) |*conn| {
+        if (conn.state == .established and conn.credit_dirty) self.queueCredit(conn);
+    }
     if (!queue.isReady()) return false;
     var did_work = false;
 
-    while (self.pending_count > 0) {
+    var processed: usize = 0;
+    while (self.pending_count > 0 and processed < 32) : (processed += 1) {
         const head = queue.popAvail(mem) catch break orelse break;
 
         var descs: [16]Queue.Desc = undefined;
@@ -660,8 +702,9 @@ pub fn deliverPending(self: *Self, mem: *Memory, queue: *Queue) bool {
             break;
         }
 
+        const pkt = self.pending[0];
         self.pending_count -= 1;
-        const pkt = self.pending[self.pending_count];
+        std.mem.copyForwards(PendingPacket, self.pending[0..self.pending_count], self.pending[1..][0..self.pending_count]);
 
         const hdr_buf = mem.slice(@intCast(descs[0].addr), HDR_SIZE) catch {
             queue.pushUsed(mem, head, 0) catch |e| log.warn("pushUsed failed: {}", .{e});
@@ -729,4 +772,45 @@ fn closeConnectionPtr(_: *Self, conn: *Connection) void {
         conn.fd = -1;
     }
     conn.state = .idle;
+    if (conn.write_buf.len > 0) std.heap.page_allocator.free(conn.write_buf);
+    conn.write_buf = &.{};
+    conn.write_len = 0;
+    conn.credit_dirty = false;
+}
+
+fn checkSocket(fd: i32) !void {
+    var socket_error: i32 = 0;
+    var length: u32 = @sizeOf(i32);
+    const rc: isize = @bitCast(linux.syscall5(.getsockopt, @intCast(fd), 1, 4, @intFromPtr(&socket_error), @intFromPtr(&length)));
+    if (rc < 0 or socket_error != 0 or length != @sizeOf(i32)) return error.HostConnectionFailed;
+}
+
+pub fn readable(self: *Self, index: usize, generation: u64) void {
+    const conn = &self.connections[index];
+    if (conn.generation != generation or conn.state != .connecting or self.pending_count + 2 >= self.pending.len) return;
+    checkSocket(conn.fd) catch {
+        self.queueRst(conn.guest_port, conn.host_port);
+        self.closeConnectionPtr(conn);
+        return;
+    };
+    conn.state = .established;
+    self.queueResponse(conn.guest_port, conn.host_port);
+}
+
+pub const Interest = struct { fd: i32 = -1, generation: u64 = 0, events: u32 = 0 };
+
+pub fn interests(self: *const Self, can_receive: bool) [MAX_CONNECTIONS]Interest {
+    var result: [MAX_CONNECTIONS]Interest = @splat(.{});
+    for (self.connections, 0..) |conn, i| {
+        if (conn.state == .connecting and conn.fd >= 0 and self.pending_count + 2 < self.pending.len) {
+            result[i] = .{ .fd = conn.fd, .generation = conn.generation, .events = linux.EPOLL.OUT };
+            continue;
+        }
+        if (conn.state != .established or conn.fd < 0) continue;
+        var events: u32 = 0;
+        if (can_receive and conn.availableForTx() > 0 and self.pending_count + 2 < self.pending.len) events |= linux.EPOLL.IN;
+        if (conn.write_len > 0) events |= linux.EPOLL.OUT;
+        if (events != 0) result[i] = .{ .fd = conn.fd, .generation = conn.generation, .events = events };
+    }
+    return result;
 }
