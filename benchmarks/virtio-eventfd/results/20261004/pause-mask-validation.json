@@ -1,0 +1,1268 @@
+{
+  "issue": 3,
+  "classification": "staged native correctness and syscall-wall diagnostic, not performance qualification",
+  "base_head": "7efea146094b6674ecaf783ce3c05453cdb5db6f",
+  "rows": {
+    "Debug": {
+      "actual_tests": {
+        "units": 39,
+        "dedicated": 20,
+        "existing_integration": 7,
+        "enforced_common": 3
+      },
+      "post_iret_halt_cases": 16,
+      "dormant_pause_samples": 12,
+      "elf_sha256": "7a8324e969d86f99d8928db9c6c0b21ba4d1e12b0b43fe7275a5f3b80c35dcb6",
+      "pause": {
+        "C00": {
+          "mean_owner_ms": 0.068039,
+          "mean_deassign_ms": 0.0,
+          "ioctl_wall_fraction": 0.0,
+          "samples": [
+            {
+              "sample": 0,
+              "owner_ns": 68334,
+              "deassign_ns": 0,
+              "calls": 0,
+              "events": []
+            },
+            {
+              "sample": 1,
+              "owner_ns": 70532,
+              "deassign_ns": 0,
+              "calls": 0,
+              "events": []
+            },
+            {
+              "sample": 2,
+              "owner_ns": 65251,
+              "deassign_ns": 0,
+              "calls": 0,
+              "events": []
+            }
+          ]
+        },
+        "C10": {
+          "mean_owner_ms": 19.358946666666668,
+          "mean_deassign_ms": 19.108362333333332,
+          "ioctl_wall_fraction": 0.9870558900931936,
+          "samples": [
+            {
+              "sample": 0,
+              "owner_ns": 19374866,
+              "deassign_ns": 19115033,
+              "calls": 9,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 18891107
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 28592
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 21086
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 28252
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 23791
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 28699
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 28444
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 35295
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 29767
+                }
+              ]
+            },
+            {
+              "sample": 1,
+              "owner_ns": 19348899,
+              "deassign_ns": 19103181,
+              "calls": 9,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 18945663
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 22802
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 15983
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 22962
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 17734
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 22902
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 17850
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 21831
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 15454
+                }
+              ]
+            },
+            {
+              "sample": 2,
+              "owner_ns": 19353075,
+              "deassign_ns": 19106873,
+              "calls": 9,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 18884220
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 33577
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 24265
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 32114
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 22837
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 28359
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 31867
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 25925
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 23709
+                }
+              ]
+            }
+          ]
+        },
+        "C01": {
+          "mean_owner_ms": 0.255533,
+          "mean_deassign_ms": 0.13143266666666667,
+          "ioctl_wall_fraction": 0.5143471358559037,
+          "samples": [
+            {
+              "sample": 0,
+              "owner_ns": 301695,
+              "deassign_ns": 166336,
+              "calls": 3,
+              "events": [
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 53227
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 36306
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 76803
+                }
+              ]
+            },
+            {
+              "sample": 1,
+              "owner_ns": 243565,
+              "deassign_ns": 123959,
+              "calls": 3,
+              "events": [
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 52279
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 37877
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 33803
+                }
+              ]
+            },
+            {
+              "sample": 2,
+              "owner_ns": 221339,
+              "deassign_ns": 104003,
+              "calls": 3,
+              "events": [
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 39148
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 25480
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 39375
+                }
+              ]
+            }
+          ]
+        },
+        "C11": {
+          "mean_owner_ms": 19.400479333333333,
+          "mean_deassign_ms": 19.125606,
+          "ioctl_wall_fraction": 0.9858316215485948,
+          "samples": [
+            {
+              "sample": 0,
+              "owner_ns": 19370440,
+              "deassign_ns": 19098409,
+              "calls": 12,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 18797436
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 25973
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 23240
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 30080
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 34670
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 22386
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 21036
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 33422
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 31362
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 28880
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 21981
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 27943
+                }
+              ]
+            },
+            {
+              "sample": 1,
+              "owner_ns": 19440293,
+              "deassign_ns": 19152618,
+              "calls": 12,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 18735581
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 32858
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 25635
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 107887
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 33606
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 23624
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 59863
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 35442
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 30801
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 21374
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 19756
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 26191
+                }
+              ]
+            },
+            {
+              "sample": 2,
+              "owner_ns": 19390705,
+              "deassign_ns": 19125791,
+              "calls": 12,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 18833061
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 32926
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 27028
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 33829
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 30788
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 24472
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 21395
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 29966
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 24458
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 21948
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 21204
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 24716
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "target": "x86_64-linux-musl",
+      "compiler_selection": "existing default, no native override",
+      "test_timing_symbols_absent_from_production": true,
+      "safe_units_execution": "fresh build-run"
+    },
+    "ReleaseSafe": {
+      "actual_tests": {
+        "units": 39,
+        "dedicated": 20,
+        "existing_integration": 7,
+        "enforced_common": 3
+      },
+      "post_iret_halt_cases": 16,
+      "dormant_pause_samples": 12,
+      "elf_sha256": "9bad9c7fd12026f168016967b8878aba707cc9865ee9e05a8c511276d4774d44",
+      "pause": {
+        "C00": {
+          "mean_owner_ms": 0.08348366666666668,
+          "mean_deassign_ms": 0.0,
+          "ioctl_wall_fraction": 0.0,
+          "samples": [
+            {
+              "sample": 0,
+              "owner_ns": 103990,
+              "deassign_ns": 0,
+              "calls": 0,
+              "events": []
+            },
+            {
+              "sample": 1,
+              "owner_ns": 82864,
+              "deassign_ns": 0,
+              "calls": 0,
+              "events": []
+            },
+            {
+              "sample": 2,
+              "owner_ns": 63597,
+              "deassign_ns": 0,
+              "calls": 0,
+              "events": []
+            }
+          ]
+        },
+        "C10": {
+          "mean_owner_ms": 23.116032333333333,
+          "mean_deassign_ms": 22.923816666666667,
+          "ioctl_wall_fraction": 0.9916847465908114,
+          "samples": [
+            {
+              "sample": 0,
+              "owner_ns": 19610999,
+              "deassign_ns": 19441426,
+              "calls": 9,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 19360478
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 8084
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 3873
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 3794
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 3397
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 3155
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 28223
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 16814
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 13608
+                }
+              ]
+            },
+            {
+              "sample": 1,
+              "owner_ns": 29838765,
+              "deassign_ns": 29634376,
+              "calls": 9,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 29452922
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 9766
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 5929
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 36576
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 21549
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 19832
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 32188
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 25895
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 29719
+                }
+              ]
+            },
+            {
+              "sample": 2,
+              "owner_ns": 19898333,
+              "deassign_ns": 19695648,
+              "calls": 9,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 19485879
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 26807
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 21653
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 34452
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 24649
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 23970
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 36507
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 20712
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 21019
+                }
+              ]
+            }
+          ]
+        },
+        "C01": {
+          "mean_owner_ms": 0.18474166666666667,
+          "mean_deassign_ms": 0.07889833333333333,
+          "ioctl_wall_fraction": 0.4270738418512337,
+          "samples": [
+            {
+              "sample": 0,
+              "owner_ns": 187367,
+              "deassign_ns": 81086,
+              "calls": 3,
+              "events": [
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 41028
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 25002
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 15056
+                }
+              ]
+            },
+            {
+              "sample": 1,
+              "owner_ns": 163012,
+              "deassign_ns": 70234,
+              "calls": 3,
+              "events": [
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 32808
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 22466
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 14960
+                }
+              ]
+            },
+            {
+              "sample": 2,
+              "owner_ns": 203846,
+              "deassign_ns": 85375,
+              "calls": 3,
+              "events": [
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 40378
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 19111
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 25886
+                }
+              ]
+            }
+          ]
+        },
+        "C11": {
+          "mean_owner_ms": 23.393697,
+          "mean_deassign_ms": 23.197956333333334,
+          "ioctl_wall_fraction": 0.9916327604539519,
+          "samples": [
+            {
+              "sample": 0,
+              "owner_ns": 20108156,
+              "deassign_ns": 19928072,
+              "calls": 12,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 19725568
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 24233
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 22288
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 28271
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 31568
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 20059
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 21680
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 25077
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 11647
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 4281
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 4216
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 9184
+                }
+              ]
+            },
+            {
+              "sample": 1,
+              "owner_ns": 29971775,
+              "deassign_ns": 29772423,
+              "calls": 12,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 29516722
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 25751
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 24817
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 28810
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 23408
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 35184
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 13889
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 27322
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 20829
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 14298
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 12766
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 28627
+                }
+              ]
+            },
+            {
+              "sample": 2,
+              "owner_ns": 20101160,
+              "deassign_ns": 19893374,
+              "calls": 12,
+              "events": [
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 19575883
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 36855
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 32848,
+                  "ns": 21197
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 5,
+                  "ns": 42171
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 36655
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 24682
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 36944,
+                  "ns": 26500
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 6,
+                  "ns": 28381
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 32806
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 19660
+                },
+                {
+                  "operation": "ioeventfd deassign",
+                  "request": 1077980793,
+                  "identity": 41040,
+                  "ns": 23306
+                },
+                {
+                  "operation": "irqfd deassign",
+                  "request": 1075883638,
+                  "identity": 7,
+                  "ns": 25278
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "target": "x86_64-linux-musl",
+      "compiler_selection": "existing default, no native override",
+      "test_timing_symbols_absent_from_production": true,
+      "safe_units_execution": "explicit retained artifact, not cached runner count"
+    }
+  },
+  "runtime_semantics_changed": false,
+  "kernel_barriers_or_deassignment_removed": false,
+  "root_call_chain": "owners.pause -> sequential Owner.pause/control -> refresh(false) -> removeKick -> KVM_IOEVENTFD DEASSIGN; IRQFD also synchronously deassigned/drained",
+  "kernel_internal_rcu_or_scheduler_cause_proven": false,
+  "minimal_safe_pause_optimization_adopted": false,
+  "not_a_linux_workload": "three dormant vsock devices, nine ready disjoint empty rings, three GSIs; probe does not run guest instructions",
+  "wall_not_cpu": "time inside ioctl includes kernel/scheduling/wait, not marginal kernel CPU",
+  "failures_retained": [
+    "initial project-mutex compile error",
+    "two Safe SIGSYS31 from unneeded getpid logging",
+    "3GiB guard blocked Debug before execution"
+  ],
+  "failure_fix": "remove getpid logging; seccomp unchanged, no audit bypass",
+  "source_capture_limit": "initial Debug compile/first-pass diff overwritten; raw logs and executed ELF remain, final source diffs captured",
+  "helper_census_limit": "final native fork children and post-IRET TIDs recorded; compiler/inspection/initial Debug helper creation census incomplete",
+  "recorded_owned_numbers": 107,
+  "all_recorded_number_paths_absent": true,
+  "executed_test_elfs_retained": [
+    {
+      "path": "/d/hearth/.perf/worktrees/virtio-eventfd/.perf/eventfd/cache/local-current/o/ef98f91d784fc557580ca27c5e2447a5/test",
+      "sha256": "8a1ff49677b3a29fac4d571f0763e6a21a20f14e9241a0dff66db053fa3e35b5"
+    },
+    {
+      "path": "/d/hearth/.perf/worktrees/virtio-eventfd/.perf/eventfd/cache/local-current/o/d35fc24853c4e34c4a0c55ade5dcdf52/test",
+      "sha256": "43a9fbfc2f060070aa139f283f035a4681fb6466af8c813749501610df8d1b25"
+    },
+    {
+      "path": "/d/hearth/.perf/worktrees/virtio-eventfd/.perf/eventfd/cache/local-current/o/e7a1c3df6a8571df4bb6b16e5e8ae8b4/test",
+      "sha256": "687754e10f7926b73e26eb500f8ebedffdf7700e228367684547be5ce7bd8820"
+    },
+    {
+      "path": "/d/hearth/.perf/worktrees/virtio-eventfd/.perf/eventfd/cache/local-current/o/239085af8fc26f10ed1a9dfbfa555ec2/test",
+      "sha256": "2f5c2fac1c02a5df354fa67d655fb7aed06ca4cf2ebb36ebb275c232b89b6786"
+    },
+    {
+      "path": "/d/hearth/.perf/worktrees/virtio-eventfd/.perf/eventfd/cache/local-current/o/6511989f4a6d73a22577cdbd5382548f/test",
+      "sha256": "8d916a6e23b9b3fd97e90e057ebe07a399396948319a65d95dffde0d4fa7503e"
+    }
+  ],
+  "owned_derived_objects_cleanup": {
+    "scope": "eight explicitly named own derived Safe compiler intermediates only",
+    "raw_logs_source_abi_dependencies_and_all_executed_elfs_preserved": true,
+    "frozen_runtime_images_or_performance_inputs_removed": false,
+    "global_or_unowned_cache_modified": false,
+    "records": [
+      {
+        "removed_path": ".perf/eventfd/cache/local-current/o/f2be8032c6f00cfb6368198b045838bb/test_zcu.o",
+        "bytes": 7210528,
+        "allocated_bytes": 7213056,
+        "removed_sha256": "ce75dc460884b8101e47f22a040a9578e46d29408910233b35a964b3b63d4935",
+        "retained_executable": ".perf/eventfd/cache/local-current/o/f2be8032c6f00cfb6368198b045838bb/test",
+        "retained_sha256": "df5ef442dd7dab951a68c9d9f3208e2f887b951fc5d64ec2b160414ddcdc0217"
+      },
+      {
+        "removed_path": ".perf/eventfd/cache/local-current/o/a68ff18fdf724ffd0fb4ce037cd77c3b/test_zcu.o",
+        "bytes": 6770704,
+        "allocated_bytes": 6774784,
+        "removed_sha256": "9c3a4f6383d2ade6c03444a7d6cef399a8298f427f5b8f8caebdcb4645a8b35b",
+        "retained_executable": ".perf/eventfd/cache/local-current/o/a68ff18fdf724ffd0fb4ce037cd77c3b/test",
+        "retained_sha256": "ffe4fe8e6fe42f891e3eeb24f3100b6fd7f562c2b5dc67beda55e7016deddb37"
+      },
+      {
+        "removed_path": ".perf/eventfd/cache/local-current/o/6511989f4a6d73a22577cdbd5382548f/test_zcu.o",
+        "bytes": 7209488,
+        "allocated_bytes": 7213056,
+        "removed_sha256": "547c8978b920625c25c8e4bae1153532ff165101783947867ce9d86ea7b289cb",
+        "retained_executable": ".perf/eventfd/cache/local-current/o/6511989f4a6d73a22577cdbd5382548f/test",
+        "retained_sha256": "8d916a6e23b9b3fd97e90e057ebe07a399396948319a65d95dffde0d4fa7503e"
+      },
+      {
+        "removed_path": ".perf/eventfd/cache/local-bare/o/cbe530a3bb83e4e8c56e61eaee0beaaf/test_zcu.o",
+        "bytes": 6253696,
+        "allocated_bytes": 6254592,
+        "removed_sha256": "af7c7e3c9d7ddf7ba9bc67cdff0f2cf08043cbdb506529ef22cf1d5c8c2adf54",
+        "retained_executable": ".perf/eventfd/cache/local-bare/o/cbe530a3bb83e4e8c56e61eaee0beaaf/test",
+        "retained_sha256": "2c7ceb2a7f5feeef67d93684880b8e46536e8c0dfd70575b808608fbb4079d9a"
+      },
+      {
+        "removed_path": ".perf/eventfd/cache/local-current/o/7a6d35d5098fe5941990231cfbedacb6/test_zcu.o",
+        "bytes": 6770760,
+        "allocated_bytes": 6774784,
+        "removed_sha256": "abf2ceed1caac9238e95d32a8aa325713c89b0c76883563e9f3a56720f57ec5e",
+        "retained_executable": ".perf/eventfd/cache/local-current/o/7a6d35d5098fe5941990231cfbedacb6/test",
+        "retained_sha256": "d5ec0eb08d94ea9575398f832dcca954857051b0f488704692be6a1c723c8efa"
+      },
+      {
+        "removed_path": ".perf/eventfd/cache/local-current/o/d9b4adf5d2033e00315b6f95442ad9ec/test_zcu.o",
+        "bytes": 7100136,
+        "allocated_bytes": 7102464,
+        "removed_sha256": "a53d2c2cbe2bdc441c839f98c898c51fba4b17d7b5ddd54118e69ef5ec26a047",
+        "retained_executable": ".perf/eventfd/cache/local-current/o/d9b4adf5d2033e00315b6f95442ad9ec/test",
+        "retained_sha256": "c2bfa43dd608b114c7498299a36d2e50dea0b8aedc5e75ce38c1074613cfbb2d"
+      },
+      {
+        "removed_path": ".perf/eventfd/cache/local-current/o/239085af8fc26f10ed1a9dfbfa555ec2/test_zcu.o",
+        "bytes": 6258384,
+        "allocated_bytes": 6258688,
+        "removed_sha256": "11b4cd23e6fe1bc6a461639b5a8d0cec4ec1a73176edc6fc9e6bffd4a6f6727b",
+        "retained_executable": ".perf/eventfd/cache/local-current/o/239085af8fc26f10ed1a9dfbfa555ec2/test",
+        "retained_sha256": "2f5c2fac1c02a5df354fa67d655fb7aed06ca4cf2ebb36ebb275c232b89b6786"
+      },
+      {
+        "removed_path": ".perf/eventfd/cache/local-current/o/6dafb36784604721ff7fe18a134ed6d5/flint_zcu.o",
+        "bytes": 9601448,
+        "allocated_bytes": 9605120,
+        "removed_sha256": "34fe388ed3d02a88d8208dfa87bcb4e598be8d8a70364ec40cef5d00595bd2db",
+        "retained_executable": ".perf/eventfd/cache/local-current/o/6dafb36784604721ff7fe18a134ed6d5/flint",
+        "retained_sha256": "9bad9c7fd12026f168016967b8878aba707cc9865ee9e05a8c511276d4774d44"
+      }
+    ],
+    "removed_allocated_bytes": 57196544,
+    "free_bytes_after": 3235201024,
+    "capacity_change_attribution": "only named allocated bytes claimed, no attribution of other filesystem changes"
+  },
+  "new_candidate_samples": 0,
+  "performance_merge_eligible": false,
+  "old_linux_pause_regression_noise_halt_save_compatibility_full_congestion_gaps_unclosed": true,
+  "archive": "pause-mask-validation.tar.gz",
+  "archive_sha256": "850ce8c4f07b4d3f221522ab2e262be21c02f313809ab8191f8df7c78eda1974",
+  "archive_bytes": 170350,
+  "verified_files": 58
+}

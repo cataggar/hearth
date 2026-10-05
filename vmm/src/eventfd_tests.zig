@@ -67,6 +67,7 @@ fn isolated(comptime scenario: fn () anyerror!void) !void {
     }
     var status: i32 = 0;
     const waited: isize = @bitCast(linux.wait4(@intCast(pid), &status, 0, null));
+    std.debug.print("enforced_case child_pid={} waited={} status={}\n", .{ pid, waited, status });
     try std.testing.expectEqual(pid, waited);
     try std.testing.expectEqual(@as(i32, 0), status);
 }
@@ -353,7 +354,136 @@ const IrqOptions = struct {
     masked: bool = false,
     reset_pending: bool = false,
     ioapic: bool = false,
+    post_iret: bool = false,
 };
+
+test "real KVM dormant queue pause attributes deassignment without dropping fences" {
+    try isolated(struct {
+        var mutex: @import("sync.zig").Mutex = .{};
+        var elapsed: u64 = 0;
+        var count: usize = 0;
+
+        fn now() !u64 {
+            var stamp: linux.timespec = undefined;
+            if (linux.clock_gettime(.MONOTONIC, &stamp) != 0) return error.ClockFailed;
+            return @as(u64, @intCast(stamp.sec)) * 1_000_000_000 + @as(u64, @intCast(stamp.nsec));
+        }
+
+        fn observe(event: Accelerator.TestIoctlTiming) void {
+            mutex.lock();
+            defer mutex.unlock();
+            elapsed += event.elapsed_ns;
+            count += 1;
+            std.debug.print("pause_ioctl operation={s} request=0x{x} identity=0x{x} ns={}\n", .{
+                event.operation, event.request, event.identity, event.elapsed_ns,
+            });
+        }
+
+        fn run() !void {
+            for ([_]Owner.Mode{ .C00, .C10, .C01, .C11 }) |mode| {
+                for (0..3) |sample| {
+                    var fixture = try Fixture.init(&.{ 0xfa, 0xf4 });
+                    defer fixture.deinit();
+                    var devices: [virtio.MAX_DEVICES]?Device = @splat(null);
+                    for (0..3) |index| {
+                        devices[index] = try Device.initVsock(0x8000 + index * 0x1000, @intCast(5 + index), @intCast(43 + index), "/unused-owned-fixture");
+                        const device = &devices[index].?;
+                        device.status = virtio.STATUS_DRIVER_OK;
+                        for (&device.queues, 0..) |*queue, queue_index| {
+                            const ring = 0x200 + (index * 3 + queue_index) * 0x100;
+                            queue.size = 8;
+                            queue.desc_addr = ring;
+                            queue.avail_addr = ring + 0x80;
+                            queue.used_addr = ring + 0xa0;
+                            queue.ready = true;
+                        }
+                    }
+                    defer for (devices[0..3]) |*device| device.*.?.deinit();
+                    var owners: Owner.Set = .{};
+                    try owners.start(&devices, 3, &fixture.vm, &fixture.mem, mode);
+                    defer owners.stop();
+                    elapsed = 0;
+                    count = 0;
+                    Accelerator.test_ioctl_observer = &observe;
+                    defer Accelerator.test_ioctl_observer = null;
+                    const started = try now();
+                    try owners.pause();
+                    const total = try now() - started;
+                    Accelerator.test_ioctl_observer = null;
+                    const expected: usize = (if (mode == .C10 or mode == .C11) @as(usize, 9) else 0) +
+                        (if (mode == .C01 or mode == .C11) @as(usize, 3) else 0);
+                    try std.testing.expectEqual(expected, count);
+                    try std.testing.expect(elapsed <= total);
+                    for (owners.owners[0..owners.count]) |*owner| {
+                        try std.testing.expect(!owner.irq.assigned);
+                        for (owner.kicks) |kick| try std.testing.expectEqual(@as(i32, -1), kick.fd);
+                    }
+                    std.debug.print("pause_diagnostic mode={s} sample={} queues=9 gsis=3 owner_ns={} deassign_ns={} calls={}\n", .{
+                        @tagName(mode), sample, total, elapsed, count,
+                    });
+                    try owners.unpause();
+                    try owners.finish();
+                }
+            }
+        }
+    }.run);
+}
+
+fn expectKvmHalt(tid: i32) !void {
+    try expectSleeping(tid);
+    var path: [96]u8 = undefined;
+    const name = try std.fmt.bufPrint(path[0 .. path.len - 1], "/proc/self/task/{}/wchan", .{tid});
+    path[name.len] = 0;
+    const opened: isize = @bitCast(linux.open(@ptrCast(&path), .{ .ACCMODE = .RDONLY, .CLOEXEC = true }, 0));
+    if (opened < 0) return error.KernelWaitUnavailable;
+    defer abi.close(@intCast(opened));
+    var data: [128]u8 = undefined;
+    const length: isize = @bitCast(linux.read(@intCast(opened), &data, data.len));
+    if (length <= 0) return error.KernelWaitUnavailable;
+    try std.testing.expect(std.mem.indexOf(u8, data[0..@intCast(length)], "kvm_vcpu_block") != null);
+}
+
+fn afterIret(fixture: *Fixture, irq: *Accelerator.Irq, options: IrqOptions, expected_index: u16) !void {
+    for (0..2) |round| {
+        @atomicStore(u8, &fixture.vcpu.kvm_run.immediate_exit, 0, .release);
+        var returning = Run{ .vcpu = &fixture.vcpu };
+        const thread = try std.Thread.spawn(.{}, Run.entry, .{&returning});
+        var joined = false;
+        defer if (!joined) {
+            @atomicStore(u8, &fixture.vcpu.kvm_run.immediate_exit, 1, .release);
+            const tid = returning.tid.load(.acquire);
+            if (tid > 0) _ = linux.tkill(tid, linux.SIG.USR1);
+            thread.join();
+        };
+        _ = linux.nanosleep(&.{ .sec = 0, .nsec = 200_000_000 }, null);
+        if (!returning.done.load(.acquire)) {
+            try expectKvmHalt(returning.tid.load(.acquire));
+            try std.testing.expectEqual(@as(u16, @intCast(round + 1)), std.mem.readInt(u16, fixture.mem.mem[0x700..][0..2], .little));
+            try std.testing.expect(!try irqPending(&fixture.vm, options.ioapic));
+            std.debug.print("post_iret halted tid={} irqs={} ioapic={} irqfd={} reset={}\n", .{
+                returning.tid.load(.acquire), round + 1, options.ioapic, options.accelerated, options.reset_pending,
+            });
+            return;
+        }
+        thread.join();
+        joined = true;
+        const count = std.mem.readInt(u16, fixture.mem.mem[0x700..][0..2], .little);
+        std.debug.print("post_iret queued IRQ: ioapic={} irqfd={} level={} eoi_first={} round={} count={} exit={}\n", .{
+            options.ioapic, options.accelerated, options.level, options.eoi_first, round, count, returning.exit,
+        });
+        // One level IRQ may already be in LAPIC/PIC before transport ACK.
+        try std.testing.expect(options.level and options.eoi_first and round == 0);
+        try std.testing.expect(!returning.failed);
+        try std.testing.expectEqual(@as(u16, 2), count);
+        try std.testing.expectEqual(@as(u32, c.KVM_EXIT_MMIO), returning.exit);
+        try std.testing.expectEqual(@as(u64, 0x8064), fixture.vcpu.getMmioData().phys_addr);
+        try std.testing.expectEqual(expected_index, std.mem.readInt(u16, fixture.mem.mem[0x704..][0..2], .little));
+        try irq.reconcile(true, 0);
+        try std.testing.expectEqual(@as(u32, c.KVM_EXIT_IO), try fixture.vcpu.run());
+        if (options.accelerated) try irq.resampled(true, 0);
+    }
+    return error.StaleInterruptStorm;
+}
 
 fn irqPending(vm: *Vm, ioapic: bool) !bool {
     const chip = try vm.getIrqChip(if (ioapic) c.KVM_IRQCHIP_IOAPIC else c.KVM_IRQCHIP_PIC_MASTER);
@@ -514,7 +644,34 @@ fn irqScenario(options: IrqOptions) !void {
     if (level and options.accelerated) try irq.resampled(true, 0);
     try std.testing.expect(!try irqPending(&fixture.vm, options.ioapic));
     try std.testing.expectEqual(@as(u16, 1), std.mem.readInt(u16, fixture.mem.mem[0x700..][0..2], .little));
+    if (options.post_iret) try afterIret(&fixture, &irq, options, expected_index);
     try irq.quiesce();
+}
+
+test "real KVM line and irqfd return through IRET to timer-free HLT without stale storms" {
+    try isolated(struct {
+        fn run() !void {
+            for ([_]bool{ false, true }) |ioapic| {
+                for ([_]bool{ false, true }) |accelerated| {
+                    for ([_]bool{ false, true }) |level|
+                        try irqScenario(.{ .accelerated = accelerated, .level = level, .ioapic = ioapic, .eoi_first = true, .post_iret = true });
+                }
+            }
+        }
+    }.run);
+}
+
+test "real KVM masked level reset remains quiet after IRET for both interrupt chips" {
+    try isolated(struct {
+        fn run() !void {
+            for ([_]bool{ false, true }) |ioapic| {
+                for ([_]bool{ false, true }) |accelerated| {
+                    for ([_]bool{ false, true }) |reset_pending|
+                        try irqScenario(.{ .accelerated = accelerated, .level = true, .ioapic = ioapic, .masked = true, .reset_pending = reset_pending, .eoi_first = true, .post_iret = true });
+                }
+            }
+        }
+    }.run);
 }
 
 test "real KVM IOAPIC edge and level routes deliver with both PICs masked" {

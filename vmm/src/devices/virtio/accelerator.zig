@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const linux = std.os.linux;
 const abi = @import("../../kvm/abi.zig");
 const c = abi.c;
@@ -6,6 +7,21 @@ const Vm = @import("../../kvm/vm.zig");
 
 const log = std.log.scoped(.virtio_accelerator);
 pub const EVENT_FLAGS: u32 = 0x80800;
+
+pub const TestIoctlTiming = struct {
+    operation: []const u8,
+    request: u32,
+    identity: u64,
+    elapsed_ns: u64,
+};
+
+pub var test_ioctl_observer: ?*const fn (TestIoctlTiming) void = null;
+
+fn monotonic() u64 {
+    var stamp: linux.timespec = undefined;
+    if (linux.clock_gettime(.MONOTONIC, &stamp) != 0) return 0;
+    return @as(u64, @intCast(stamp.sec)) * 1_000_000_000 + @as(u64, @intCast(stamp.nsec));
+}
 
 pub fn eventfd() !i32 {
     const rc: isize = @bitCast(linux.syscall2(.eventfd2, 0, EVENT_FLAGS));
@@ -37,6 +53,12 @@ pub fn drain(fd: i32) !void {
 }
 
 fn ioctl(vm: *const Vm, request: u32, argument: usize, operation: []const u8, identity: u64) !void {
+    const started = if (builtin.is_test and test_ioctl_observer != null) monotonic() else 0;
+    defer if (builtin.is_test) {
+        if (test_ioctl_observer) |observe| {
+            observe(.{ .operation = operation, .request = request, .identity = identity, .elapsed_ns = monotonic() - started });
+        }
+    };
     while (true) {
         const rc: isize = @bitCast(linux.ioctl(vm.fd, request, argument));
         if (rc == -@as(isize, @backingInt(linux.E.INTR))) continue;

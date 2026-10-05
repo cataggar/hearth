@@ -4,6 +4,34 @@
 
 **Date**: 2026-10-04
 
+### Parent-directed pause attribution and post-IRET acceptance
+
+Investigate the published exploratory pause regressions without changing
+quiescence or numeric gates. Add test-build-only ioctl timing and a bounded,
+actual KVM dormant-queue pause diagnostic to separate synchronous deassignment
+from owner admission/acknowledgement. It is mechanism evidence, not a Linux
+workload performance result. Extend native IRQ checks through actual IRET and
+return to timer-free HLT, including masked/reset epochs and bounded extra
+level EOI-before-ACK delivery. Preserve all callback synchronization, true
+deassertion, counter drainage, generations and owners-before-memory teardown.
+No production shortcut will be adopted absent a demonstrated safe cause.
+Frozen reviewer trees remain untouched; new results get distinct identities.
+
+Executed: Debug/Safe each66 actual Zig+3 real standalone cases pass, including
+explicit Safe39-unit execution after the build runner cached that artifact.
+Thirty-two native post-IRET cases reach verified KVM HLT across edge/level,
+PIC/IOAPIC, direct/IRQFD and masked/reset epochs. One architecturally queued
+level IOAPIC EOI-before-ACK delivery is handled; repeated stale delivery fails.
+The nine-queue dormant diagnostic attributes98.58–99.17% C10/C11 pause wall
+to synchronous deassignment ioctl intervals. Exact host-kernel internals are
+not proven; no barrier removal, runtime shortcut or performance win adopted.
+Initial compile/SIGSYS logging failures and pre-execution capacity stop are
+retained. Eight named owned derivative objects were removed only after
+preserving/hashing associated ELFs;3GiB guard unchanged. New58-file seal,
+107 recorded IDs absent and current limitations are in the result report.
+Full active congestion, Linux pause regression and all other adoption gaps
+remain open; qualification/plan stay blocked/active.
+
 ### Canonical prerequisite convergence — 2026-10-05
 
 Reused prerequisite-only `7dfee42` as `85e6f3b` with `-x`; no sibling

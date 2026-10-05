@@ -17,6 +17,106 @@ CPU reductions, not qualified speedups; ioeventfd modes also had severe pause
 regressions. Fresh post-cleanup qualification is separately reported below.
 Legacy remains the default; PR #9 remains draft without auto-merge.
 
+## Staged post-IRET/mask/reset acceptance and pause attribution
+
+The parent's frozen `6c218b0` review trees were not accessed or modified.
+This continuation starts from owned publication `7efea14`, retains every
+synchronous deassignment/drain/generation barrier, and changes no production
+runtime semantics. Test-build-only ioctl timing is compile-time disabled in
+the production path; both production ELF symbol inventories also exclude
+the observer and its monotonic helper. No new runtime switch or syscall
+permission was introduced.
+
+**Debug and ReleaseSafe each pass66 actual Zig tests +3 actual enforced
+standalone cases**:39 units,20 dedicated (19 real enforced KVM, one policy),
+seven existing integrations (five guests, two CLI/errors), and three default-L0
+jailed API/CLI/disk/identity cases. Safe's cached39-unit artifact was explicitly
+executed separately; cached runner counts are not claimed as new executions.
+The unchanged combined Python suite also passes20/20, with its log retained
+privately.
+
+Two new dedicated cases each exercise eight native scenarios: line/IRQFD,
+PIC/IOAPIC, edge/level and masked/reset epochs. **32 post-IRET scenarios**
+across both optimization rows actually execute IRET and reach verified
+`kvm_vcpu_block`, without guest PIT/heartbeat stimulation. A level IOAPIC
+EOI-before-transport-ACK can already queue one additional interrupt: the
+fixture handles it, verifies the used index, acknowledges/deasserts again,
+and requires genuine HLT with no third delivery. Both direct-line and IRQFD
+routes exhibit this architectural case; it is not an IRQFD-only defect.
+These bounded cases extend earlier ISR-exit-only checks but do **not** claim
+complete active congestion/ACK/EOI stress or legacy snapshot compatibility.
+
+### Pause source attribution, not an optimization
+
+A separate actual KVM diagnostic uses three dormant vsock devices, nine ready
+disjoint empty rings and three GSIs; it does not run guest instructions.
+Three samples/mode/optimization capture owner-pause wall time and each
+synchronous registration ioctl. There is no Linux disk/TAP/vsock workload,
+matched A/A qualification, kernel-stack attribution or marginal CPU claim.
+
+| Row | Mode | Mean owner pause ms | Mean deassignment-call wall ms | Fraction |
+|---|---|---:|---:|---:|
+| Debug | C00 | 0.068039 | 0 | 0% |
+| Debug | C10 | 19.358947 | 19.108362 | 98.706% |
+| Debug | C01 | 0.255533 | 0.131433 | 51.435% |
+| Debug | C11 | 19.400479 | 19.125606 | 98.583% |
+| Safe | C00 | 0.083484 | 0 | 0% |
+| Safe | C10 | 23.116032 | 22.923817 | 99.168% |
+| Safe | C01 | 0.184742 | 0.078898 | 42.707% |
+| Safe | C11 | 23.393697 | 23.197956 | 99.163% |
+
+Each C10 pause contains nine IOEVENTFD DEASSIGN calls; C01 three IRQFD
+DEASSIGN calls; C11 all twelve. All queue registrations are absent and IRQ
+sources synchronously detached/drained before acknowledgement, and resume
+recreates them. The precise source chain is `Set.pause` → sequential
+`Owner.pause/control` → `refresh(false)` → `removeKick` →
+`KVM_IOEVENTFD(DEASSIGN)`, plus IRQFD deassignment/drain. The large C10/C11
+cost lies inside those IOEVENTFD ioctl wall intervals, not primarily in
+mailbox acknowledgement. Wall time includes kernel waiting/scheduling;
+the exact host-kernel RCU/lock/scheduler mechanism was **not** traced/proven.
+
+No safe minimal speedup is adopted: retaining registrations, omitting
+callback synchronization, draining counters early or acknowledging pause
+before owners complete would change the required contract. A different
+retention/batching design needs separate proof and acceptance, not a quick
+gate workaround. These nine-queue diagnostics cannot be compared as a
+before/after improvement to historical six-queue Linux pause20.52/29.56ms
+or C00 .298ms. Those exploratory regressions remain unacceptable; no
+accelerator gain is credited to C00 reliability work.
+
+### Failures, capacity and persistence
+
+Initial test compilation used an obsolete mutex API; its failure is retained.
+The first Safe run passed64/66 but the two new cases were killed by SIGSYS31
+after an unnecessary `getpid` logging call inside enforcement. Removing that
+logging call—not expanding seccomp or bypassing audit—makes the final cases
+pass. The initial compile/first-Debug source diff was overwritten; raw logs
+and executed ELF remain, and both final source diffs are captured. No failed
+run is counted as passing.
+
+A subsequent Debug phase stopped before execution at the unchanged3GiB
+storage guard. Under the fleet lock, only eight explicitly named owned
+`*_zcu.o` intermediates were removed, reclaiming57,196,544 allocated bytes
+after hashing and preserving every associated executed ELF, source, ABI,
+dependency, image and log. No global/unowned cache or frozen performance
+input was removed, and no unrelated capacity change is attributed to this.
+The guard then passed and full Debug validation actually ran.
+
+[Receipt](pause-mask-validation.json) and
+[58-file selected evidence](pause-mask-validation.tar.gz), SHA256
+`850ce8c4f07b4d3f221522ab2e262be21c02f313809ab8191f8df7c78eda1974`,
+retain raw successes/failures, final source diffs, syscall intervals,
+symbol inventories, isolated common cases and exact-owned cleanup.
+**107 recorded owned PID/TID number paths are absent**. Final native
+children were waited and post-IRET threads joined; short compiler/inspection
+helpers and initial Debug creation census remain incomplete, explicitly.
+Images/ELFs/caches stay private; original L0 and all old row pins remain.
+
+Qualification is still **BLOCKED**: zero new candidate samples; unchanged
+failed-noise/paired inference, expensive Linux pause, actual halt-save0/4,
+old/new compatibility, full active IRQ congestion and marginal kernel CPU
+gaps. No merge, auto-merge or default adoption is recommended.
+
 ## Canonical jail prerequisite convergence — 2026-10-05
 
 Reused only canonical correctness commit

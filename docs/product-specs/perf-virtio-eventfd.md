@@ -20,6 +20,22 @@ blocked. New ELF identities and raw evidence are separate from older epochs.
 
 ## Goal
 
+Pause-regression investigation must attribute actual synchronous kernel
+deassignment separately from owner/vCPU fences. Test-only timing must not
+become a production hot-path cost or substitute for matched Linux performance.
+IRQ acceptance must include actual IRET followed by timer-free HLT, not stop at
+an ISR's userspace exit; one already queued level EOI-before-ACK interrupt may
+be handled, but repeated stale delivery or failure to sleep is a failure.
+Masks/resets must retain generation and callback-drain barriers.
+
+The executed stage now passes Debug/Safe66+3 each and32 native post-IRET
+KVM-HLT cases, including bounded queued level interrupts and masked/reset
+epochs. The separate nine-queue diagnostic places98.58–99.17% of C10/C11
+pause wall inside synchronous deassignment calls; this is not kernel CPU
+or Linux workload performance. All barriers remain; no safe minimal runtime
+shortcut or gain is adopted. Earlier Linux pause regressions, failed noise,
+halt-save0/4, legacy compatibility and full active congestion remain blockers.
+
 Determine whether `KVM_IOEVENTFD` queue kicks and `KVM_IRQFD` completion
 interrupts improve Flint on nested Azure KVM. Test each independently and then
 together. Registration alone is not success: queues and host-originated I/O
