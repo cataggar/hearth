@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  attestations: read
 
 jobs:
   typecheck:
@@ -61,7 +62,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends build-essential libc6-dev linux-libc-dev
       - name: Install Zig via ghr
-        uses: cataggar/ghr/actions/install@v0.6.1
+        uses: cataggar/ghr/actions/install@v0.9.1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -109,7 +110,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends build-essential libc6-dev
       - name: Install Zig via ghr
-        uses: cataggar/ghr/actions/install@v0.6.1
+        uses: cataggar/ghr/actions/install@v0.9.1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -212,7 +213,7 @@ jobs:
           (cd .ci/guest/initrd && printf 'init\n' | bsdcpio -o -H newc) | gzip > .ci/guest/initrd.cpio.gz
           gzip -dc .ci/guest/initrd.cpio.gz | bsdcpio -t | grep -Fx init
       - name: Install Zig via ghr
-        uses: cataggar/ghr/actions/install@v0.6.1
+        uses: cataggar/ghr/actions/install@v0.9.1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
